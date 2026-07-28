@@ -24,6 +24,8 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
     [MaxLength(200)]
     public string OriginalFileName { get; set; }
 
+    // TODO: add a lowercase version of the original file name for searching
+
     [MaxLength(256)]
     public string HashSha3 { get; set; }
 
@@ -31,6 +33,7 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
 
     public bool IsDeleted { get; set; }
 
+    // TODO: remove this as DualView won't use it
     /// <summary>
     ///   When set to on, won't be deleted automatically from job results when the jobs expire
     /// </summary>
