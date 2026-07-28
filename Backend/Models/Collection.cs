@@ -9,12 +9,13 @@ namespace Backend.Models;
 /// <summary>
 ///   A collection of media
 /// </summary>
-// [Index(nameof(NameLowerCase), IsUnique = true)]
-public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>
+[Index(nameof(NameLowerCase), IsUnique = true)]
+public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDelete
 {
     public Collection(string name, long folderId)
     {
         Name = name;
+        NameLowerCase = name.ToLowerInvariant();
         FolderId = folderId;
     }
 
@@ -22,14 +23,31 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>
     public long Id { get; set; }
 
     [MaxLength(200)]
-    public string Name { get; set; }
+    public string Name
+    {
+        get;
+        set
+        {
+            field = value;
+            NameLowerCase = value.ToLowerInvariant();
+        }
+    }
 
-    // TODO: add an all lowercase name property and a unique index for it (should do the same for folders to make searching easier)
+    [MaxLength(200)]
+    public string NameLowerCase { get; set; }
+
+    public long? PreviewMediaId { get; set; }
+
+    public DateTime? LastViewed { get; set; }
+
+    public bool IsDeleted { get; set; }
 
     public long FolderId { get; set; }
     public MediaFolder Folder { get; set; } = null!;
 
     public ICollection<CollectionItem> Items { get; set; } = new List<CollectionItem>();
+
+    public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
 
     public CollectionDTO GetDTO()
     {

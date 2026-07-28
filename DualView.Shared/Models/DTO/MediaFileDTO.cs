@@ -33,6 +33,9 @@ public class MediaFileDTO(string originalFileName, string hashSha3) : IMediaFile
     public int CropRight { get; set; }
     public int CropBottom { get; set; }
 
+    public bool IsFavorited { get; set; }
+    public int Stars { get; set; }
+
     public long? ParentMediaId { get; set; }
 }
 
@@ -69,6 +72,9 @@ public interface IMediaFile
     public int CropTop { get; set; }
     public int CropRight { get; set; }
     public int CropBottom { get; set; }
+
+    public bool IsFavorited { get; set; }
+    public int Stars { get; set; }
 
     public long? ParentMediaId { get; set; }
 }

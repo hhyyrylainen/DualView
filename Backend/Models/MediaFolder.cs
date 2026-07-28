@@ -7,15 +7,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
 
-[Index(nameof(ParentId), nameof(Name), IsUnique = true)]
+[Index(nameof(ParentId), nameof(NameLowerCase), IsUnique = true)]
 public class MediaFolder : UpdateableModel, IDTOProvider<MediaFolderDTO>,
-    IInfoProvider<MediaFolderInfo>
+    IInfoProvider<MediaFolderInfo>, ISoftDelete
 {
     public const long UncategorizedFolderId = 1;
 
     public MediaFolder(string name, long? parentId)
     {
         Name = name;
+        NameLowerCase = name.ToLowerInvariant();
         ParentId = parentId;
     }
 
@@ -23,9 +24,20 @@ public class MediaFolder : UpdateableModel, IDTOProvider<MediaFolderDTO>,
     public long Id { get; set; }
 
     [MaxLength(200)]
-    public string Name { get; set; }
+    public string Name
+    {
+        get;
+        set
+        {
+            field = value;
+            NameLowerCase = value.ToLowerInvariant();
+        }
+    }
 
-    // TODO: add a lowercase name that is uniquely indexed within the parent folder(s)
+    [MaxLength(200)]
+    public string NameLowerCase { get; set; }
+
+    public bool IsDeleted { get; set; }
 
     public long? ParentId { get; set; }
 

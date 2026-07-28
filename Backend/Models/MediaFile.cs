@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using Backend.Utilities;
@@ -10,11 +11,12 @@ namespace Backend.Models;
 ///   Concrete stored media file
 /// </summary>
 [Index(nameof(HashSha3), IsUnique = true)]
-public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
+public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile, ISoftDelete
 {
     public MediaFile(string originalFileName, string hashSha3)
     {
         OriginalFileName = originalFileName;
+        NameLowerCase = originalFileName.ToLowerInvariant();
         HashSha3 = hashSha3;
     }
 
@@ -22,14 +24,25 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
     public long Id { get; set; }
 
     [MaxLength(200)]
-    public string OriginalFileName { get; set; }
+    public string OriginalFileName
+    {
+        get;
+        set
+        {
+            field = value;
+            NameLowerCase = value.ToLowerInvariant();
+        }
+    }
 
-    // TODO: add a lowercase version of the original file name for searching
+    [MaxLength(200)]
+    public string NameLowerCase { get; set; }
 
     [MaxLength(256)]
     public string HashSha3 { get; set; }
 
     public DateTime ImportedAt { get; set; } = DateTime.UtcNow;
+
+    public DateTime? LastViewed { get; set; }
 
     public bool IsDeleted { get; set; }
 
@@ -56,6 +69,12 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
     public int CropRight { get; set; }
     public int CropBottom { get; set; }
 
+    // Rating properties
+    public bool IsFavorited { get; set; }
+
+    [Range(-1, 5)]
+    public int Stars { get; set; } = -1;
+
     public long? ParentMediaId { get; set; }
 
     public MediaFile? ParentMedia { get; set; }
@@ -63,6 +82,11 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
     public ICollection<MediaFile> Children { get; set; } = new List<MediaFile>();
 
     public ICollection<CollectionItem> InCollections { get; set; } = new List<CollectionItem>();
+
+    public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
+
+    // TODO: make this mandatory as all files should have info where they came from even if it has to have blank fields
+    public MediaImportInfo? ImportInfo { get; set; }
 
     public string PathRelativeToStorage()
     {
@@ -92,6 +116,8 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
             CropTop = CropTop,
             CropRight = CropRight,
             CropBottom = CropBottom,
+            IsFavorited = IsFavorited,
+            Stars = Stars,
             ParentMediaId = ParentMediaId,
         };
     }
