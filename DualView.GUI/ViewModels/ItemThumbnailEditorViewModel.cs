@@ -70,7 +70,7 @@ public class ItemThumbnailEditorViewModel : ViewModelBase, IDisposable
             {
                 if (EditedItem.Thumbnail != currentlyShownThumbnail)
                 {
-                    currentlyShownThumbnail = EditedItem.Thumbnail;
+                    currentlyShownThumbnail = EditedItem.Thumbnail != null ? new ConfiguredMediaDTO(EditedItem.Thumbnail) : null;
                     RefreshShownThumbnail();
                 }
             }
@@ -166,7 +166,7 @@ public class ItemThumbnailEditorViewModel : ViewModelBase, IDisposable
                             OnEdited?.Invoke();
 
                             // Refresh our view
-                            currentlyShownThumbnail = EditedItem.Thumbnail;
+                            currentlyShownThumbnail = new ConfiguredMediaDTO(thumbnail);
                             RefreshShownThumbnail();
                         });
                     }

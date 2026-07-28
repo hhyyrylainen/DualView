@@ -387,28 +387,11 @@ public class MaintenanceService : IMaintenanceService
         protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
             IDatabaseService databaseService, IServiceScope scope, CancellationToken cancellationToken)
         {
-            var cutoff = DateTime.UtcNow - TimeSpan.FromHours(24);
-
             var dataFolderService = scope.ServiceProvider.GetRequiredService<IDataFolderService>();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<PurgeDeletedMedia>>();
             var storage = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
 
-            // 1. Purge old deleted ConfiguredMedia
-            var configsToPurge = await databaseService.GetOldDeletedConfigsAsync(cutoff);
-            int configsPurged = 0;
-
-            foreach (var config in configsToPurge)
-            {
-                if (cancellationToken.IsCancellationRequested)
-                    break;
-
-                // Thumbnails and generated file clearing are on a different job, so we don't need to do it here
-
-                await databaseService.PurgeConfiguredMediaAsync(config);
-                configsPurged++;
-            }
-
-            // 2. Purge MediaFiles with no configurations
+            // Purge MediaFiles that are deleted and not marked keep
             var filesToPurge = await databaseService.GetEligibleMediaFilesForPurgeAsync();
             int filesPurged = 0;
 
@@ -418,6 +401,8 @@ public class MaintenanceService : IMaintenanceService
                     break;
 
                 var path = Path.Join(storage, mediaFile.PathRelativeToStorage());
+                var croppedPath = Path.Join(storage, mediaFile.CroppedPathRelativeToStorage());
+
                 if (File.Exists(path))
                 {
                     try
@@ -429,17 +414,24 @@ public class MaintenanceService : IMaintenanceService
                         logger.LogWarning(e, "Failed to delete physical media file {Path}", path);
                     }
                 }
-                else
+
+                if (File.Exists(croppedPath))
                 {
-                    // All media should have valid paths until deleted from the database, so this is an error
-                    logger.LogError("Media file {Path} does not exist when purging it", path);
+                    try
+                    {
+                        File.Delete(croppedPath);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogWarning(e, "Failed to delete physical cropped media file {Path}", croppedPath);
+                    }
                 }
 
                 await databaseService.PurgeMediaFileAsync(mediaFile);
                 filesPurged++;
             }
 
-            jobRecord.StatusMessage = $"Purged {configsPurged} configs and {filesPurged} media files";
+            jobRecord.StatusMessage = $"Purged {filesPurged} media files";
             return true;
         }
     }

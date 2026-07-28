@@ -23,26 +23,25 @@ public class MediaFolderController : Controller
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<MediaStorageFolderInfo>>> GetAllFolders(long? parentFolderId = null)
+    public async Task<ActionResult<List<MediaFolderInfo>>> GetAllFolders(long? parentFolderId = null)
     {
-        var media = await databaseService.GetMediaFoldersAsync(parentFolderId);
-
-        return media.ConvertToInfo<MediaStorageFolder, MediaStorageFolderInfo>();
+        var folders = await databaseService.GetMediaFoldersAsync(parentFolderId);
+        return folders.Select(f => f.GetInfo()).ToList();
     }
 
-    [HttpGet("folder/full/{folderId:long}")]
-    public async Task<ActionResult<List<ConfiguredMediaDTO>>> GetFullMediaList([Required] long folderId)
+    [HttpGet("{folderId:long}/collections")]
+    public async Task<ActionResult<Tuple<List<CollectionDTO>, int>>> GetFolderCollections([Required] long folderId,
+        [Required] int page, int pageSize = 100)
     {
-        return (await databaseService.GetMediaInFolderAsync(folderId))
-            .ConvertToDTO<ConfiguredMedia, ConfiguredMediaDTO>();
+        return await databaseService.GetFolderCollections(folderId, page, pageSize);
     }
 
-    [HttpGet("folder/{folderId:long}")]
-    public async Task<ActionResult<Tuple<List<ConfiguredMediaInfo>, int>>> GetMediaPaged([Required] long folderId,
+    [HttpGet("collection/{collectionId:long}/contents")]
+    public async Task<ActionResult<Tuple<List<MediaFileDTO>, int>>> GetCollectionContents([Required] long collectionId,
         [Required] int page, int pageSize = 100, FolderSortColumn sortColumn = FolderSortColumn.DateCreated,
         SortDirection sortDirection = SortDirection.Descending)
     {
-        return await databaseService.GetMediaFolderContents(folderId, page, pageSize, sortColumn, sortDirection);
+        return await databaseService.GetCollectionContents(collectionId, page, pageSize, sortColumn, sortDirection);
     }
 
     [HttpPost]
@@ -55,6 +54,8 @@ public class MediaFolderController : Controller
 
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("Name is empty");
+
+        // TODO: add an all-lowercase name to make searching easier
 
         if (request.ParentFolderId != null)
         {
@@ -73,8 +74,19 @@ public class MediaFolderController : Controller
         return Ok(id.ToString());
     }
 
+    // TODO: should split out a separate collections controller
+    [HttpPost("{folderId:long}/collections")]
+    public async Task<IActionResult> CreateCollection([Required] long folderId, [FromBody] [Required] string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest("Name is missing");
+
+        var id = await databaseService.CreateCollection(name, folderId);
+        return Ok(id.ToString());
+    }
+
     [HttpGet("atPath")]
-    public async Task<ActionResult<MediaStorageFolderDTO?>> GetByPath(string path)
+    public async Task<ActionResult<MediaFolderDTO?>> GetByPath(string path)
     {
         var media = await databaseService.GetMediaFolderFromPathAsync(path);
 
@@ -85,7 +97,7 @@ public class MediaFolderController : Controller
     }
 
     [HttpGet("{id:long}")]
-    public async Task<ActionResult<MediaStorageFolderDTO?>> GetById([Required] long id)
+    public async Task<ActionResult<MediaFolderDTO?>> GetById([Required] long id)
     {
         var folder = await databaseService.GetMediaFolderAsync(id);
 
@@ -95,27 +107,19 @@ public class MediaFolderController : Controller
         return folder.GetDTO();
     }
 
-    [HttpPost("addMediaToFolder")]
-    public async Task<IActionResult> AddMediaToFolder([Required] string folderPath,
-        [Required] long mediaConfigurationId, bool canCreateRootFolder = false)
+    [HttpPost("collection/{collectionId:long}/addMedia")]
+    public async Task<IActionResult> AddMediaToCollection([Required] long collectionId,
+        [Required] long mediaId, [Required] int sequenceNumber)
     {
-        if (string.IsNullOrWhiteSpace(folderPath))
-            return BadRequest("Path is missing");
-
-        await databaseService.AddMediaToFolder(mediaConfigurationId, folderPath, canCreateRootFolder);
-
+        await databaseService.AddMediaToCollection(mediaId, collectionId, sequenceNumber);
         return Ok();
     }
 
-    [HttpPost("removeMediaFromFolder")]
-    public async Task<IActionResult> RemoveMediaFromFolder([Required] string folderPath,
-        [Required] long mediaConfigurationId)
+    [HttpPost("collection/{collectionId:long}/removeMedia")]
+    public async Task<IActionResult> RemoveMediaFromCollection([Required] long collectionId,
+        [Required] long mediaId)
     {
-        if (string.IsNullOrWhiteSpace(folderPath))
-            return BadRequest("Path is missing");
-
-        await databaseService.RemoveMediaFromFolder(mediaConfigurationId, folderPath);
-
+        await databaseService.RemoveMediaFromCollection(mediaId, collectionId);
         return Ok();
     }
 }

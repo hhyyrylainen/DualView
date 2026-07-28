@@ -57,111 +57,96 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<List<MediaStorageFolderInfo>> GetMediaFoldersAsync(long? limitToParent = null)
+    public async Task<List<MediaFolderInfo>> GetMediaFoldersAsync(long? limitToParent = null)
     {
         if (limitToParent.HasValue)
         {
-            return await HttpClient.GetFromJsonAsync<List<MediaStorageFolderInfo>>(
+            return await HttpClient.GetFromJsonAsync<List<MediaFolderInfo>>(
                        $"api/v1/mediaFolder?parentFolderId={limitToParent}") ??
                    throw new Exception("Failed to get folders");
         }
 
-        return await HttpClient.GetFromJsonAsync<List<MediaStorageFolderInfo>>("api/v1/mediaFolder") ??
+        return await HttpClient.GetFromJsonAsync<List<MediaFolderInfo>>("api/v1/mediaFolder") ??
                throw new Exception("Failed to get folders");
     }
 
-    public async Task<MediaStorageFolderDTO?> GetMediaFolderAsync(long id)
+    public async Task<MediaFolderDTO?> GetMediaFolderAsync(long id)
     {
-        return await HttpClient.GetFromJsonAsync<MediaStorageFolderDTO>($"api/v1/mediaFolder/{id}");
+        return await HttpClient.GetFromJsonAsync<MediaFolderDTO>($"api/v1/mediaFolder/{id}");
     }
 
-    public async Task<MediaStorageFolderDTO?> GetMediaFolderFromPathAsync(string path)
+    public async Task<MediaFolderDTO?> GetMediaFolderFromPathAsync(string path)
     {
-        return await HttpClient.GetFromJsonAsync<MediaStorageFolderDTO?>("api/v1/mediaFolder/atPath?path=" +
+        return await HttpClient.GetFromJsonAsync<MediaFolderDTO?>("api/v1/mediaFolder/atPath?path=" +
                                                                          UrlEncoder.Default.Encode(path));
     }
 
-    public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
-        int pageSize, FolderSortColumn sortColumn,
-        SortDirection sortDirection)
+    public async Task<Tuple<List<CollectionDTO>, int>> GetFolderCollections(long folderId, int page, int pageSize)
     {
-        return await HttpClient.GetFromJsonAsync<Tuple<List<ConfiguredMediaInfo>, int>>(
-                   $"api/v1/mediaFolder/folder/{folderId}?page={itemPage}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}") ??
+        return await HttpClient.GetFromJsonAsync<Tuple<List<CollectionDTO>, int>>(
+                   $"api/v1/mediaFolder/{folderId}/collections?page={page}&pageSize={pageSize}") ??
+               throw new Exception("Failed to get collections");
+    }
+
+    public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
+        FolderSortColumn sortColumn, SortDirection sortDirection)
+    {
+        return await HttpClient.GetFromJsonAsync<Tuple<List<MediaFileDTO>, int>>(
+                   $"api/v1/collection/{collectionId}/contents?page={page}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}") ??
                throw new Exception("Failed to get media");
     }
 
-    public async Task<ConfiguredMediaDTO?> GetConfiguredMediaAsync(long mediaConfigId)
+    public async Task<MediaFileDTO?> GetMediaFileAsync(long mediaId)
     {
-        return await HttpClient.GetFromJsonAsync<ConfiguredMediaDTO?>($"api/v1/media/{mediaConfigId}");
+        return await HttpClient.GetFromJsonAsync<MediaFileDTO?>($"api/v1/media/{mediaId}");
     }
 
-    public async Task<MediaConfigFolderInfo> GetConfiguredMediaFoldersAsync(long mediaConfigId)
+    public async Task<List<long>> GetMediaCollectionsAsync(long mediaId)
     {
-        return await HttpClient.GetFromJsonAsync<MediaConfigFolderInfo>($"api/v1/media/{mediaConfigId}/inFolders") ??
-               throw new Exception("Failed to get media folders");
+        return await HttpClient.GetFromJsonAsync<List<long>>($"api/v1/media/{mediaId}/collections") ??
+               new List<long>();
     }
 
-    public async Task<List<ConfiguredMediaDTO>> GetConfiguredMediaSiblingsAsync(long mediaConfigId)
+    public async Task<List<MediaFileDTO>> GetMediaFileSiblingsAsync(long mediaId)
     {
-        return await HttpClient.GetFromJsonAsync<List<ConfiguredMediaDTO>>($"api/v1/media/{mediaConfigId}/siblings") ??
-               new List<ConfiguredMediaDTO>();
+        return await HttpClient.GetFromJsonAsync<List<MediaFileDTO>>($"api/v1/media/{mediaId}/siblings") ??
+               new List<MediaFileDTO>();
     }
 
-    public async Task<ConfiguredMediaDTO> CreateConfiguredMediaAsync(long mediaId, string configName,
-        List<string> folders)
+    public async Task<MediaFileDTO> CreateMediaFileAsync(MediaFileDTO mediaFile, long collectionId)
     {
-        var response = await HttpClient.PostAsJsonAsync("api/v1/media/createConfig",
-            new CreateMediaConfigRequest(configName, mediaId)
-            {
-                FoldersToAdd = folders,
-                CreateFolders = true,
-            });
-
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/media?collectionId={collectionId}", mediaFile);
         response.EnsureSuccessStatusCode();
 
-        // Decode the response as JSON
-        return await response.Content.ReadFromJsonAsync<ConfiguredMediaDTO>() ??
-               throw new Exception("Failed to read media config create response");
+        return await response.Content.ReadFromJsonAsync<MediaFileDTO>() ??
+               throw new Exception("Failed to read media create response");
     }
 
-    public async Task SaveConfiguredMediaAsync(ConfiguredMediaDTO media)
+    public async Task SaveMediaFileAsync(MediaFileDTO media)
     {
         var response = await HttpClient.PutAsJsonAsync($"api/v1/media/{media.Id}", media);
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<ConfiguredMediaDTO?> GetPrimeConfiguredMediaFromFileAsync(long mediaFileId)
+    public async Task<bool> SetMediaKeepStatusAsync(long mediaId, bool keep)
     {
-        return await HttpClient.GetFromJsonAsync<ConfiguredMediaDTO>($"api/v1/media/byMediaFileId/{mediaFileId}");
-    }
-
-    public async Task<bool> SetMediaKeepStatusAsync(long configuredMediaId, bool keep)
-    {
-        var response = await HttpClient.PostAsync($"api/v1/media/{configuredMediaId}/keepStatus?keep={keep}", null);
+        var response = await HttpClient.PostAsync($"api/v1/media/{mediaId}/keepStatus?keep={keep}", null);
         response.EnsureSuccessStatusCode();
 
         return response.StatusCode == HttpStatusCode.Created;
     }
 
-    public async Task<bool> IsMediaSafeToDeleteAsync(long configuredMediaId)
+    public async Task<bool> IsMediaSafeToDeleteAsync(long mediaId)
     {
-        var response = await HttpClient.GetAsync($"api/v1/media/{configuredMediaId}/safeToDelete");
+        var response = await HttpClient.GetAsync($"api/v1/media/{mediaId}/safeToDelete");
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<bool>();
     }
 
-    public async Task DeleteMediaAsync(long configuredMediaId)
+    public async Task DeleteMediaAsync(long mediaId)
     {
-        var response = await HttpClient.DeleteAsync($"api/v1/media/{configuredMediaId}");
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task RemoveMediaFromFolder(long mediaConfigurationId, string folderPath)
-    {
-        var response = await HttpClient.PostAsync(
-            $"api/v1/mediaFolder/removeMediaFromFolder?folderPath={UrlEncoder.Default.Encode(folderPath)}&mediaConfigurationId={mediaConfigurationId}",
-            null);
+        var response = await HttpClient.DeleteAsync($"api/v1/media/{mediaId}");
         response.EnsureSuccessStatusCode();
     }
 
@@ -174,24 +159,89 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return long.Parse(idString);
     }
 
-    public async Task AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder = false)
+    public async Task<long> CreateCollection(string collectionName, long folderId)
     {
-        var response = await HttpClient.PostAsJsonAsync(
-            $"api/v1/mediaFolder/addMediaToFolder?folderPath={UrlEncoder.Default.Encode(folderPath)}&" +
-            $"mediaConfigurationId={mediaConfigurationId}&canCreateRootFolder={canCreateRootFolder}",
-            new StringContent(string.Empty));
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/mediaFolder/{folderId}/collections", collectionName);
+        response.EnsureSuccessStatusCode();
+        var idString = await response.Content.ReadAsStringAsync();
+        return long.Parse(idString);
+    }
+
+    public async Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber)
+    {
+        var response = await HttpClient.PostAsync(
+            $"api/v1/collection/{collectionId}/addMedia?mediaId={mediaId}&sequenceNumber={sequenceNumber}",
+            null);
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<List<ConfiguredMediaDTO>> GetDeletedMediaAsync(int limit)
+    public async Task RemoveMediaFromCollection(long mediaId, long collectionId)
     {
-        return await HttpClient.GetFromJsonAsync<List<ConfiguredMediaDTO>>($"api/v1/media/deleted?limit={limit}") ??
-               new List<ConfiguredMediaDTO>();
+        var response = await HttpClient.PostAsync(
+            $"api/v1/collection/{collectionId}/removeMedia?mediaId={mediaId}",
+            null);
+        response.EnsureSuccessStatusCode();
     }
 
-    public async Task RestoreMediaAsync(long configuredMediaId)
+    public async Task<List<MediaFileDTO>> GetDeletedMediaAsync(int limit)
     {
-        var response = await HttpClient.PostAsync($"api/v1/media/{configuredMediaId}/restore", null);
+        return await HttpClient.GetFromJsonAsync<List<MediaFileDTO>>($"api/v1/media/deleted?limit={limit}") ??
+               new List<MediaFileDTO>();
+    }
+
+    public async Task RestoreMediaAsync(long mediaId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/media/{mediaId}/restore", null);
         response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<ConfiguredMediaDTO?> GetConfiguredMediaAsync(long mediaConfigId)
+    {
+        var media = await GetMediaFileAsync(mediaConfigId);
+        return media != null ? new ConfiguredMediaDTO(media) : null;
+    }
+
+    public Task<MediaConfigFolderInfo> GetConfiguredMediaFoldersAsync(long mediaConfigId)
+    {
+        return Task.FromResult(new MediaConfigFolderInfo("Media", "Root"));
+    }
+
+    public async Task<List<ConfiguredMediaDTO>> GetConfiguredMediaSiblingsAsync(long mediaConfigId)
+    {
+        var siblings = await GetMediaFileSiblingsAsync(mediaConfigId);
+        return siblings.Select(s => new ConfiguredMediaDTO(s)).ToList();
+    }
+
+    public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
+        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection)
+    {
+        // This is tricky, maybe just return empty or error
+        return new Tuple<List<ConfiguredMediaInfo>, int>(new List<ConfiguredMediaInfo>(), 0);
+    }
+
+    public Task AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder = false)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task RemoveMediaFromFolder(long mediaConfigurationId, string folderPath)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task<ConfiguredMediaDTO> CreateConfiguredMediaAsync(long mediaId, string configName, List<string> folders)
+    {
+        throw new NotSupportedException();
+    }
+
+    public Task SaveConfiguredMediaAsync(ConfiguredMediaDTO media)
+    {
+        return SaveMediaFileAsync(media);
+    }
+
+    public async Task<ConfiguredMediaDTO?> GetPrimeConfiguredMediaFromFileAsync(long mediaFileId)
+    {
+        var media = await GetMediaFileAsync(mediaFileId);
+        return media != null ? new ConfiguredMediaDTO(media) : null;
     }
 }

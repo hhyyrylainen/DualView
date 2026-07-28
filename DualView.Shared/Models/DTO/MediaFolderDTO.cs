@@ -2,13 +2,13 @@ using System.ComponentModel.DataAnnotations;
 
 namespace DualView.Shared.Models.DTO;
 
-public class MediaStorageFolderDTO(string name) : MediaStorageFolderInfo(name)
+public class MediaFolderDTO(string name) : MediaFolderInfo(name)
 {
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
 
-public class MediaStorageFolderInfo(string name) : IFolderInfo
+public class MediaFolderInfo(string name) : IFolderInfo
 {
     public long Id { get; set; }
 

@@ -87,107 +87,64 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<long> CreateMediaFolder(string folderName, long? parentId)
     {
-        var folder = new MediaStorageFolder(folderName.TrimOrThrowIfEmpty(), parentId);
+        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty(), parentId);
 
-        await dbContext.MediaStorageFolders.AddAsync(folder);
+        await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
         return folder.Id;
     }
 
-    public async Task AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder = false)
+    public async Task<long> CreateCollection(string collectionName, long folderId)
     {
-        var media = await dbContext.ConfiguredMedia.FirstOrDefaultAsync(m =>
-            m.Id == mediaConfigurationId && !m.IsDeleted);
+        var collection = new Collection(collectionName.TrimOrThrowIfEmpty(), folderId);
 
-        if (media == null)
-            throw new ArgumentException("Media not found");
+        await dbContext.Collections.AddAsync(collection);
+        await SaveAsync();
+        // TODO: notify
+        return collection.Id;
+    }
 
-        // Then parse the folder
-        var target = await MediaStorageFolder.GetOrCreateAtPath(folderPath, this, true, canCreateRootFolder);
-
-        if (target == null)
-            throw new ArgumentException("Cannot find / create folder at path " + folderPath);
-
-        // Check for duplicate WITHOUT loading the collection
-        bool alreadyExists =
-            await dbContext.ConfiguredMedia.AnyAsync(m => m.Id == mediaConfigurationId && m.InFolders.Contains(target));
+    public async Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber)
+    {
+        var alreadyExists = await dbContext.Set<CollectionItem>().AnyAsync(ci =>
+            ci.CollectionId == collectionId && ci.MediaFileId == mediaId);
 
         if (alreadyExists)
-        {
-            // Do nothing as it is already there
             return;
-        }
 
-        target.ContainedItems.Add(media);
+        var item = new CollectionItem
+        {
+            CollectionId = collectionId,
+            MediaFileId = mediaId,
+            SequenceNumber = sequenceNumber
+        };
+
+        await dbContext.Set<CollectionItem>().AddAsync(item);
         await SaveAsync();
-        await updateNotifier.NotifyMediaFolderContentsUpdated(target.Id);
     }
 
-    public async Task RemoveMediaFromFolder(long mediaConfigurationId, string folderPath)
+    public async Task RemoveMediaFromCollection(long mediaId, long collectionId)
     {
-        var media = await dbContext.ConfiguredMedia.FirstOrDefaultAsync(m =>
-            m.Id == mediaConfigurationId && !m.IsDeleted);
+        var item = await dbContext.Set<CollectionItem>().FirstOrDefaultAsync(ci =>
+            ci.CollectionId == collectionId && ci.MediaFileId == mediaId);
 
-        if (media == null)
-            throw new ArgumentException("Media not found");
-
-        // Resolve folder by path (do not create)
-        var target = await GetMediaFolderFromPathAsync(folderPath);
-        if (target == null)
-            throw new ArgumentException("Cannot find folder at path " + folderPath);
-
-        // Load relation if needed
-        var exists = await dbContext.MediaStorageFolders
-            .Where(f => f.Id == target.Id)
-            .AnyAsync(f => f.ContainedItems.Contains(media));
-
-        if (!exists)
-        {
-            // Nothing to do
+        if (item == null)
             return;
-        }
 
-        // Attach and remove
-        await dbContext.Entry(target).Collection(f => f.ContainedItems).LoadAsync();
-        target.ContainedItems.Remove(media);
+        dbContext.Set<CollectionItem>().Remove(item);
         await SaveAsync();
-        await updateNotifier.NotifyMediaFolderContentsUpdated(target.Id);
     }
 
-    public async Task<MediaConfigFolderInfo> GetConfiguredMediaFoldersAsync(long mediaConfigId)
+    public async Task<List<long>> GetMediaCollectionsAsync(long mediaId)
     {
-        var media = await dbContext.ConfiguredMedia.FindAsync(mediaConfigId);
-
-        if (media == null)
-            throw new ArgumentException("Media not found");
-
-        var folders = await dbContext.MediaStorageFolders.Where(f => f.ContainedItems.Contains(media)).ToListAsync();
-
-        var result = new MediaConfigFolderInfo(media.Name, null!);
-
-        foreach (var folder in folders)
-        {
-            var fullPath = await GetMediaFolderPath(folder);
-
-            if (string.IsNullOrEmpty(result.PrimaryFolder))
-            {
-                result.PrimaryFolder = fullPath;
-            }
-            else
-            {
-                result.SecondaryFolders ??= new List<string>();
-                result.SecondaryFolders.Add(fullPath);
-            }
-        }
-
-        if (string.IsNullOrEmpty(result.PrimaryFolder))
-            throw new Exception("Media is not in any folder");
-
-        return result;
+        return await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.MediaFileId == mediaId)
+            .Select(ci => ci.CollectionId)
+            .ToListAsync();
     }
 
-    public async Task<string> GetMediaFolderPath(MediaStorageFolder? folder)
+    public async Task<string> GetMediaFolderPath(MediaFolder? folder)
     {
         if (folder == null)
             throw new ArgumentException("Initial folder must be specified");
@@ -203,31 +160,28 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             if (nextId == null)
                 break;
 
-            folder = await dbContext.MediaStorageFolders.FirstOrDefaultAsync(f => f.Id == nextId);
+            folder = await dbContext.MediaFolders.FirstOrDefaultAsync(f => f.Id == nextId);
         }
 
         return builder.ToString();
     }
 
-    public async Task<MediaStorageFolder> CreateMediaFolderAsync(string folderName, long? parentId)
+    public async Task<MediaFolder> CreateMediaFolderAsync(string folderName, long? parentId)
     {
-        var folder = new MediaStorageFolder(folderName.TrimOrThrowIfEmpty(), parentId);
+        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty(), parentId);
 
-        await dbContext.MediaStorageFolders.AddAsync(folder);
+        await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
         return folder;
     }
 
-    public async Task<bool> SetMediaKeepStatusAsync(long configuredMediaId, bool keep)
+    public async Task<bool> SetMediaKeepStatusAsync(long mediaId, bool keep)
     {
-        // Load the configured media with the linked media file
-        var mediaConfig = await GetConfiguredMediaAsync(configuredMediaId, true);
+        var mediaFile = await GetMediaByIdAsync(mediaId);
 
-        if (mediaConfig == null || mediaConfig.IsDeleted || mediaConfig.MediaFile == null)
-            throw new ArgumentException("Configured media not found");
-
-        var mediaFile = mediaConfig.MediaFile;
+        if (mediaFile == null || mediaFile.IsDeleted)
+            throw new ArgumentException("Media not found");
 
         bool changes = false;
 
@@ -241,227 +195,184 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return changes;
     }
 
-    public async Task<bool> IsMediaSafeToDeleteAsync(long configuredMediaId)
+    public async Task<bool> IsMediaSafeToDeleteAsync(long mediaId)
     {
-        var media = await dbContext.ConfiguredMedia
-            .Include(m => m.InFolders)
-            .Include(m => m.MediaFile)
-            .ThenInclude(mf => mf.Configurations)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(m => m.Id == configuredMediaId);
+        var media = await dbContext.MediaFiles
+            .Include(m => m.InCollections)
+            .FirstOrDefaultAsync(m => m.Id == mediaId);
 
         if (media == null)
             return false;
 
-        if (IsConfiguredMediaInUse(media))
+        // For now, if it's in any collection, it's not safe to delete? 
+        // Or if it's marked as keep.
+        if (media.Keep)
             return false;
 
         return true;
     }
 
-    public async Task DeleteMediaAsync(long configuredMediaId)
+    public async Task DeleteMediaAsync(long mediaId)
     {
-        var media = await dbContext.ConfiguredMedia.FirstOrDefaultAsync(m => m.Id == configuredMediaId);
+        var media = await dbContext.MediaFiles.FirstOrDefaultAsync(m => m.Id == mediaId);
         if (media == null || media.IsDeleted)
             return;
 
         media.IsDeleted = true;
-        media.BumpUpdatedAtTime();
         await SaveAsync();
     }
 
-    public async Task RestoreMediaAsync(long configuredMediaId)
+    public async Task RestoreMediaAsync(long mediaId)
     {
-        var config = await dbContext.ConfiguredMedia
-                         .Include(m => m.MediaFile)
-                         .FirstOrDefaultAsync(m => m.Id == configuredMediaId) ??
-                     throw new ArgumentException("Media configuration not found");
+        var media = await dbContext.MediaFiles
+                         .FirstOrDefaultAsync(m => m.Id == mediaId) ??
+                     throw new ArgumentException("Media file not found");
 
-        if (!config.IsDeleted)
+        if (!media.IsDeleted)
             return;
 
-        logger.LogInformation("Restoring media configuration {Id}", configuredMediaId);
-        config.IsDeleted = false;
-        config.BumpUpdatedAtTime();
-
-        if (config.MediaFile.IsDeleted)
-        {
-            logger.LogInformation("Also restoring media file {Id} because its configuration was restored",
-                config.MediaFileId);
-            config.MediaFile.IsDeleted = false;
-        }
-
-        await SaveMediaConfigAsync(config);
-        await updateNotifier.NotifyMediaUpdated(config.Id);
+        logger.LogInformation("Restoring media file {Id}", mediaId);
+        media.IsDeleted = false;
+        await SaveAsync();
     }
 
-    public async Task<List<ConfiguredMedia>> GetDeletedMediaAsync(int limit)
+    public async Task<List<MediaFile>> GetDeletedMediaAsync(int limit)
     {
-        return await dbContext.ConfiguredMedia
-            .Include(m => m.MediaFile)
+        return await dbContext.MediaFiles
             .Where(m => m.IsDeleted)
-            .OrderByDescending(m => m.UpdatedAt)
+            .OrderByDescending(m => m.ImportedAt)
             .Take(limit)
             .ToListAsync();
     }
 
-    public async Task<List<ConfiguredMediaDTO>> GetConfiguredMediaSiblingsAsync(long mediaConfigId)
+    public async Task<List<MediaFile>> GetMediaFileSiblingsAsync(long mediaId)
     {
-        var media = await dbContext.ConfiguredMedia.FindAsync(mediaConfigId);
+        var collectionIds = await GetMediaCollectionsAsync(mediaId);
 
-        if (media == null)
-            return new List<ConfiguredMediaDTO>();
-
-        var allConfigs = await dbContext.ConfiguredMedia.Where(c => c.MediaFileId == media.MediaFileId).ToListAsync();
-
-        return allConfigs.Where(c => c.Id != mediaConfigId).Select(c => c.GetDTO()).ToList();
+        return await dbContext.Set<CollectionItem>()
+            .Where(ci => collectionIds.Contains(ci.CollectionId) && ci.MediaFileId != mediaId)
+            .Select(ci => ci.MediaFile)
+            .Distinct()
+            .ToListAsync();
     }
 
-    public async Task<ConfiguredMediaDTO> CreateConfiguredMediaAsync(long mediaId, string configName,
-        List<string> folders)
+    async Task<List<MediaFileDTO>> IClientDatabaseService.GetMediaFileSiblingsAsync(long mediaId)
     {
-        var mainFolder = folders.FirstOrDefault();
+        return (await GetMediaFileSiblingsAsync(mediaId)).Select(m => m.GetDTO()).ToList();
+    }
 
-        if (string.IsNullOrWhiteSpace(mainFolder))
-            throw new ArgumentException("Must provide at least one folder");
-
-        var originalMedia = await GetMediaByIdAsync(mediaId);
-
-        if (originalMedia == null)
-            throw new ArgumentException("Media not found");
-
-        var newConfig = await CreateMediaConfig(originalMedia, configName, mainFolder, true);
-
-        // Add the extra folders
-        for (int i = 1; i < folders.Count; ++i)
+    public async Task<MediaFileDTO> CreateMediaFileAsync(MediaFileDTO mediaFile, long collectionId)
+    {
+        var newMedia = new MediaFile(mediaFile.OriginalFileName, mediaFile.HashSha3)
         {
-            var folder = folders[i];
-            try
-            {
-                await AddMediaToFolder(newConfig.Id, folder, true);
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Failed to add media to folder {Folder}, but will continue creation", folder);
-                continue;
-            }
+            MediaType = mediaFile.MediaType,
+            Width = mediaFile.Width,
+            Height = mediaFile.Height,
+            FrameCount = mediaFile.FrameCount,
+            FramesPerSecond = mediaFile.FramesPerSecond,
+            Keep = mediaFile.Keep,
+            ParentMediaId = mediaFile.ParentMediaId
+        };
 
-            logger.LogInformation("Added new media config {Id} to extra folder: {Folder}", newConfig.Id, folder);
-        }
-
-        return newConfig.GetDTO();
+        var result = await CreateMediaAsync(newMedia, collectionId);
+        return result.GetDTO();
     }
 
-    public Task SaveConfiguredMediaAsync(ConfiguredMediaDTO media)
+    public async Task SaveMediaFileAsync(MediaFileDTO media)
     {
-        // Due to clearing thumbnails etc. checks that very complex logic is not duplicated here from
-        // MediaController.UpdateConfig
-        throw new NotSupportedException(
-            "This edit is so complex that it has to go through the MediaController (instead of directly the database)");
+        var existing = await dbContext.MediaFiles.FindAsync(media.Id) ??
+                       throw new ArgumentException("Media not found");
+
+        existing.Keep = media.Keep;
+        existing.IsDeleted = media.IsDeleted;
+        existing.CropLeft = media.CropLeft;
+        existing.CropTop = media.CropTop;
+        existing.CropRight = media.CropRight;
+        existing.CropBottom = media.CropBottom;
+
+        await SaveAsync();
     }
 
-    public async Task<ConfiguredMediaDTO?> GetPrimeConfiguredMediaFromFileAsync(long mediaFileId)
-    {
-        return (await GetConfiguredMediaByMediaFileAsync(mediaFileId, true))?.GetDTO();
-    }
-
-    public async Task<List<MediaStorageFolder>> GetMediaFoldersAsync(long? limitToParent)
+    public async Task<List<MediaFolder>> GetMediaFoldersAsync(long? limitToParent)
     {
         if (limitToParent != null)
         {
-            return await dbContext.MediaStorageFolders.Where(f => f.ParentId == limitToParent).ToListAsync();
+            return await dbContext.MediaFolders.Where(f => f.ParentId == limitToParent).ToListAsync();
         }
 
-        return await dbContext.MediaStorageFolders.ToListAsync();
+        return await dbContext.MediaFolders.ToListAsync();
     }
 
-    public async Task<MediaStorageFolder?> GetMediaFolderAsync(long id)
+    public async Task<MediaFolder?> GetMediaFolderAsync(long id)
     {
-        return await dbContext.MediaStorageFolders.FindAsync(id);
+        return await dbContext.MediaFolders.FindAsync(id);
     }
 
-    public async Task<MediaStorageFolder?> GetMediaFolderAsync(string name, long? parentFolderId)
+    public async Task<MediaFolder?> GetMediaFolderAsync(string name, long? parentFolderId)
     {
-        return await dbContext.MediaStorageFolders.FirstOrDefaultAsync(f =>
+        return await dbContext.MediaFolders.FirstOrDefaultAsync(f =>
             f.Name == name && f.ParentId == parentFolderId);
     }
 
-    public async Task<MediaStorageFolder?> GetMediaFolderFromPathAsync(string path)
+    public async Task<MediaFolder?> GetMediaFolderFromPathAsync(string path)
     {
-        return await MediaStorageFolder.GetOrCreateAtPath(path.TrimEnd(), this, false);
+        return await MediaFolder.GetOrCreateAtPath(path.TrimEnd(), this, false);
     }
 
-    public async Task<List<ConfiguredMedia>> GetMediaInFolderAsync(long folderId)
+    public async Task<Tuple<List<CollectionDTO>, int>> GetFolderCollections(long folderId, int page, int pageSize)
     {
-        var folder = await dbContext.MediaStorageFolders.FindAsync(folderId) ??
-                     throw new ArgumentException("Folder not found");
-        return await dbContext.ConfiguredMedia.Where(m => m.InFolders.Contains(folder) && !m.IsDeleted).ToListAsync();
+        var query = dbContext.Collections.Where(c => c.FolderId == folderId);
+        var total = await query.CountAsync();
+        var items = await query.OrderBy(c => c.Name)
+            .Skip(page * pageSize)
+            .Take(pageSize)
+            .Select(c => c.GetDTO())
+            .ToListAsync();
+
+        return new Tuple<List<CollectionDTO>, int>(items, total);
     }
 
-    public async Task<ConfiguredMedia?> GetMediaByNameAndPath(string requestName, string mainFolder)
+    public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
+        FolderSortColumn sortColumn, SortDirection sortDirection)
     {
-        var folder = await MediaStorageFolder.GetOrCreateAtPath(mainFolder, this, false);
-
-        // Can't conflict if the path doesn't exist
-        if (folder == null)
-            return null;
-
-        return await dbContext.ConfiguredMedia.FirstOrDefaultAsync(m =>
-            m.Name == requestName && m.InFolders.Contains(folder));
-    }
-
-    public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
-        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection)
-    {
-        var query = dbContext.ConfiguredMedia.Where(m => m.InFolders.Any(f => f.Id == folderId) && !m.IsDeleted);
+        var query = dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId);
 
         var total = await query.CountAsync();
 
-        var totalPages = (int)Math.Ceiling(total / (double)pageSize);
+        // TODO: sorting
+        var items = await query.OrderBy(ci => ci.SequenceNumber)
+            .Skip(page * pageSize)
+            .Take(pageSize)
+            .Select(ci => ci.MediaFile.GetDTO())
+            .ToListAsync();
 
-        if (sortDirection == SortDirection.Ascending)
-        {
-            switch (sortColumn)
-            {
-                case FolderSortColumn.Name:
-                    query = query.OrderBy(c => c.Name).ThenBy(c => c.Id);
-                    break;
-                case FolderSortColumn.DateCreated:
-                    query = query.OrderBy(c => c.CreatedAt);
-                    break;
-                case FolderSortColumn.DateModified:
-                    query = query.OrderBy(c => c.UpdatedAt);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(sortColumn), sortColumn, null);
-            }
-        }
-        else
-        {
-            switch (sortColumn)
-            {
-                case FolderSortColumn.Name:
-                    query = query.OrderByDescending(c => c.Name).ThenByDescending(c => c.Id);
-                    break;
-                case FolderSortColumn.DateCreated:
-                    query = query.OrderByDescending(c => c.CreatedAt);
-                    break;
-                case FolderSortColumn.DateModified:
-                    query = query.OrderByDescending(c => c.UpdatedAt);
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException(nameof(sortColumn), sortColumn, null);
-            }
-        }
+        return new Tuple<List<MediaFileDTO>, int>(items, total);
+    }
+    public async Task<List<Collection>> GetCollectionsInFolderAsync(long folderId)
+    {
+        return await dbContext.Collections.Where(c => c.FolderId == folderId).ToListAsync();
+    }
 
-        query = query.Skip(itemPage * pageSize).Take(pageSize);
+    public async Task<Collection?> GetCollectionByNameAndFolder(string name, long folderId)
+    {
+        return await dbContext.Collections.FirstOrDefaultAsync(c => c.Name == name && c.FolderId == folderId);
+    }
 
-        return Tuple.Create(
-            await query.Select(c =>
-                    new ConfiguredMediaInfo(c.Name, c.Id, c.Prime, c.MediaFileId, c.MediaType, c.Width, c.Height,
-                        c.MaskEnabled))
-                .ToListAsync(),
-            totalPages);
+    public async Task<Collection?> GetCollectionAsync(long id)
+    {
+        return await dbContext.Collections.FindAsync(id);
+    }
+
+    public async Task SaveCollectionAsync(Collection collection)
+    {
+        await SaveAsync();
+    }
+
+    public async Task DeleteCollectionAsync(Collection collection)
+    {
+        dbContext.Collections.Remove(collection);
+        await SaveAsync();
     }
 
     public async Task<MediaFile?> GetMediaByHashAsync(string sha3)
@@ -480,166 +391,34 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyMediaUpdated(mediaFile.Id);
     }
 
-    public Task<List<ConfiguredMedia>> GetMediaConfigurationsAsync(long mediaFileId)
+    public async Task MakeSureMediaIsSetToKeep(long mediaId)
     {
-        return dbContext.ConfiguredMedia.Where(c => c.MediaFileId == mediaFileId && !c.IsDeleted).ToListAsync();
+        var media = await dbContext.MediaFiles.FindAsync(mediaId) ?? throw new ArgumentException("Media not found");
+        media.Keep = true;
+        await SaveAsync();
     }
 
-    public async Task<ConfiguredMedia> GetConfiguredMediaPrimeAsync(long mediaId)
+    public async Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, long collectionId)
     {
-        return await dbContext.ConfiguredMedia.FirstOrDefaultAsync(c => c.Prime && c.MediaFileId == mediaId) ??
-               throw new InvalidOperationException("Media file has no prime configuration");
-    }
-
-    public async Task<ConfiguredMedia?> GetConfiguredMediaAsync(long id, bool loadMedia = false)
-    {
-        if (loadMedia)
-        {
-            return await dbContext.ConfiguredMedia.Include(c => c.MediaFile).FirstOrDefaultAsync(c => c.Id == id);
-        }
-
-        return await dbContext.ConfiguredMedia.FindAsync(id);
-    }
-
-    public Task<ConfiguredMedia?> GetConfiguredMediaByMediaFileAsync(long id, bool loadMedia = false)
-    {
-        var query = dbContext.ConfiguredMedia.Where(c => c.MediaFileId == id && c.Prime && !c.IsDeleted);
-
-        if (loadMedia)
-        {
-            query = query.Include(c => c.MediaFile);
-        }
-
-        return query.FirstOrDefaultAsync();
-    }
-
-    public async Task<ConfiguredMedia> CreateMediaConfig(MediaFile originalMedia, string newName, string mainFolder,
-        bool markAsKeep, bool allowCreateFolder = true, bool allowRootFolderCreate = false)
-    {
-        if (originalMedia.IsDeleted)
-            throw new InvalidOperationException("Cannot create a new configuration for a deleted media file");
-
-        if (!originalMedia.Keep && markAsKeep)
-        {
-            originalMedia.Keep = true;
-        }
-
-        var newConfig = new ConfiguredMedia(newName)
-        {
-            MediaFileId = originalMedia.Id,
-            MediaFile = originalMedia,
-            Prime = false,
-            Width = originalMedia.Width,
-            Height = originalMedia.Height,
-            FrameCount = originalMedia.FrameCount,
-            FramesPerSecond = originalMedia.FramesPerSecond,
-            MediaType = originalMedia.MediaType,
-        };
-
-        var folder =
-            await MediaStorageFolder.GetOrCreateAtPath(mainFolder, this, allowCreateFolder, allowRootFolderCreate);
-
-        if (folder == null)
-            throw new ArgumentException("Invalid folder to put new media config in");
-
-        newConfig.InFolders.Add(folder);
-
-        await dbContext.ConfiguredMedia.AddAsync(newConfig);
-        await dbContext.SaveChangesAsync();
-
-        await updateNotifier.NotifyMediaUpdated(originalMedia.Id);
-        await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
-
-        return newConfig;
-    }
-
-    public async Task MakeSureMediaIsSetToKeep(long configuredMediaId)
-    {
-        var media = await GetConfiguredMediaAsync(configuredMediaId, true);
-
-        if (media == null || media.MediaFile == null)
-            throw new ArgumentException("Media does not exist");
-
-        // Restore and mark as keep to keep as thumbnail
-        if (media.IsDeleted)
-        {
-            media.IsDeleted = false;
-            media.BumpUpdatedAtTime();
-
-            if (!media.MediaFile.Keep)
-            {
-                await SaveMediaFileAsync(media.MediaFile);
-            }
-        }
-        else if (!media.MediaFile.Keep || media.MediaFile.IsDeleted)
-        {
-            media.MediaFile.IsDeleted = false;
-            media.MediaFile.Keep = true;
-            await SaveMediaFileAsync(media.MediaFile);
-        }
-    }
-
-    public async Task<ConfiguredMedia> CreateMediaAsync(MediaFile mediaItem, string initialFolder,
-        bool canCreateRootFolder = false)
-    {
-        var folder =
-            await MediaStorageFolder.GetOrCreateAtPath(initialFolder.TrimEnd(), this, true, canCreateRootFolder);
-
-        if (folder == null)
-            throw new ArgumentException("Cannot find / create folder at path " + initialFolder);
-
-        var primeConfig = new ConfiguredMedia(ConfiguredMedia.AdjustedNameFromOriginal(mediaItem.OriginalFileName))
-        {
-            Prime = true,
-            MediaFile = mediaItem,
-            InFolders = new List<MediaStorageFolder>
-            {
-                folder,
-            },
-            Width = mediaItem.Width,
-            Height = mediaItem.Height,
-            FrameCount = mediaItem.FrameCount,
-            FramesPerSecond = mediaItem.FramesPerSecond,
-            MediaType = mediaItem.MediaType,
-        };
-
         await dbContext.MediaFiles.AddAsync(mediaItem);
-
-        mediaItem.Configurations.Add(primeConfig);
-        await dbContext.ConfiguredMedia.AddAsync(primeConfig);
-
         await SaveAsync();
 
-        await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
-        return primeConfig;
-    }
+        // Get the next sequence number
+        var sequenceNumber = await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId)
+            .Select(ci => ci.SequenceNumber)
+            .DefaultIfEmpty(0)
+            .MaxAsync() + 1;
 
-    public async Task SaveMediaConfigAsync(ConfiguredMedia media)
-    {
-        await SaveAsync();
-        await updateNotifier.NotifyMediaUpdated(media.Id);
-    }
-
-    public async Task<List<ConfiguredMedia>> GetOldDeletedConfigsAsync(DateTime cutoff)
-    {
-        return await dbContext.ConfiguredMedia
-            .Include(m => m.MediaFile)
-            .Where(m => m.IsDeleted && m.UpdatedAt < cutoff)
-            .ToListAsync();
-    }
-
-    public async Task PurgeConfiguredMediaAsync(ConfiguredMedia config)
-    {
-        dbContext.ConfiguredMedia.Remove(config);
-        await SaveAsync();
+        await AddMediaToCollection(mediaItem.Id, collectionId, sequenceNumber);
+        
+        return mediaItem;
     }
 
     public async Task<List<MediaFile>> GetEligibleMediaFilesForPurgeAsync()
     {
-        // We want to delete MediaFiles that are not marked Keep and have no configurations
         return await dbContext.MediaFiles
-            .Include(mf => mf.Configurations)
-            .Where(mf => !mf.Keep && !mf.Configurations.Any())
+            .Where(m => m.IsDeleted && !m.Keep)
             .ToListAsync();
     }
 
@@ -699,30 +478,81 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return dbContext.Entry(mediaFile).ReloadAsync();
     }
 
-    // Server-side prerendering compatibility with IClientDatabaseService
-    async Task<List<MediaStorageFolderInfo>> IClientDatabaseService.GetMediaFoldersAsync(long? limitToParent)
+    // Note: these are dummy compatibility methods that can be deleted when not found useful when converting
+    async Task<ConfiguredMediaDTO?> IClientDatabaseService.GetConfiguredMediaAsync(long mediaConfigId)
     {
-        return (await GetMediaFoldersAsync(limitToParent)).ConvertToInfo<MediaStorageFolder, MediaStorageFolderInfo>();
+        var media = await GetMediaByIdAsync(mediaConfigId);
+        return media != null ? new ConfiguredMediaDTO(media.GetDTO()) : null;
     }
 
-    async Task<MediaStorageFolderDTO?> IClientDatabaseService.GetMediaFolderAsync(long id)
+    async Task<MediaConfigFolderInfo> IClientDatabaseService.GetConfiguredMediaFoldersAsync(long mediaConfigId)
+    {
+        return new MediaConfigFolderInfo("Media", "Root");
+    }
+
+    async Task<List<ConfiguredMediaDTO>> IClientDatabaseService.GetConfiguredMediaSiblingsAsync(long mediaConfigId)
+    {
+        var siblings = await GetMediaFileSiblingsAsync(mediaConfigId);
+        return siblings.Select(s => new ConfiguredMediaDTO(s.GetDTO())).ToList();
+    }
+
+    async Task<Tuple<List<ConfiguredMediaInfo>, int>> IClientDatabaseService.GetMediaFolderContents(long folderId,
+        int itemPage, int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection)
+    {
+        return new Tuple<List<ConfiguredMediaInfo>, int>(new List<ConfiguredMediaInfo>(), 0);
+    }
+
+    Task IClientDatabaseService.AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder)
+    {
+        return Task.CompletedTask;
+    }
+
+    Task IClientDatabaseService.RemoveMediaFromFolder(long mediaConfigurationId, string folderPath)
+    {
+        return Task.CompletedTask;
+    }
+
+    Task<ConfiguredMediaDTO> IClientDatabaseService.CreateConfiguredMediaAsync(long mediaId, string configName,
+        List<string> folders)
+    {
+        throw new NotSupportedException();
+    }
+
+    Task IClientDatabaseService.SaveConfiguredMediaAsync(ConfiguredMediaDTO media)
+    {
+        return ((IClientDatabaseService)this).SaveMediaFileAsync(media);
+    }
+
+    async Task<ConfiguredMediaDTO?> IClientDatabaseService.GetPrimeConfiguredMediaFromFileAsync(long mediaFileId)
+    {
+        var media = await GetMediaByIdAsync(mediaFileId);
+        return media != null ? new ConfiguredMediaDTO(media.GetDTO()) : null;
+    }
+
+    // Server-side prerendering compatibility with IClientDatabaseService
+    async Task<List<MediaFolderInfo>> IClientDatabaseService.GetMediaFoldersAsync(long? limitToParent)
+    {
+        return (await GetMediaFoldersAsync(limitToParent)).Select(f => f.GetInfo()).ToList();
+    }
+
+    async Task<MediaFolderDTO?> IClientDatabaseService.GetMediaFolderAsync(long id)
     {
         return (await GetMediaFolderAsync(id))?.GetDTO();
     }
 
-    async Task<MediaStorageFolderDTO?> IClientDatabaseService.GetMediaFolderFromPathAsync(string path)
+    async Task<MediaFolderDTO?> IClientDatabaseService.GetMediaFolderFromPathAsync(string path)
     {
         return (await GetMediaFolderFromPathAsync(path))?.GetDTO();
     }
 
-    async Task<List<ConfiguredMediaDTO>> IClientDatabaseService.GetDeletedMediaAsync(int limit)
+    async Task<MediaFileDTO?> IClientDatabaseService.GetMediaFileAsync(long mediaId)
     {
-        return (await GetDeletedMediaAsync(limit)).ConvertToDTO<ConfiguredMedia, ConfiguredMediaDTO>();
+        return (await GetMediaByIdAsync(mediaId))?.GetDTO();
     }
 
-    async Task<ConfiguredMediaDTO?> IClientDatabaseService.GetConfiguredMediaAsync(long mediaConfigId)
+    async Task<List<MediaFileDTO>> IClientDatabaseService.GetDeletedMediaAsync(int limit)
     {
-        return (await GetConfiguredMediaAsync(mediaConfigId, true))?.GetDTO();
+        return (await GetDeletedMediaAsync(limit)).Select(m => m.GetDTO()).ToList();
     }
 
     public void Dispose()
@@ -743,13 +573,5 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
             disposed = true;
         }
-    }
-
-    private bool IsConfiguredMediaInUse(ConfiguredMedia media)
-    {
-        if (media.MediaFile.Configurations.Count >= 2)
-            return true;
-
-        return media.InFolders.Any();
     }
 }

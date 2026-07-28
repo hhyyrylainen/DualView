@@ -29,10 +29,10 @@ public class MediaContentController : Controller
         this.mediaProcessingService = mediaProcessingService;
     }
 
-    [HttpGet("{mediaConfigId:long}/content")]
-    public async Task<ActionResult> GetFullMediaContent([Required] long mediaConfigId)
+    [HttpGet("{mediaId:long}/content")]
+    public async Task<ActionResult> GetFullMediaContent([Required] long mediaId)
     {
-        var media = await databaseService.GetConfiguredMediaAsync(mediaConfigId);
+        var media = await databaseService.GetMediaByIdAsync(mediaId);
 
         if (media == null)
             return NotFound();
@@ -47,13 +47,13 @@ public class MediaContentController : Controller
         // This gives the shortened name, but as it is basically never downloaded, this should be fine;
         // we can add a separate endpoint for browser downloads if wanted
         return File(System.IO.File.OpenRead(localPath), media.MediaType.ToMimeType(),
-            media.Name, true);
+            media.OriginalFileName, true);
     }
 
-    [HttpGet("{mediaConfigId:long}/thumbnail")]
-    public async Task<ActionResult> GetThumbnail([Required] long mediaConfigId)
+    [HttpGet("{mediaId:long}/thumbnail")]
+    public async Task<ActionResult> GetThumbnail([Required] long mediaId)
     {
-        var media = await databaseService.GetConfiguredMediaAsync(mediaConfigId, true);
+        var media = await databaseService.GetMediaByIdAsync(mediaId);
 
         if (media == null)
             return NotFound();
@@ -79,11 +79,11 @@ public class MediaContentController : Controller
         }
 
         return File(System.IO.File.OpenRead(path), media.MediaType.ToMimeType(),
-            "thumb_" + media.MediaFile.OriginalFileName);
+            "thumb_" + media.OriginalFileName);
     }
 
     [NonAction]
-    private async Task<string> GetThumbnailPathInternal(ConfiguredMedia media)
+    private async Task<string> GetThumbnailPathInternal(MediaFile media)
     {
         var storage = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
         return await mediaProcessingService.ThumbnailPathForMedia(media, storage);

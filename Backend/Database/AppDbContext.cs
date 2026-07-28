@@ -15,8 +15,8 @@ public class AppDbContext : DbContext
 
     public DbSet<MaintenanceJobRecord> MaintenanceJobRecords { get; set; }
 
-    public DbSet<MediaStorageFolder> MediaStorageFolders { get; set; }
-    public DbSet<ConfiguredMedia> ConfiguredMedia { get; set; }
+    public DbSet<MediaFolder> MediaFolders { get; set; }
+    public DbSet<Collection> Collections { get; set; }
     public DbSet<MediaFile> MediaFiles { get; set; }
 
     public static async Task SeedData(DbContext context, CancellationToken cancellation)
@@ -25,15 +25,15 @@ public class AppDbContext : DbContext
 
         // Create default folders
         var folder =
-            await dbContext.MediaStorageFolders.FirstOrDefaultAsync(f => f.Name == "Uncategorized", cancellation);
+            await dbContext.MediaFolders.FirstOrDefaultAsync(f => f.Name == "Uncategorized", cancellation);
 
         if (folder == null)
         {
-            folder = new MediaStorageFolder("Uncategorized", null)
+            folder = new MediaFolder("Uncategorized", null)
             {
-                Id = MediaStorageFolder.UncategorizedFolderId,
+                Id = MediaFolder.UncategorizedFolderId,
             };
-            await dbContext.MediaStorageFolders.AddAsync(folder, cancellation);
+            await dbContext.MediaFolders.AddAsync(folder, cancellation);
             await dbContext.SaveChangesAsync(cancellation);
         }
     }
@@ -44,28 +44,33 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<MediaFile>(builder =>
         {
-            builder.HasMany(d => d.Configurations).WithOne(p => p.MediaFile)
-                .OnDelete(DeleteBehavior.Restrict);
-
-            builder.HasOne(d => d.DerivedFrom).WithMany(p => p.DerivedImages)
+            builder.HasOne(d => d.ParentMedia).WithMany(p => p.Children)
+                .HasForeignKey(d => d.ParentMediaId)
                 .OnDelete(DeleteBehavior.SetNull);
         });
 
-        modelBuilder.Entity<MediaStorageFolder>(builder =>
+        modelBuilder.Entity<MediaFolder>(builder =>
         {
-            builder.HasMany(d => d.ContainedItems).WithMany(p => p.InFolders)
-                .UsingEntity(entityBuilder => entityBuilder.ToTable("MediaFolderMedia"));
+            builder.HasMany(d => d.ContainedCollections).WithOne(p => p.Folder)
+                .HasForeignKey(p => p.FolderId)
+                .OnDelete(DeleteBehavior.Restrict);
 
-            builder.HasMany(d => d.SubFolders).WithOne(p => p.Parent).OnDelete(DeleteBehavior.Restrict);
+            builder.HasMany(d => d.SubFolders).WithOne(p => p.Parent)
+                .HasForeignKey(p => p.ParentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
-        modelBuilder.Entity<ConfiguredMedia>(builder =>
+        modelBuilder.Entity<CollectionItem>(builder =>
         {
-            // Ensure only one prime (unmodified) media per MediaFile
-            builder
-                .HasIndex(e => e.MediaFileId)
-                .HasFilter("Prime = 1") // SQLite: boolean true is 1
-                .IsUnique();
+            builder.HasKey(ci => new { ci.CollectionId, ci.MediaFileId });
+
+            builder.HasOne(ci => ci.Collection)
+                .WithMany(c => c.Items)
+                .HasForeignKey(ci => ci.CollectionId);
+
+            builder.HasOne(ci => ci.MediaFile)
+                .WithMany(m => m.InCollections)
+                .HasForeignKey(ci => ci.MediaFileId);
         });
     }
 }

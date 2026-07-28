@@ -30,10 +30,10 @@ public class MediaEditSelectorWindowViewModel : ViewModelBase, IDisposable
         });
         NewFolders.Add(new NewFolderViewModel("Outputs/Images/Model/2026-02-22/"));
 
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Some_stuff_j2221"), _ => { }, true));
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Another sibling"), _ => { }, false));
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Third sibling"), _ => { }, false));
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Sibling with a pretty long name"), _ => { },
+        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Some_stuff_j2221", string.Empty), _ => { }, true));
+        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Another sibling", string.Empty), _ => { }, false));
+        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Third sibling", string.Empty), _ => { }, false));
+        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Sibling with a pretty long name", string.Empty), _ => { },
             false));
     }
 

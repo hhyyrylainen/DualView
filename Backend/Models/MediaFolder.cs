@@ -8,12 +8,12 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Models;
 
 [Index(nameof(ParentId), nameof(Name), IsUnique = true)]
-public class MediaStorageFolder : UpdateableModel, IDTOProvider<MediaStorageFolderDTO>,
-    IInfoProvider<MediaStorageFolderInfo>
+public class MediaFolder : UpdateableModel, IDTOProvider<MediaFolderDTO>,
+    IInfoProvider<MediaFolderInfo>
 {
     public const long UncategorizedFolderId = 1;
 
-    public MediaStorageFolder(string name, long? parentId)
+    public MediaFolder(string name, long? parentId)
     {
         Name = name;
         ParentId = parentId;
@@ -25,20 +25,22 @@ public class MediaStorageFolder : UpdateableModel, IDTOProvider<MediaStorageFold
     [MaxLength(200)]
     public string Name { get; set; }
 
+    // TODO: add a lowercase name that is uniquely indexed within the parent folder(s)
+
     public long? ParentId { get; set; }
 
-    public MediaStorageFolder? Parent { get; set; }
+    public MediaFolder? Parent { get; set; }
 
-    public ICollection<MediaStorageFolder> SubFolders { get; set; } = new List<MediaStorageFolder>();
+    public ICollection<MediaFolder> SubFolders { get; set; } = new List<MediaFolder>();
 
-    public ICollection<ConfiguredMedia> ContainedItems { get; set; } = new List<ConfiguredMedia>();
+    public ICollection<Collection> ContainedCollections { get; set; } = new List<Collection>();
 
-    public static async Task<MediaStorageFolder?> GetOrCreateAtPath(string path, IDatabaseService databaseService,
+    public static async Task<MediaFolder?> GetOrCreateAtPath(string path, IDatabaseService databaseService,
         bool allowCreating, bool allowRootPathCreation = false)
     {
         var pathElements = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-        MediaStorageFolder? current = null;
+        MediaFolder? current = null;
         bool root = true;
         foreach (var pathElement in pathElements)
         {
@@ -72,9 +74,9 @@ public class MediaStorageFolder : UpdateableModel, IDTOProvider<MediaStorageFold
         return current;
     }
 
-    public MediaStorageFolderDTO GetDTO()
+    public MediaFolderDTO GetDTO()
     {
-        return new MediaStorageFolderDTO(Name)
+        return new MediaFolderDTO(Name)
         {
             Id = Id,
             ParentId = ParentId,
@@ -83,9 +85,9 @@ public class MediaStorageFolder : UpdateableModel, IDTOProvider<MediaStorageFold
         };
     }
 
-    public MediaStorageFolderInfo GetInfo()
+    public MediaFolderInfo GetInfo()
     {
-        return new MediaStorageFolderInfo(Name)
+        return new MediaFolderInfo(Name)
         {
             Id = Id,
             ParentId = ParentId,

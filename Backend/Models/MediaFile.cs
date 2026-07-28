@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Backend.Models;
 
 /// <summary>
-///   Concrete stored media file, not used directly but with <see cref="ConfiguredMedia"/>
+///   Concrete stored media file
 /// </summary>
 [Index(nameof(HashSha3), IsUnique = true)]
 public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
@@ -47,20 +47,29 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
     /// </summary>
     public float FramesPerSecond { get; set; }
 
-    public long? DerivedFromImageId { get; set; }
+    // Cropping properties
+    public int CropLeft { get; set; }
+    public int CropTop { get; set; }
+    public int CropRight { get; set; }
+    public int CropBottom { get; set; }
 
-    public MediaFile? DerivedFrom { get; set; }
+    public long? ParentMediaId { get; set; }
 
-    public ICollection<MediaFile> DerivedImages { get; set; } = new List<MediaFile>();
+    public MediaFile? ParentMedia { get; set; }
 
-    /// <summary>
-    ///   Actual configurations of this file that should be used
-    /// </summary>
-    public ICollection<ConfiguredMedia> Configurations { get; set; } = new List<ConfiguredMedia>();
+    public ICollection<MediaFile> Children { get; set; } = new List<MediaFile>();
+
+    public ICollection<CollectionItem> InCollections { get; set; } = new List<CollectionItem>();
 
     public string PathRelativeToStorage()
     {
         return $"originalMedia/{HashSha3[..2]}/{HashSha3[2..4]}/{HashSha3[4..]}{Path.GetExtension(OriginalFileName)}";
+    }
+
+    public string CroppedPathRelativeToStorage()
+    {
+        var extension = Path.GetExtension(OriginalFileName);
+        return $"originalMedia/{HashSha3[..2]}/{HashSha3[2..4]}/{HashSha3[4..]}_cropped{extension}";
     }
 
     public MediaFileDTO GetDTO()
@@ -76,7 +85,11 @@ public class MediaFile : IDTOProvider<MediaFileDTO>, IMediaFile
             Height = Height,
             FrameCount = FrameCount,
             FramesPerSecond = FramesPerSecond,
-            DerivedFromImageId = DerivedFromImageId,
+            CropLeft = CropLeft,
+            CropTop = CropTop,
+            CropRight = CropRight,
+            CropBottom = CropBottom,
+            ParentMediaId = ParentMediaId,
         };
     }
 }

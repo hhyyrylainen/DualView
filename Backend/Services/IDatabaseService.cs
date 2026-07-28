@@ -19,45 +19,38 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task SaveAsync();
 
     // Media folders
-    public Task<List<MediaStorageFolder>> GetMediaFoldersAsync(long? limitToParent = null);
-    public Task<MediaStorageFolder?> GetMediaFolderAsync(long id);
-    public Task<MediaStorageFolder?> GetMediaFolderAsync(string name, long? parentFolderId);
+    public Task<List<MediaFolder>> GetMediaFoldersAsync(long? limitToParent = null);
+    public Task<MediaFolder?> GetMediaFolderAsync(long id);
+    public Task<MediaFolder?> GetMediaFolderAsync(string name, long? parentFolderId);
 
-    public Task<MediaStorageFolder> CreateMediaFolderAsync(string folderName, long? parentId);
-    public Task<MediaStorageFolder?> GetMediaFolderFromPathAsync(string path);
+    public Task<MediaFolder> CreateMediaFolderAsync(string folderName, long? parentId);
+    public Task<MediaFolder?> GetMediaFolderFromPathAsync(string path);
 
-    public Task<List<ConfiguredMedia>> GetMediaInFolderAsync(long folderId);
-    public Task<ConfiguredMedia?> GetMediaByNameAndPath(string requestName, string mainFolder);
+    public Task<List<Collection>> GetCollectionsInFolderAsync(long folderId);
+    public Task<Collection?> GetCollectionByNameAndFolder(string name, long folderId);
+
+    // Collections
+    public Task<Collection?> GetCollectionAsync(long id);
+    public Task SaveCollectionAsync(Collection collection);
+    public Task DeleteCollectionAsync(Collection collection);
 
     // Media
     public Task<MediaFile?> GetMediaByHashAsync(string sha3);
     public Task<MediaFile?> GetMediaByIdAsync(long id);
 
     public Task SaveMediaFileAsync(MediaFile mediaFile);
-    public Task<List<ConfiguredMedia>> GetMediaConfigurationsAsync(long mediaFileId);
 
-    // NOTE: this uses the media ID and not the config ID
-    public Task<ConfiguredMedia> GetConfiguredMediaPrimeAsync(long mediaId);
+    public Task<List<MediaFile>> GetMediaFileSiblingsAsync(long mediaId);
 
-    public Task<ConfiguredMedia?> GetConfiguredMediaAsync(long id, bool loadMedia = false);
-    public Task<ConfiguredMedia?> GetConfiguredMediaByMediaFileAsync(long id, bool loadMedia = false);
+    public Task MakeSureMediaIsSetToKeep(long mediaId);
 
-    public Task<ConfiguredMedia> CreateMediaConfig(MediaFile originalMedia, string newName, string mainFolder,
-        bool markAsKeep, bool allowCreateFolder = true, bool allowRootFolderCreate = false);
-
-    public Task MakeSureMediaIsSetToKeep(long configuredMediaId);
-
-    public Task<List<ConfiguredMedia>> GetDeletedMediaAsync(int limit);
+    public Task<List<MediaFile>> GetDeletedMediaAsync(int limit);
 
     /// <summary>
-    ///   Creates a new media file and its accompanying prime config
+    ///   Creates a new media file and adds it to a collection
     /// </summary>
-    public Task<ConfiguredMedia> CreateMediaAsync(MediaFile mediaItem, string initialFolder,
-        bool canCreateRootFolder = false);
+    public Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, long collectionId);
 
-    public Task SaveMediaConfigAsync(ConfiguredMedia media);
-    public Task<List<ConfiguredMedia>> GetOldDeletedConfigsAsync(DateTime cutoff);
-    public Task PurgeConfiguredMediaAsync(ConfiguredMedia config);
     public Task<List<MediaFile>> GetEligibleMediaFilesForPurgeAsync();
     public Task PurgeMediaFileAsync(MediaFile mediaFile);
 

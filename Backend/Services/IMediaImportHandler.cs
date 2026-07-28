@@ -4,6 +4,6 @@ namespace Backend.Services;
 
 public interface IMediaImportHandler
 {
-    public Task<ConfiguredMedia> ImportMedia(string fileName, Stream stream, string targetFolder, bool markAsKeep,
-        long? derivedFromId = null);
+    public Task<MediaFile> ImportMedia(string fileName, Stream stream, long targetCollectionId, bool markAsKeep,
+        long? parentMediaId = null);
 }

@@ -31,11 +31,10 @@ public class MediaController : Controller
         this.dataFolderService = dataFolderService;
     }
 
-    [HttpGet("{mediaConfigId:long}")]
-    public async Task<ActionResult<ConfiguredMediaDTO>> GetFullMedia([Required] long mediaConfigId,
-        bool loadMedia = true)
+    [HttpGet("{mediaId:long}")]
+    public async Task<ActionResult<MediaFileDTO>> GetFullMedia([Required] long mediaId)
     {
-        var media = await databaseService.GetConfiguredMediaAsync(mediaConfigId, loadMedia);
+        var media = await databaseService.GetMediaByIdAsync(mediaId);
 
         if (media == null)
             return NotFound();
@@ -43,20 +42,10 @@ public class MediaController : Controller
         return media.GetDTO();
     }
 
-    [HttpGet("byMediaFileId/{mediaFileId:long}")]
-    public async Task<ActionResult<ConfiguredMediaDTO>> GetByMediaId([Required] long mediaFileId,
-        bool loadMedia = true)
-    {
-        var media = await databaseService.GetConfiguredMediaByMediaFileAsync(mediaFileId, loadMedia);
-
-        if (media == null)
-            return Json(null);
-
-        return media.GetDTO();
-    }
+    // TODO: when creating a collection the name should have preceding and trailing spaces stripped
 
     [HttpPost("import")]
-    public async Task<ActionResult<ConfiguredMediaDTO>> ImportMedia([FromQuery] [Required] string targetFolder,
+    public async Task<ActionResult<MediaFileDTO>> ImportMedia([FromQuery] [Required] long targetCollectionId,
         [Required] IFormFile file)
     {
         if (file.Length == 0)
@@ -69,154 +58,66 @@ public class MediaController : Controller
         await using var stream = file.OpenReadStream();
 
         // We want to keep all user-imported media permanently without auto delete
-        var primeMediaConfiguration = await mediaImportHandler.ImportMedia(file.FileName, stream, targetFolder, true,
+        var media = await mediaImportHandler.ImportMedia(file.FileName, stream, targetCollectionId, true,
             null);
 
-        return primeMediaConfiguration.GetDTO();
+        return media.GetDTO();
     }
 
-    [HttpGet("{mediaConfigId:long}/inFolders")]
-    public async Task<ActionResult<MediaConfigFolderInfo>> GetFoldersMediaConfigIsIn([Required] long mediaConfigId)
+    [HttpGet("{mediaId:long}/collections")]
+    public async Task<ActionResult<List<long>>> GetCollectionsMediaIsIn([Required] long mediaId)
     {
-        var media = await databaseService.GetConfiguredMediaAsync(mediaConfigId);
-
-        if (media == null)
-            return NotFound();
-
-        return await databaseService.GetConfiguredMediaFoldersAsync(media.Id);
+        return await databaseService.GetMediaCollectionsAsync(mediaId);
     }
 
-    [HttpGet("{mediaConfigId:long}/siblings")]
-    public async Task<ActionResult<List<ConfiguredMediaDTO>>> GetSiblings([Required] long mediaConfigId)
+    [HttpGet("{mediaId:long}/siblings")]
+    public async Task<ActionResult<List<MediaFileDTO>>> GetSiblings([Required] long mediaId)
     {
-        var media = await databaseService.GetConfiguredMediaAsync(mediaConfigId);
-
-        if (media == null)
-            return NotFound();
-
-        var allConfigs = await databaseService.GetMediaConfigurationsAsync(media.MediaFileId);
-
-        return allConfigs.Where(c => c.Id != mediaConfigId).Select(c => c.GetDTO()).ToList();
+        var siblings = await databaseService.GetMediaFileSiblingsAsync(mediaId);
+        return siblings.Select(m => m.GetDTO()).ToList();
     }
 
-    [HttpPost("createConfig")]
-    public async Task<ActionResult<ConfiguredMediaDTO>> CreateNewMediaConfig(
-        [FromBody] CreateMediaConfigRequest request)
+    [HttpPut("{mediaId:long}")]
+    public async Task<ActionResult> UpdateMedia(long mediaId, [FromBody] MediaFileDTO request)
     {
-        var originalMedia = await databaseService.GetMediaByIdAsync(request.ParentMediaId);
-
-        if (originalMedia == null)
-            return NotFound();
-
-        var mainFolder = request.FoldersToAdd?.FirstOrDefault();
-
-        if (string.IsNullOrWhiteSpace(mainFolder))
-            return BadRequest("Main folder cannot be empty");
-
-        // Check if the name conflicts
-        var conflict = await databaseService.GetMediaByNameAndPath(request.Name, mainFolder);
-
-        if (conflict != null)
-            return BadRequest("A media with the same name already exists in the folder");
-
-        logger.LogInformation("Creating new config for media: {Id}, in folder: {Folder}", originalMedia.Id, mainFolder);
-        var newConfig = await databaseService.CreateMediaConfig(originalMedia, request.Name, mainFolder,
-            request.MarkAsKeep, request.CreateFolders, request.CreateFolders);
-
-        if (request.FoldersToAdd != null)
-        {
-            // Add the extra folders
-            for (int i = 1; i < request.FoldersToAdd.Count; ++i)
-            {
-                var folder = request.FoldersToAdd[i];
-                try
-                {
-                    await databaseService.AddMediaToFolder(newConfig.Id, folder, request.CreateFolders);
-                }
-                catch (Exception e)
-                {
-                    logger.LogError(e, "Failed to add media to folder {Folder}, but will continue creation", folder);
-                    continue;
-                }
-
-                logger.LogInformation("Added new media config {Id} to folder: {Folder}", newConfig.Id, folder);
-            }
-        }
-
-        return newConfig.GetDTO();
-    }
-
-    [HttpPut("{configId:long}")]
-    public async Task<ActionResult> UpdateConfig(long configId, [FromBody] ConfiguredMediaDTO request)
-    {
-        if (configId != request.Id)
+        if (mediaId != request.Id)
             return BadRequest("ID mismatch");
 
-        var media = await databaseService.GetConfiguredMediaAsync(configId, true);
+        var media = await databaseService.GetMediaByIdAsync(mediaId);
 
         if (media == null || media.IsDeleted)
             return NotFound();
 
-        if (media.Prime)
-            return BadRequest("Cannot edit prime media");
+        // Update properties
+        media.Keep = request.Keep;
+        media.CropLeft = request.CropLeft;
+        media.CropTop = request.CropTop;
+        media.CropRight = request.CropRight;
+        media.CropBottom = request.CropBottom;
 
-        if (request.Name != media.Name)
-        {
-            // Check if the name conflicts
-            var folders = await databaseService.GetConfiguredMediaFoldersAsync(configId);
-
-            var conflict = await databaseService.GetMediaByNameAndPath(request.Name, folders.PrimaryFolder);
-
-            if (conflict != null)
-                return BadRequest("A media with the same name already exists in the folder");
-
-            if (folders.SecondaryFolders != null)
-            {
-                foreach (var folder in folders.SecondaryFolders)
-                {
-                    conflict = await databaseService.GetMediaByNameAndPath(request.Name, folder);
-
-                    if (conflict != null)
-                        return BadRequest("A media with the same name already exists in a secondary folder");
-                }
-            }
-        }
-
-        if (!media.UpdateFromClient(request))
-        {
-            return Ok("No changes were made");
-        }
-
-        media.BumpUpdatedAtTime();
-        media.RefreshDerivedStatistics();
-
-        logger.LogInformation("Updating media config {Id} (for media: {Id2})", configId, media.MediaFileId);
-
-        await databaseService.SaveMediaConfigAsync(media);
+        await databaseService.SaveMediaFileAsync(media);
 
         try
         {
             var storage = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
-            mediaProcessingService.NotifyMediaConfigChanged(media, storage);
+            mediaProcessingService.NotifyMediaFileChanged(media, storage);
         }
         catch (Exception e)
         {
             logger.LogError(e, "Failed to update thumbnail / saved file after edit");
         }
 
-        // TODO: do we want to notify *all* folders this is in of the change?
-
         return Ok();
     }
 
-    [HttpPost("{configId:long}/keepStatus")]
-    public async Task<ActionResult> SetKeepStatus([Required] long configId, [Required] bool keep)
+    [HttpPost("{mediaId:long}/keepStatus")]
+    public async Task<ActionResult> SetKeepStatus([Required] long mediaId, [Required] bool keep)
     {
         try
         {
-            if (await databaseService.SetMediaKeepStatusAsync(configId, keep))
+            if (await databaseService.SetMediaKeepStatusAsync(mediaId, keep))
             {
-                logger.LogInformation("Set keep status for media config {Id} to {Keep}", configId, keep);
+                logger.LogInformation("Set keep status for media {Id} to {Keep}", mediaId, keep);
                 return Created();
             }
 
@@ -228,43 +129,35 @@ public class MediaController : Controller
         }
     }
 
-    [HttpGet("{configId:long}/safeToDelete")]
-    public async Task<ActionResult<bool>> IsSafeToDelete([Required] long configId)
+    [HttpGet("{mediaId:long}/safeToDelete")]
+    public async Task<ActionResult<bool>> IsSafeToDelete([Required] long mediaId)
     {
-        return await databaseService.IsMediaSafeToDeleteAsync(configId);
+        return await databaseService.IsMediaSafeToDeleteAsync(mediaId);
     }
 
-    [HttpDelete("{configId:long}")]
-    public async Task<ActionResult> DeleteMedia([Required] long configId)
+    [HttpDelete("{mediaId:long}")]
+    public async Task<ActionResult> DeleteMedia([Required] long mediaId)
     {
-        var media = await databaseService.GetConfiguredMediaAsync(configId);
+        await databaseService.DeleteMediaAsync(mediaId);
 
-        if (media == null)
-            return NotFound();
-
-        if (media.IsDeleted)
-            return Ok("Already deleted");
-
-        await databaseService.DeleteMediaAsync(configId);
-
-        logger.LogInformation("Deleted media config {Id}", configId);
+        logger.LogInformation("Deleted media {Id}", mediaId);
 
         return Ok();
     }
 
     [HttpGet("deleted")]
-    public async Task<ActionResult<List<ConfiguredMediaDTO>>> GetDeletedMedia([FromQuery] int limit = 100)
+    public async Task<ActionResult<List<MediaFileDTO>>> GetDeletedMedia([FromQuery] int limit = 100)
     {
         var deleted = await databaseService.GetDeletedMediaAsync(limit);
         return deleted.Select(m => m.GetDTO()).ToList();
     }
 
-    [HttpPost("{configId:long}/restore")]
-    public async Task<ActionResult> RestoreMedia([Required] long configId)
+    [HttpPost("{mediaId:long}/restore")]
+    public async Task<ActionResult> RestoreMedia([Required] long mediaId)
     {
         try
         {
-            await databaseService.RestoreMediaAsync(configId);
+            await databaseService.RestoreMediaAsync(mediaId);
             return Ok();
         }
         catch (ArgumentException)
@@ -273,20 +166,22 @@ public class MediaController : Controller
         }
     }
 
-    [HttpPost("{configId:long}/previewChanges")]
-    public async Task<ActionResult> PreviewConfigParameters(long configId, [FromBody] ConfiguredMediaDTO request)
+    [HttpPost("{mediaId:long}/previewChanges")]
+    public async Task<ActionResult> PreviewChanges(long mediaId, [FromBody] MediaFileDTO request)
     {
-        if (configId != request.Id)
+        if (mediaId != request.Id)
             return BadRequest("ID mismatch");
 
-        var media = await databaseService.GetConfiguredMediaAsync(configId, true);
+        var media = await databaseService.GetMediaByIdAsync(mediaId);
 
         if (media == null || media.IsDeleted)
             return NotFound();
 
-        // We allow previewing changes on prime media
-        media.Prime = false;
-        request.Prime = false;
+        // Update properties on the local object for preview
+        media.CropLeft = request.CropLeft;
+        media.CropTop = request.CropTop;
+        media.CropRight = request.CropRight;
+        media.CropBottom = request.CropBottom;
 
         Stream stream;
 
@@ -296,16 +191,6 @@ public class MediaController : Controller
         await PreviewProcessingLock.WaitAsync(HttpContext.RequestAborted);
         try
         {
-            if (!media.UpdateFromClient(request))
-            {
-                // No changes actually, so we could return an old cached copy *if* one is made
-                return File(
-                    System.IO.File.OpenRead(await mediaProcessingService.ModifiedMediaPath(media, null, storage)),
-                    media.MediaType.ToMimeType(), false);
-            }
-
-            media.RefreshDerivedStatistics();
-
             stream = await mediaProcessingService.GetProcessedMediaStream(media, storage);
         }
         finally

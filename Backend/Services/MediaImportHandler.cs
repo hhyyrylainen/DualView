@@ -38,39 +38,32 @@ public class MediaImportHandler : IMediaImportHandler
         return storage;
     }
 
-    public static async Task<string?> GetMediaLocalPath(IConfiguredMediaInfo media, IDatabaseService databaseService,
+    public static async Task<string?> GetMediaLocalPath(IMediaFile media, IDatabaseService databaseService,
         IDataFolderService dataFolderService, IMediaProcessingService mediaProcessingService)
     {
-        var originalMedia = await databaseService.GetMediaByIdAsync(media.MediaFileId);
+        var originalMedia = await databaseService.GetMediaByIdAsync(media.Id);
 
         if (originalMedia == null)
             return null;
 
         var storage = await GetBaseMediaFolder(databaseService, dataFolderService);
 
-        // If this is the prime, return the primary data
-        if (media.Prime)
+        // Check if we need to return a cropped version
+        if (originalMedia.MediaType.IsImage() && NeedsCropping(originalMedia))
         {
-            return Path.Join(storage, originalMedia.PathRelativeToStorage());
+            return await mediaProcessingService.ModifiedMediaPath(originalMedia, storage);
         }
 
-        // We need to read some database stuff if we don't have the full info here
-        var asConfigured = media as ConfiguredMedia;
-
-        if (asConfigured == null)
-        {
-            asConfigured = await databaseService.GetConfiguredMediaAsync(media.Id);
-
-            if (asConfigured == null)
-                throw new InvalidOperationException("We got a general interface but looking up the main media failed");
-        }
-
-        // Otherwise, we need to make sure the processed data exists and then return that
-        return await mediaProcessingService.ModifiedMediaPath(asConfigured, originalMedia, storage);
+        return Path.Join(storage, originalMedia.PathRelativeToStorage());
     }
 
-    public async Task<ConfiguredMedia> ImportMedia(string fileName, Stream stream, string targetFolder, bool markAsKeep,
-        long? derivedFromId = null)
+    private static bool NeedsCropping(MediaFile media)
+    {
+        return media.CropLeft > 0 || media.CropTop > 0 || media.CropRight > 0 || media.CropBottom > 0 ;
+    }
+
+    public async Task<MediaFile> ImportMedia(string fileName, Stream stream, long targetCollectionId, bool markAsKeep,
+        long? parentMediaId = null)
     {
         if (!stream.CanSeek)
             throw new ArgumentException("Current implementation of importing must be able to seek");
@@ -94,28 +87,28 @@ public class MediaImportHandler : IMediaImportHandler
         {
             logger.LogInformation("Hash is already imported: {Hash}", sha3);
 
-            // If it already exists, we should update the derived from if it wasn't already set
-            if (existing.DerivedFromImageId == null && derivedFromId != null)
+            // If it already exists, we should update the parent media if it wasn't already set
+            if (existing.ParentMediaId == null && parentMediaId != null)
             {
-                existing.DerivedFromImageId = derivedFromId;
+                existing.ParentMediaId = parentMediaId;
                 await databaseService.SaveMediaFileAsync(existing);
             }
 
-            // Get the prime to return
-            var prime = await databaseService.GetConfiguredMediaPrimeAsync(existing.Id);
-
-            // But before returning, make sure it is added to the folder as desired
+            // But before returning, make sure it is added to the collection as desired
             try
             {
-                await databaseService.AddMediaToFolder(prime.Id, targetFolder, false);
+                // We need to calculate the next sequence number
+                var sequenceNumber = await GetNextSequenceNumber(targetCollectionId);
+                await databaseService.AddMediaToCollection(existing.Id, targetCollectionId, sequenceNumber);
             }
             catch (Exception e)
             {
-                logger.LogError(e, "Failed to add media to folder (it was already imported): {Folder}", targetFolder);
+                logger.LogError(e, "Failed to add media to collection (it was already imported): {CollectionId}",
+                    targetCollectionId);
                 throw;
             }
 
-            return prime;
+            return existing;
         }
 
         if (!type.IsImage())
@@ -123,11 +116,11 @@ public class MediaImportHandler : IMediaImportHandler
             // Video
 
             var videoMedia = await CreateVideoMedia(stream, fileName, sha3, type, markAsKeep);
-            videoMedia.DerivedFromImageId = derivedFromId;
+            videoMedia.ParentMediaId = parentMediaId;
 
-            var videoPrime = await SaveFinalMedia(stream, targetFolder, storage, videoMedia);
+            var result = await SaveFinalMedia(stream, targetCollectionId, storage, videoMedia);
 
-            return videoPrime;
+            return result;
         }
 
         using var frames = new MagickImageCollection();
@@ -166,12 +159,24 @@ public class MediaImportHandler : IMediaImportHandler
             MediaType = type,
 
             Keep = markAsKeep,
-            DerivedFromImageId = derivedFromId,
+            ParentMediaId = parentMediaId,
         };
 
-        var newPrime = await SaveFinalMedia(stream, targetFolder, storage, mediaItem);
+        var finalResult = await SaveFinalMedia(stream, targetCollectionId, storage, mediaItem);
 
-        return newPrime;
+        return finalResult;
+    }
+
+    private async Task<int> GetNextSequenceNumber(long collectionId)
+    {
+        // TODO: implement a method to directly get next sequence number for a collection in the database
+        // This is a bit inefficient but for importing it should be fine
+        // Ideally IDatabaseService would have a method for this
+        var collection = await databaseService.GetCollectionAsync(collectionId);
+        if (collection == null)
+            return 1;
+
+        return collection.Items.Select(i => i.SequenceNumber).DefaultIfEmpty(0).Max() + 1;
     }
 
     private async Task<MediaFile> CreateVideoMedia(Stream stream, string fileName, string sha3, MediaType type,
@@ -237,7 +242,7 @@ public class MediaImportHandler : IMediaImportHandler
         return mediaItem;
     }
 
-    private async Task<ConfiguredMedia> SaveFinalMedia(Stream stream, string targetFolder, string storage,
+    private async Task<MediaFile> SaveFinalMedia(Stream stream, long targetCollectionId, string storage,
         MediaFile mediaItem)
     {
         var finalPath = Path.Join(storage, mediaItem.PathRelativeToStorage());
@@ -252,10 +257,10 @@ public class MediaImportHandler : IMediaImportHandler
         stream.Position = 0;
         await stream.CopyToAsync(writer);
 
-        // Finally, can save the item (and this puts it in the folder as well)
-        var newPrime = await databaseService.CreateMediaAsync(mediaItem, targetFolder, false);
+        // Finally, can save the item (and this adds it to the collection)
+        var newMedia = await databaseService.CreateMediaAsync(mediaItem, targetCollectionId);
 
-        logger.LogInformation("Media imported successfully, prime config: {Id}", newPrime.Id);
-        return newPrime;
+        logger.LogInformation("Media imported successfully, id: {Id}", newMedia.Id);
+        return newMedia;
     }
 }

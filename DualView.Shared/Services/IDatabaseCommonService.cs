@@ -18,27 +18,34 @@ public interface IDatabaseCommonService
 
     // Media
     public Task<long> CreateMediaFolder(string folderName, long? parentId);
-    public Task AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder = false);
-    public Task RemoveMediaFromFolder(long mediaConfigurationId, string folderPath);
+    public Task<long> CreateCollection(string collectionName, long folderId);
 
-    public Task<MediaConfigFolderInfo> GetConfiguredMediaFoldersAsync(long mediaConfigId);
+    public Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber);
+    public Task RemoveMediaFromCollection(long mediaId, long collectionId);
+
+    public Task<List<long>> GetMediaCollectionsAsync(long mediaId);
 
     /// <summary>
-    ///   Pages API to get a subset of media in a folder
+    ///   Pages API to get a subset of collections in a folder
     /// </summary>
-    public Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage, int pageSize,
+    public Task<Tuple<List<CollectionDTO>, int>> GetFolderCollections(long folderId, int page, int pageSize);
+
+    /// <summary>
+    ///   Pages API to get a subset of media in a collection
+    /// </summary>
+    public Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
         FolderSortColumn sortColumn, SortDirection sortDirection);
 
     /// <summary>
     ///   Updates media keep status.
     /// </summary>
-    /// <param name="configuredMediaId">Configured media to update</param>
+    /// <param name="mediaId">Media to update</param>
     /// <param name="keep">New keep value</param>
     /// <returns>True if modified, false if status was already right</returns>
-    public Task<bool> SetMediaKeepStatusAsync(long configuredMediaId, bool keep);
+    public Task<bool> SetMediaKeepStatusAsync(long mediaId, bool keep);
 
-    public Task<bool> IsMediaSafeToDeleteAsync(long configuredMediaId);
-    public Task DeleteMediaAsync(long configuredMediaId);
+    public Task<bool> IsMediaSafeToDeleteAsync(long mediaId);
+    public Task DeleteMediaAsync(long mediaId);
 
-    public Task RestoreMediaAsync(long configuredMediaId);
+    public Task RestoreMediaAsync(long mediaId);
 }

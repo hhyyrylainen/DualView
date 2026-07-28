@@ -14,11 +14,11 @@ public class HttpBackendAPI : IBackendAPI
         HttpClient = httpClient;
     }
 
-    public async Task<ConfiguredMediaDTO> ImportMedia(string fileName, Stream data, string targetFolder,
+    public async Task<MediaFileDTO> ImportMedia(string fileName, Stream data, long targetCollectionId,
         bool importAlphaAsMask = false)
     {
         var response = await HttpClient.PostAsync(
-            $"api/v1/media/import?targetFolder={UrlEncoder.Default.Encode(targetFolder)}&" +
+            $"api/v1/media/import?targetCollectionId={targetCollectionId}&" +
             $"importAlphaAsMask={(importAlphaAsMask ? "true" : "false")}",
             new MultipartFormDataContent
             {
@@ -26,7 +26,7 @@ public class HttpBackendAPI : IBackendAPI
             });
 
         response.EnsureSuccessStatusCode();
-        var content = await response.Content.ReadFromJsonAsync<ConfiguredMediaDTO>() ??
+        var content = await response.Content.ReadFromJsonAsync<MediaFileDTO>() ??
                       throw new Exception("Failed to deserialize response");
         return content;
     }

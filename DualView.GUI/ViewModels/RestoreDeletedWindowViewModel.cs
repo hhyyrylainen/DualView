@@ -154,15 +154,15 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
         {
             var media = await databaseService.GetDeletedMediaAsync(100);
 
-            var groups = media.GroupBy(m => m.MediaFileId)
+            var groups = media.GroupBy(m => m.Id)
                 .Select(g =>
                 {
                     var first = g.First();
-                    var group = new DeletedMediaGroupViewModel(first.MediaFile!);
+                    var group = new DeletedMediaGroupViewModel(first);
                     foreach (var m in g)
                     {
                         group.Configurations.Add(
-                            new DeletedMediaConfigViewModel(m, StartMediaRestore, serviceProvider!));
+                            new DeletedMediaConfigViewModel(new ConfiguredMediaDTO(m), StartMediaRestore, serviceProvider!));
                     }
 
                     return group;

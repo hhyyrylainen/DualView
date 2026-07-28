@@ -85,11 +85,8 @@ public class MediaProcessingService : IMediaProcessingService
         return ((uint)newWidth, (uint)newHeight);
     }
 
-    public async Task<string> ThumbnailPathForMedia(ConfiguredMedia media, string baseStorageLocation)
+    public async Task<string> ThumbnailPathForMedia(MediaFile media, string baseStorageLocation)
     {
-        // The navigation must be loaded
-        var original = media.MediaFile ?? throw new InvalidOperationException("MediaFile navigation must be loaded");
-
         // Gate starting processing for the same thing at the same time
         await WaitForExistingMediaProcessing(media);
 
@@ -98,10 +95,10 @@ public class MediaProcessingService : IMediaProcessingService
             if (!media.MediaType.IsImage())
             {
                 // Video handling
-                return await SmallVideoPath(media, baseStorageLocation, original);
+                return await SmallVideoPath(media, baseStorageLocation, media);
             }
 
-            return await ThumbnailPath(media, baseStorageLocation, original);
+            return await ThumbnailPath(media, baseStorageLocation, media);
         }
         finally
         {
@@ -109,27 +106,16 @@ public class MediaProcessingService : IMediaProcessingService
         }
     }
 
-    public async Task<string> ModifiedMediaPath(ConfiguredMedia media, MediaFile? originalMedia,
-        string baseStorageLocation)
+    public async Task<string> ModifiedMediaPath(MediaFile media, string baseStorageLocation)
     {
-        if (media.Prime)
-            throw new ArgumentException("Prime media can never be modified, use a different API to access that");
-
-        var original = media.MediaFile;
-
-        if (original == null!)
-            original = originalMedia ?? throw new InvalidOperationException("MediaFile navigation must be loaded");
-
-        media.MediaFile = original;
-
         // Theoretically we don't need to wait for thumbnails but for simplicity we just do
         await WaitForExistingMediaProcessing(media);
 
         try
         {
-            var path = GetPathForProcessedMedia(media, baseStorageLocation);
+            var path = Path.Join(baseStorageLocation, media.CroppedPathRelativeToStorage());
 
-            if (Path.Exists(path))
+            if (File.Exists(path))
                 return path;
 
             if (!media.MediaType.IsImage())
@@ -140,7 +126,7 @@ public class MediaProcessingService : IMediaProcessingService
 
             using var image = new MagickImageCollection();
 
-            var originalPath = Path.Join(baseStorageLocation, original.PathRelativeToStorage());
+            var originalPath = Path.Join(baseStorageLocation, media.PathRelativeToStorage());
             await image.ReadAsync(originalPath).ConfigureAwait(false);
 
             if (image.Count < 1)
@@ -168,25 +154,15 @@ public class MediaProcessingService : IMediaProcessingService
         }
     }
 
-    public void NotifyMediaConfigChanged(ConfiguredMedia media, string baseStorageLocation)
+    public void NotifyMediaFileChanged(MediaFile media, string baseStorageLocation)
     {
-        if (media.MediaFile == null)
-            throw new InvalidOperationException("MediaFile navigation must be loaded");
-
-        // TODO: should we lock here to make sure no jobs will generate the files again immediately?
-        var path = GetPathForProcessedMedia(media, baseStorageLocation);
-        var path2 = GetPathForProcessedMedia(media, baseStorageLocation, true);
+        var path = Path.Join(baseStorageLocation, media.CroppedPathRelativeToStorage());
 
         try
         {
             if (File.Exists(path))
             {
                 File.Delete(path);
-            }
-
-            if (File.Exists(path2))
-            {
-                File.Delete(path2);
             }
         }
         catch (Exception e)
@@ -207,68 +183,17 @@ public class MediaProcessingService : IMediaProcessingService
         }
     }
 
-    public string GetPathForProcessedMedia(ConfiguredMedia media, string baseStorageLocation, bool includeMask = false)
+    public void ApplyMediaImageAdjustments(MediaFile mediaSettings, MagickImageCollection image)
     {
-        if (media.Prime)
-            throw new ArgumentException("Prime config can never change so it cannot have a processed path");
-
-        // The navigation must be loaded
-        var original = media.MediaFile ?? throw new InvalidOperationException("MediaFile navigation must be loaded");
-
-        var file =
-            $"{media.Id}{(includeMask && media.MaskEnabled ? "_masked" : "")}{Path.GetExtension(original.OriginalFileName)}";
-
-        return Path.Combine(baseStorageLocation, "processed", $"{media.Id % 100}", file);
-    }
-
-    public void ApplyMediaImageAdjustments(ConfiguredMedia mediaSettings, MagickImageCollection image)
-    {
-        if (mediaSettings.Prime)
-            logger.LogWarning("Uselessly applying prime media config adjustments (there should be none)");
-
         // Apply each frame edit
         foreach (var singleFrame in image)
         {
-            ApplyMediaImageAdjustments(mediaSettings, singleFrame, false);
-        }
-
-        if (mediaSettings.CropStart is > 0)
-        {
-            for (int i = 0; i < mediaSettings.CropStart.Value; ++i)
-            {
-                // Keep at least one frame
-                if (image.Count <= 1)
-                    break;
-
-                image.RemoveAt(0);
-            }
-        }
-
-        if (mediaSettings.CropEnd is > 0)
-        {
-            for (int i = 0; i < mediaSettings.CropEnd.Value; ++i)
-            {
-                // Keep at least one frame
-                if (image.Count <= 1)
-                    break;
-
-                image.RemoveAt(image.Count - 1);
-            }
+            ApplyMediaImageAdjustments(mediaSettings, singleFrame);
         }
     }
 
-    public void ApplyMediaImageAdjustments(ConfiguredMedia mediaSettings, IMagickImage singleFrame,
-        bool warnOnPrime = true)
+    public void ApplyMediaImageAdjustments(MediaFile mediaSettings, IMagickImage singleFrame)
     {
-        if (mediaSettings.Prime && warnOnPrime)
-            logger.LogWarning("Uselessly applying prime media config adjustments (there should be none)");
-
-        if (mediaSettings.FlipHorizontal)
-            singleFrame.Flop();
-
-        if (mediaSettings.FlipVertical)
-            singleFrame.Flip();
-
         if (mediaSettings.CropLeft > 0 || mediaSettings.CropTop > 0 || mediaSettings.CropRight > 0 ||
             mediaSettings.CropBottom > 0)
         {
@@ -276,18 +201,10 @@ public class MediaProcessingService : IMediaProcessingService
                 singleFrame.Width - (uint)mediaSettings.CropRight,
                 singleFrame.Height - (uint)mediaSettings.CropBottom));
         }
-
-        if (Math.Abs(mediaSettings.Scale - 1) > 0.001f)
-            singleFrame.Scale(new Percentage(mediaSettings.Scale * 100));
-
-        if (mediaSettings.Rotation != 0)
-            singleFrame.Rotate(mediaSettings.Rotation);
     }
 
-    public async Task<Stream> GetProcessedMediaStream(ConfiguredMedia media, string baseStorageLocation)
+    public async Task<Stream> GetProcessedMediaStream(MediaFile media, string baseStorageLocation)
     {
-        var original = media.MediaFile ?? throw new InvalidOperationException("MediaFile navigation must be loaded");
-
         if (!media.MediaType.IsImage())
         {
             // Video handling
@@ -296,7 +213,7 @@ public class MediaProcessingService : IMediaProcessingService
 
         using var image = new MagickImageCollection();
 
-        var originalPath = Path.Join(baseStorageLocation, original.PathRelativeToStorage());
+        var originalPath = Path.Join(baseStorageLocation, media.PathRelativeToStorage());
         await image.ReadAsync(originalPath).ConfigureAwait(false);
 
         if (image.Count < 1)
@@ -310,14 +227,7 @@ public class MediaProcessingService : IMediaProcessingService
             frame.AutoOrient();
         }
 
-        if (media.Prime)
-        {
-            // Prime, so we don't need to do anything
-        }
-        else
-        {
-            ApplyMediaImageAdjustments(media, image);
-        }
+        ApplyMediaImageAdjustments(media, image);
 
         var targetStream = new MemoryStream();
         await image.WriteAsync(targetStream).ConfigureAwait(false);
@@ -325,27 +235,26 @@ public class MediaProcessingService : IMediaProcessingService
         return targetStream;
     }
 
-    private static string GetPathForThumbnail(ConfiguredMedia media, string baseStorageLocation)
+    private static string GetPathForThumbnail(MediaFile media, string baseStorageLocation)
     {
         string thumbnailExtension;
 
         if (media.MediaType.IsImage())
         {
-            thumbnailExtension = Path.GetExtension(media.MediaFile.OriginalFileName);
+            thumbnailExtension = Path.GetExtension(media.OriginalFileName);
         }
         else
         {
             thumbnailExtension = ".webm";
         }
 
-        // By default, thumbnails are masked, so that is the main name here
         var thumbnailFile = $"{media.Id}_um{thumbnailExtension}";
 
         // To not pack all thumbnails in the same folder, we use the media ID as a prefix (with a modulo)
         return Path.Combine(baseStorageLocation, "thumbnails", $"{media.Id % 100}", thumbnailFile);
     }
 
-    private async Task<string> ThumbnailPath(ConfiguredMedia media, string baseStorageLocation, MediaFile original)
+    private async Task<string> ThumbnailPath(MediaFile media, string baseStorageLocation, MediaFile original)
     {
         var thumbnailPath = GetPathForThumbnail(media, baseStorageLocation);
 
@@ -373,14 +282,7 @@ public class MediaProcessingService : IMediaProcessingService
             entry.AutoOrient();
         }
 
-        if (media.Prime)
-        {
-            // Prime, so we can just load up the primary file without needing to do anything
-        }
-        else
-        {
-            ApplyMediaImageAdjustments(media, image);
-        }
+        ApplyMediaImageAdjustments(media, image);
 
         var animated = image.Count > 1;
 
@@ -449,7 +351,7 @@ public class MediaProcessingService : IMediaProcessingService
         return thumbnailPath;
     }
 
-    private async Task<string> SmallVideoPath(ConfiguredMedia media, string baseStorageLocation,
+    private async Task<string> SmallVideoPath(MediaFile media, string baseStorageLocation,
         MediaFile original)
     {
         // For efficiency all video thumbnails are webm
@@ -483,16 +385,7 @@ public class MediaProcessingService : IMediaProcessingService
         startInfo.ArgumentList.Add("-i");
         startInfo.ArgumentList.Add(originalPath);
 
-        if (media.Prime)
-        {
-            // Prime, so we can just load up the primary file without needing to do anything
-        }
-        else
-        {
-            // TODO: implement file processing operations
-            // This also needs deleting the thumbnail file when settings change
-            throw new NotImplementedException();
-        }
+        // TODO: implement video cropping if needed in the future
 
         var (newWidth, newHeight) = GetDivisibleByTwoDimensions((uint)width, (uint)height, VideoThumbnailSize);
 
@@ -564,7 +457,7 @@ public class MediaProcessingService : IMediaProcessingService
         return thumbnailPath;
     }
 
-    private async Task WaitForExistingMediaProcessing(ConfiguredMedia media,
+    private async Task WaitForExistingMediaProcessing(MediaFile media,
         CancellationToken cancellationToken = default)
     {
         // Simple locking based on media ID
@@ -597,7 +490,7 @@ public class MediaProcessingService : IMediaProcessingService
         }
     }
 
-    private void ReportMediaProcessingEnd(ConfiguredMedia media)
+    private void ReportMediaProcessingEnd(MediaFile media)
     {
         lock (ActiveMediaProcessingIds)
         {

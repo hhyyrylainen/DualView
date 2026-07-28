@@ -28,7 +28,12 @@ public class MediaFileDTO(string originalFileName, string hashSha3) : IMediaFile
 
     public float FramesPerSecond { get; set; }
 
-    public long? DerivedFromImageId { get; set; }
+    public int CropLeft { get; set; }
+    public int CropTop { get; set; }
+    public int CropRight { get; set; }
+    public int CropBottom { get; set; }
+
+    public long? ParentMediaId { get; set; }
 }
 
 public interface IMediaFile
@@ -60,5 +65,10 @@ public interface IMediaFile
     /// </summary>
     public float FramesPerSecond { get; set; }
 
-    public long? DerivedFromImageId { get; set; }
+    public int CropLeft { get; set; }
+    public int CropTop { get; set; }
+    public int CropRight { get; set; }
+    public int CropBottom { get; set; }
+
+    public long? ParentMediaId { get; set; }
 }

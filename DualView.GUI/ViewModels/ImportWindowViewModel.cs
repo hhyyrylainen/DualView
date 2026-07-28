@@ -212,6 +212,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         if (clientDatabaseService == null || windowService == null)
             return;
 
+        // TODO: remove the dataset include feature and instead this should take in the name of a collection and import into it or create it if missing
         var target = TargetImportPath.Trim();
         var secondary = ExtraPathToAddTo.Trim();
         var datasetName = (DatasetForAutoIncludeName ?? string.Empty).Trim();
@@ -274,8 +275,9 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
                 logger?.LogInformation("Importing {ImagePath} to {Target}", local.LocalPath, target);
 
+                // TODO: this needs to set the collection
                 var mediaConfiguration = await backendAPI!.ImportMedia(Path.GetFileName(local.LocalPath),
-                    File.OpenRead(local.LocalPath), target, ImportAlphaAsMask);
+                    File.OpenRead(local.LocalPath), 1, ImportAlphaAsMask);
 
                 if (!string.IsNullOrWhiteSpace(secondary))
                 {
