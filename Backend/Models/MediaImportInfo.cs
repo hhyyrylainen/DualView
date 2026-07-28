@@ -1,11 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
+using Backend.Utilities;
 
 namespace Backend.Models;
 
-// TODO: make this non-soft delete as these should just cascade on the main media file delete these are related to
-public class MediaImportInfo : UpdateableModel, ISoftDelete
+public class MediaImportInfo : UpdateableModel, IDTOProvider<MediaImportInfoDTO>
 {
     // TODO: if ImportStatus is only used by this class, it should be deleted
     public MediaImportInfo(long mediaFileId, DateTime importDate, ImportStatus status)
@@ -39,8 +40,6 @@ public class MediaImportInfo : UpdateableModel, ISoftDelete
 
     [MaxLength(4096)]
     public string? TagsString { get; set; }
-
-    public bool IsDeleted { get; set; }
 
     public long? DownloadGalleryId { get; set; }
     public DownloadGallery? DownloadGallery { get; set; }

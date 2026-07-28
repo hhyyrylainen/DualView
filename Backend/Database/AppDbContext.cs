@@ -150,8 +150,6 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<MediaImportInfo>(builder =>
         {
-            builder.HasQueryFilter(m => !m.IsDeleted);
-
             builder.HasOne(d => d.DownloadGallery).WithMany(p => p.AssociatedImports)
                 .HasForeignKey(d => d.DownloadGalleryId)
                 .OnDelete(DeleteBehavior.SetNull);
