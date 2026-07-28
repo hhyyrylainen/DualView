@@ -32,7 +32,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\DualView.GUI\DualView.GUI.csproj" />
-      <ProjectReference Include="..\Dualview.Shared\Dualview.Shared.csproj" />
+      <ProjectReference Include="..\DualView.Shared\DualView.Shared.csproj" />
     </ItemGroup>
 
 </Project>
