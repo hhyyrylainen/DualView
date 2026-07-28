@@ -111,13 +111,11 @@ public class MediaEditorWindowViewModel : ViewModelBase, IDisposable, IRenderHoo
             if (ShownMedia.FrameCount > 1)
             {
                 return
-                    $"{ShownMedia.Width}x{ShownMedia.Height} {ShownMedia.FrameCount} frames @ {ShownMedia.FramesPerSecond} FPS\n"
-                    + $"FlipH: {ShownMedia.FlipHorizontal} FlipV: {ShownMedia.FlipVertical}";
+                    $"{ShownMedia.Width}x{ShownMedia.Height} {ShownMedia.FrameCount} frames @ {ShownMedia.FramesPerSecond} FPS";
             }
 
             return
-                $"{ShownMedia.Width}x{ShownMedia.Height}\n"
-                + $"FlipH: {ShownMedia.FlipHorizontal} FlipV: {ShownMedia.FlipVertical}";
+                $"{ShownMedia.Width}x{ShownMedia.Height}";
         }
     }
 
@@ -136,11 +134,6 @@ public class MediaEditorWindowViewModel : ViewModelBase, IDisposable, IRenderHoo
             OnPropertyChanged(nameof(CropRight));
             OnPropertyChanged(nameof(CropTop));
             OnPropertyChanged(nameof(CropBottom));
-            OnPropertyChanged(nameof(FlipHorizontal));
-            OnPropertyChanged(nameof(FlipVertical));
-            OnPropertyChanged(nameof(ImageScale));
-            EnableScaling = Math.Abs(ImageScale - 1) > 0.00001f;
-            OnPropertyChanged(nameof(Rotation));
             HasUnsavedChanges = false;
         }
     }
@@ -240,94 +233,6 @@ public class MediaEditorWindowViewModel : ViewModelBase, IDisposable, IRenderHoo
     {
         get;
         set => SetProperty(ref field, value);
-    }
-
-    public bool FlipHorizontal
-    {
-        get => ShownMedia?.FlipHorizontal ?? false;
-        set
-        {
-            if (ShownMedia == null)
-                return;
-
-            if (ShownMedia.FlipHorizontal == value)
-                return;
-
-            ShownMedia.FlipHorizontal = value;
-            OnPropertyChanged();
-            TriggerEditsChanged();
-            HasUnsavedChanges = true;
-        }
-    }
-
-    public bool FlipVertical
-    {
-        get => ShownMedia?.FlipVertical ?? false;
-        set
-        {
-            if (ShownMedia == null)
-                return;
-
-            if (ShownMedia.FlipVertical == value)
-                return;
-
-            ShownMedia.FlipVertical = value;
-            OnPropertyChanged();
-            TriggerEditsChanged();
-            HasUnsavedChanges = true;
-        }
-    }
-
-    public float ImageScale
-    {
-        get => ShownMedia?.Scale ?? 1;
-        set
-        {
-            if (ShownMedia == null)
-                return;
-
-            if (Math.Abs(ShownMedia.Scale - value) < 0.00001f)
-                return;
-
-            ShownMedia.Scale = value;
-            OnPropertyChanged();
-            TriggerEditsChanged();
-            HasUnsavedChanges = true;
-        }
-    }
-
-    public bool EnableScaling
-    {
-        get;
-        set
-        {
-            if (field == value)
-                return;
-
-            field = value;
-            OnPropertyChanged();
-
-            if (!field)
-                ImageScale = 1;
-        }
-    }
-
-    public int Rotation
-    {
-        get => ShownMedia?.Rotation ?? 0;
-        set
-        {
-            if (ShownMedia == null)
-                return;
-
-            if (ShownMedia.Rotation == value)
-                return;
-
-            ShownMedia.Rotation = value;
-            OnPropertyChanged();
-            TriggerEditsChanged();
-            HasUnsavedChanges = true;
-        }
     }
 
     public bool HasUnsavedChanges

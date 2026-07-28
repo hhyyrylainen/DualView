@@ -27,16 +27,6 @@
                             <StackPanel>
                                 <Expander VerticalAlignment="Top" HorizontalAlignment="Stretch">
                                     <Expander.Header>
-                                        Flip
-                                    </Expander.Header>
-                                    <StackPanel>
-                                        <CheckBox IsChecked="{Binding FlipHorizontal}">Horizontally</CheckBox>
-                                        <CheckBox IsChecked="{Binding FlipVertical}">Vertically</CheckBox>
-                                    </StackPanel>
-                                </Expander>
-
-                                <Expander VerticalAlignment="Top" HorizontalAlignment="Stretch">
-                                    <Expander.Header>
                                         Cropping
                                     </Expander.Header>
                                     <StackPanel>
@@ -69,38 +59,10 @@
 
                                 <Expander VerticalAlignment="Top" HorizontalAlignment="Stretch">
                                     <Expander.Header>
-                                        Scale
-                                    </Expander.Header>
-                                    <StackPanel>
-                                        <CheckBox IsChecked="{Binding EnableScaling}">Enable scaling</CheckBox>
-                                        <Slider Minimum="0.001" Maximum="5" IsEnabled="{Binding EnableScaling}"
-                                                Value="{Binding ImageScale}" />
-                                        <TextBox IsEnabled="{Binding EnableScaling}" Text="{Binding ImageScale}" />
-                                    </StackPanel>
-                                </Expander>
-
-                                <Expander VerticalAlignment="Top" HorizontalAlignment="Stretch">
-                                    <Expander.Header>
-                                        Rotation
-                                    </Expander.Header>
-                                    <StackPanel>
-                                        <Slider Minimum="0" Maximum="359" Value="{Binding Rotation}" />
-                                        <TextBox Text="{Binding Rotation}" />
-                                    </StackPanel>
-                                </Expander>
-
-                                <Expander VerticalAlignment="Top" HorizontalAlignment="Stretch">
-                                    <Expander.Header>
                                         Animation
                                     </Expander.Header>
                                     <StackPanel>
                                         <CheckBox IsEnabled="False">Cut Start Frames</CheckBox>
-                                        <Slider Minimum="0" Maximum="100" IsEnabled="False"></Slider>
-                                        <TextBox IsEnabled="False">0</TextBox>
-
-                                        <CheckBox Margin="0 25 0 0" IsEnabled="False">Cut End Frames</CheckBox>
-                                        <Slider Minimum="0" Maximum="100" IsEnabled="False" />
-                                        <TextBox IsEnabled="False">0</TextBox>
                                     </StackPanel>
                                 </Expander>
 
