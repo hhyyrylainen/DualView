@@ -18,10 +18,4 @@
         <Using Include="Xunit"/>
     </ItemGroup>
 
-    <ItemGroup>
-      <ProjectReference Include="..\Backend\Backend.csproj" />
-      <ProjectReference Include="..\Dualview.Shared\Dualview.Shared.csproj" />
-      <ProjectReference Include="..\DualView\DualView.Server\DualView.Server.csproj" />
-    </ItemGroup>
-
 </Project>
