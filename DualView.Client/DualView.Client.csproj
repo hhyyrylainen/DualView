@@ -14,7 +14,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Dualview.Shared\Dualview.Shared.csproj" />
+    <ProjectReference Include="..\Dualview.Shared\Dualview.Shared.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AvaloniaProject">
+    <option name="projectPerEditor">
+      <map>
+        <entry key="DualView.GUI/Views/MainWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
+      </map>
+    </option>
+  </component>
+</project>

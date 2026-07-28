@@ -1,12 +1,10 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Server", "DualView\DualView.Server\DualView.Server.csproj", "{10CD6724-CC4F-4265-A1C6-8DBB07BA5DB5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Server", "DualView.Server\DualView.Server.csproj", "{10CD6724-CC4F-4265-A1C6-8DBB07BA5DB5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Client", "DualView\DualView.Client\DualView.Client.csproj", "{D2BF7F16-43DA-470F-9696-6734E3B1289F}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Client", "DualView.Client\DualView.Client.csproj", "{D2BF7F16-43DA-470F-9696-6734E3B1289F}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dualview.Shared", "Dualview.Shared\Dualview.Shared.csproj", "{3FD7084E-7D06-4939-9657-0D755E067EFE}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dualview.Server.Tests", "Dualview.Server.Tests\Dualview.Server.Tests.csproj", "{25D4EDEB-1049-420F-9BD8-2A6D66CF03C5}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backend", "Backend\Backend.csproj", "{269B1A44-266C-4F90-95C3-F0356F2FD15C}"
 EndProject
@@ -17,6 +15,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.GUI", "DualView.GUI\DualView.GUI.csproj", "{9DEADC03-01E6-4508-A374-83A7CB4A7E59}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.GUI.Tests", "DualView.GUI.Tests\DualView.GUI.Tests.csproj", "{D93DFF75-10D1-42C1-9969-F4389726E6A2}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dualview.Server.Tests", "DualView.Server.Tests\Dualview.Server.Tests.csproj", "{987B3E0C-384A-4683-82E1-F6B856BB8528}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,10 +36,6 @@ Global
 		{3FD7084E-7D06-4939-9657-0D755E067EFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3FD7084E-7D06-4939-9657-0D755E067EFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3FD7084E-7D06-4939-9657-0D755E067EFE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{25D4EDEB-1049-420F-9BD8-2A6D66CF03C5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{25D4EDEB-1049-420F-9BD8-2A6D66CF03C5}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{25D4EDEB-1049-420F-9BD8-2A6D66CF03C5}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{25D4EDEB-1049-420F-9BD8-2A6D66CF03C5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{269B1A44-266C-4F90-95C3-F0356F2FD15C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{269B1A44-266C-4F90-95C3-F0356F2FD15C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{269B1A44-266C-4F90-95C3-F0356F2FD15C}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -60,5 +56,9 @@ Global
 		{D93DFF75-10D1-42C1-9969-F4389726E6A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D93DFF75-10D1-42C1-9969-F4389726E6A2}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D93DFF75-10D1-42C1-9969-F4389726E6A2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{987B3E0C-384A-4683-82E1-F6B856BB8528}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{987B3E0C-384A-4683-82E1-F6B856BB8528}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{987B3E0C-384A-4683-82E1-F6B856BB8528}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{987B3E0C-384A-4683-82E1-F6B856BB8528}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
