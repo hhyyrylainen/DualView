@@ -44,4 +44,18 @@ public class MediaImportInfo : UpdateableModel, ISoftDelete
 
     public long? DownloadGalleryId { get; set; }
     public DownloadGallery? DownloadGallery { get; set; }
+
+    public MediaImportInfoDTO GetDTO()
+    {
+        return new MediaImportInfoDTO(MediaFileId, ImportDate, Status)
+        {
+            Id = Id,
+            SourceUrl = SourceUrl,
+            SourcePath = SourcePath,
+            Referrer = Referrer,
+            PreferredName = PreferredName,
+            TagsString = TagsString,
+            DownloadGalleryId = DownloadGalleryId,
+        };
+    }
 }

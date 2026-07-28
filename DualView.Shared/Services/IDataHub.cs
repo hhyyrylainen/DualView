@@ -57,4 +57,13 @@ public interface IDataHub
     public Task DatasetsListUpdated();
     public Task DatasetUpdated(long id);
     public Task DatasetContentsUpdated(long datasetId);
+
+    // DualView specific
+    public Task CollectionUpdated(long id);
+    public Task CollectionContentsUpdated(long id);
+    public Task TagUpdated(long id);
+    public Task TagsUpdated();
+    public Task TagModifiersUpdated();
+    public Task DownloadGalleriesUpdated();
+    public Task DownloadGalleryUpdated(long id);
 }

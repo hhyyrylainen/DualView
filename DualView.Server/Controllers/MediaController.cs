@@ -1,8 +1,6 @@
 using System.ComponentModel.DataAnnotations;
-using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
-using DualView.Shared.Requests;
 using Backend.Services;
 using Microsoft.AspNetCore.Mvc;
 

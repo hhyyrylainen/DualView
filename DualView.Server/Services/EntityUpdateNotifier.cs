@@ -194,4 +194,46 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
         logger.LogDebug("Broadcasting single dataset contents update to all clients");
         await hubContext.Clients.All.DatasetContentsUpdated(datasetId);
     }
+
+    public async Task NotifyCollectionUpdated(long id)
+    {
+        logger.LogDebug("Broadcasting single collection update to all clients");
+        await hubContext.Clients.All.CollectionUpdated(id);
+    }
+
+    public async Task NotifyCollectionContentsUpdated(long id)
+    {
+        logger.LogDebug("Broadcasting single collection contents update to all clients");
+        await hubContext.Clients.All.CollectionContentsUpdated(id);
+    }
+
+    public async Task NotifyTagUpdated(long id)
+    {
+        logger.LogDebug("Broadcasting single tag update to all clients");
+        await hubContext.Clients.All.TagUpdated(id);
+    }
+
+    public async Task NotifyTagsUpdated()
+    {
+        logger.LogDebug("Broadcasting tags list update to all clients");
+        await hubContext.Clients.All.TagsUpdated();
+    }
+
+    public async Task NotifyTagModifiersUpdated()
+    {
+        logger.LogDebug("Broadcasting tag modifiers list update to all clients");
+        await hubContext.Clients.All.TagModifiersUpdated();
+    }
+
+    public async Task NotifyDownloadGalleriesUpdated()
+    {
+        logger.LogDebug("Broadcasting download galleries list update to all clients");
+        await hubContext.Clients.All.DownloadGalleriesUpdated();
+    }
+
+    public async Task NotifyDownloadGalleryUpdated(long id)
+    {
+        logger.LogDebug("Broadcasting single download gallery update to all clients");
+        await hubContext.Clients.All.DownloadGalleryUpdated(id);
+    }
 }

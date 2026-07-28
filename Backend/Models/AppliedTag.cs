@@ -1,9 +1,10 @@
 using System.ComponentModel.DataAnnotations;
-using Microsoft.EntityFrameworkCore;
+using DualView.Shared.Models.DTO;
+using Backend.Utilities;
 
 namespace Backend.Models;
 
-public class AppliedTag
+public class AppliedTag : IDTOProvider<AppliedTagDTO>
 {
     public AppliedTag(long tagId)
     {
@@ -25,4 +26,15 @@ public class AppliedTag
     public ICollection<TagModifier> Modifiers { get; set; } = new List<TagModifier>();
     public ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
     public ICollection<Collection> Collections { get; set; } = new List<Collection>();
+
+    public AppliedTagDTO GetDTO()
+    {
+        return new AppliedTagDTO(Id, TagId)
+        {
+            Tag = Tag?.GetDTO(),
+            Modifiers = Modifiers.Select(m => m.GetDTO()).ToList(),
+            CombinedWithId = CombinedWithId,
+            CombineWord = CombineWord,
+        };
+    }
 }

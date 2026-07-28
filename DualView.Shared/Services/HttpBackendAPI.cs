@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Encodings.Web;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 

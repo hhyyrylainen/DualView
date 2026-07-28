@@ -1,11 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
+using Backend.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
 
 [Index(nameof(Name), IsUnique = true)]
-public class TagModifier : UpdateableModel, ISoftDelete
+public class TagModifier : UpdateableModel, ISoftDelete, IDTOProvider<TagModifierDTO>
 {
     public TagModifier(string name)
     {
@@ -25,4 +27,13 @@ public class TagModifier : UpdateableModel, ISoftDelete
     public bool IsDeleted { get; set; }
 
     public ICollection<TagModifierAlias> Aliases { get; set; } = new List<TagModifierAlias>();
+
+    public TagModifierDTO GetDTO()
+    {
+        return new TagModifierDTO(Name)
+        {
+            Id = Id,
+            Description = Description,
+        };
+    }
 }

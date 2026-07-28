@@ -1,5 +1,4 @@
 using Backend.Models;
-using DualView.Shared.Models.Enums;
 
 namespace Backend.Services;
 

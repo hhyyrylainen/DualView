@@ -244,4 +244,191 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         var media = await GetMediaFileAsync(mediaFileId);
         return media != null ? new ConfiguredMediaDTO(media) : null;
     }
+
+    public async Task<bool> SetMediaRatingAsync(long mediaId, bool isFavorited, int stars)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/media/{mediaId}/rating", new { isFavorited, stars });
+        return response.IsSuccessStatusCode;
+    }
+
+    // Tags
+    public async Task<long> CreateTagAsync(string name, TagCategory category)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/tag", new { name, category });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task UpdateTagAsync(long id, string? name, string? description, TagCategory? category,
+        long? exampleMediaId)
+    {
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/tag/{id}",
+            new { name, description, category, exampleMediaId });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTagAsync(long id)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/tag/{id}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<TagDTO>> GetAllTagsAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<TagDTO>>("api/v1/tag") ?? new List<TagDTO>();
+    }
+
+    public async Task<TagDTO?> GetTagAsync(long id)
+    {
+        return await HttpClient.GetFromJsonAsync<TagDTO?>($"api/v1/tag/{id}");
+    }
+
+    public async Task<long> CreateTagModifierAsync(string name)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/tagModifier", new { name });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task UpdateTagModifierAsync(long id, string? name, string? description)
+    {
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/tagModifier/{id}", new { name, description });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTagModifierAsync(long id)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/tagModifier/{id}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<TagModifierDTO>> GetAllTagModifiersAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<TagModifierDTO>>("api/v1/tagModifier") ??
+               new List<TagModifierDTO>();
+    }
+
+    public async Task<TagModifierDTO?> GetTagModifierAsync(long id)
+    {
+        return await HttpClient.GetFromJsonAsync<TagModifierDTO?>($"api/v1/tagModifier/{id}");
+    }
+
+    public async Task CreateTagAliasAsync(long tagId, string alias)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/alias", new { alias });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTagAliasAsync(long tagId, string alias)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/tag/{tagId}/alias?alias={UrlEncoder.Default.Encode(alias)}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task CreateTagModifierAliasAsync(long modifierId, string alias)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tagModifier/{modifierId}/alias", new { alias });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteTagModifierAliasAsync(long modifierId, string alias)
+    {
+        var response =
+            await HttpClient.DeleteAsync(
+                $"api/v1/tagModifier/{modifierId}/alias?alias={UrlEncoder.Default.Encode(alias)}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task AddTagImplicationAsync(long tagId, long impliedTagId)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/imply", new { impliedTagId });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RemoveTagImplicationAsync(long tagId, long impliedTagId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/tag/{tagId}/imply/{impliedTagId}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    // Applied Tags
+    public async Task<long> AddAppliedTagToMediaAsync(long mediaId, long tagId, List<long>? modifierIds,
+        long? combinedWithAppliedTagId, string? combineWord)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/media/{mediaId}/appliedTag",
+            new { tagId, modifierIds, combinedWithAppliedTagId, combineWord });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task RemoveAppliedTagFromMediaAsync(long mediaId, long appliedTagId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/media/{mediaId}/appliedTag/{appliedTagId}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<long> AddAppliedTagToCollectionAsync(long collectionId, long tagId, List<long>? modifierIds,
+        long? combinedWithAppliedTagId, string? combineWord)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/appliedTag",
+            new { tagId, modifierIds, combinedWithAppliedTagId, combineWord });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task RemoveAppliedTagFromCollectionAsync(long collectionId, long appliedTagId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/collection/{collectionId}/appliedTag/{appliedTagId}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<AppliedTagDTO>> GetMediaAppliedTagsAsync(long mediaId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<AppliedTagDTO>>($"api/v1/media/{mediaId}/appliedTag") ??
+               new List<AppliedTagDTO>();
+    }
+
+    public async Task<List<AppliedTagDTO>> GetCollectionAppliedTagsAsync(long collectionId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<AppliedTagDTO>>($"api/v1/collection/{collectionId}/appliedTag") ??
+               new List<AppliedTagDTO>();
+    }
+
+    // Import & Galleries
+    public async Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId)
+    {
+        return await HttpClient.GetFromJsonAsync<MediaImportInfoDTO?>($"api/v1/media/{mediaId}/importInfo");
+    }
+
+    public async Task<long> CreateDownloadGalleryAsync(string galleryUrl)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/downloadGallery", new { galleryUrl });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task UpdateDownloadGalleryAsync(long id, string? targetPath, string? galleryName, bool? isDownloaded,
+        string? tagsString)
+    {
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/downloadGallery/{id}",
+            new { targetPath, galleryName, isDownloaded, tagsString });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteDownloadGalleryAsync(long id)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/downloadGallery/{id}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<List<DownloadGalleryDTO>> GetAllDownloadGalleriesAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<DownloadGalleryDTO>>("api/v1/downloadGallery") ??
+               new List<DownloadGalleryDTO>();
+    }
+
+    public async Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id)
+    {
+        return await HttpClient.GetFromJsonAsync<DownloadGalleryDTO?>($"api/v1/downloadGallery/{id}");
+    }
 }

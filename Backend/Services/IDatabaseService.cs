@@ -68,4 +68,28 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     // Advanced reloading
     public Task ReloadEntity(MediaFile mediaFile);
+
+    // Tags
+    public Task<List<Tag>> GetTagsAsync();
+    public Task<Tag?> GetTagAsync(long id);
+    public Task<Tag?> GetTagByNameAsync(string name);
+    public Task<List<TagModifier>> GetTagModifiersAsync();
+    public Task<TagModifier?> GetTagModifierAsync(long id);
+    public Task<TagModifier?> GetTagModifierByNameAsync(string name);
+
+    // Applied Tags
+    public Task<List<AppliedTag>> GetMediaAppliedTagsAsync(long mediaId);
+    public Task<List<AppliedTag>> GetCollectionAppliedTagsAsync(long collectionId);
+    public Task<AppliedTag?> GetAppliedTagAsync(long id);
+
+    // Import & Galleries
+    public Task<MediaImportInfo?> GetMediaImportInfoAsync(long mediaId);
+    public Task<List<DownloadGallery>> GetDownloadGalleriesAsync();
+    public Task<DownloadGallery?> GetDownloadGalleryAsync(long id);
+    public Task<DownloadGallery?> GetDownloadGalleryByUrlAsync(string url);
+
+    // Ignored Duplicates
+    public Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2);
+    public Task RemoveIgnoredDuplicateAsync(long mediaId1, long mediaId2);
+    public Task<bool> IsIgnoredDuplicateAsync(long mediaId1, long mediaId2);
 }

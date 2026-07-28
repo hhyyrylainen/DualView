@@ -33,4 +33,19 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<ConfiguredMediaDTO> CreateConfiguredMediaAsync(long mediaId, string configName, List<string> folders);
     public Task SaveConfiguredMediaAsync(ConfiguredMediaDTO media);
     public Task<ConfiguredMediaDTO?> GetPrimeConfiguredMediaFromFileAsync(long mediaFileId);
+    
+    // Tags
+    public Task<List<TagDTO>> GetAllTagsAsync();
+    public Task<TagDTO?> GetTagAsync(long id);
+    public Task<List<TagModifierDTO>> GetAllTagModifiersAsync();
+    public Task<TagModifierDTO?> GetTagModifierAsync(long id);
+
+    // Applied Tags
+    public Task<List<AppliedTagDTO>> GetMediaAppliedTagsAsync(long mediaId);
+    public Task<List<AppliedTagDTO>> GetCollectionAppliedTagsAsync(long collectionId);
+
+    // Import & Galleries
+    public Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId);
+    public Task<List<DownloadGalleryDTO>> GetAllDownloadGalleriesAsync();
+    public Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id);
 }

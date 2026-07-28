@@ -4,6 +4,7 @@ namespace Backend.Services;
 
 public interface IEntityUpdateNotifier
 {
+    // TODO: clean out the unused values that came from an app template
     public Task NotifyDualViewSettingsListUpdated();
 
     public Task NotifyDualViewSettingsUpdated(int id);
@@ -47,4 +48,13 @@ public interface IEntityUpdateNotifier
     public Task NotifyDatasetsListUpdated();
     public Task NotifyDatasetUpdated(long id);
     public Task NotifyDatasetContentsUpdated(long datasetId);
+
+    // DualView specific
+    public Task NotifyCollectionUpdated(long id);
+    public Task NotifyCollectionContentsUpdated(long id);
+    public Task NotifyTagUpdated(long id);
+    public Task NotifyTagsUpdated();
+    public Task NotifyTagModifiersUpdated();
+    public Task NotifyDownloadGalleriesUpdated();
+    public Task NotifyDownloadGalleryUpdated(long id);
 }

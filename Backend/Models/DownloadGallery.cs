@@ -1,9 +1,13 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
+using Backend.Utilities;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
 
-public class DownloadGallery : UpdateableModel, ISoftDelete
+[Index(nameof(GalleryUrl), IsUnique = true)]
+public class DownloadGallery : UpdateableModel, ISoftDelete, IDTOProvider<DownloadGalleryDTO>
 {
     public DownloadGallery(string galleryUrl)
     {
@@ -35,4 +39,18 @@ public class DownloadGallery : UpdateableModel, ISoftDelete
     public bool IsDeleted { get; set; }
 
     public ICollection<MediaImportInfo> AssociatedImports { get; set; } = new List<MediaImportInfo>();
+
+    public DownloadGalleryDTO GetDTO()
+    {
+        return new DownloadGalleryDTO(GalleryUrl)
+        {
+            Id = Id,
+            TargetPath = TargetPath,
+            GalleryName = GalleryName,
+            CurrentlyScannedUrl = CurrentlyScannedUrl,
+            IsDownloaded = IsDownloaded,
+            TagsString = TagsString,
+            IsDeleted = IsDeleted,
+        };
+    }
 }
