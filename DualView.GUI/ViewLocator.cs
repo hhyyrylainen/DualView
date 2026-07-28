@@ -1,7 +1,7 @@
 using System;
+using DualView.GUI.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Controls.Templates;
-using DualView.GUI.ViewModels;
 
 namespace DualView.GUI;
 

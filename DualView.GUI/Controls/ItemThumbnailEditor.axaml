@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DualView.GUI.ViewModels"
+             xmlns:controls="clr-namespace:DualView.GUI.Controls"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="DualView.GUI.Controls.ItemThumbnailEditor"
+             x:DataType="vm:ItemThumbnailEditorViewModel">
+
+    <Design.DataContext>
+        <vm:ItemThumbnailEditorViewModel />
+    </Design.DataContext>
+
+
+    <Grid ColumnDefinitions="*,Auto" RowDefinitions="*,Auto,Auto,*">
+
+        <ContentControl Grid.RowSpan="4" DataContext="{Binding ThumbnailViewer}">
+            <controls:MediaViewer Margin="1" Width="128" Height="196" />
+        </ContentControl>
+
+        <Button Grid.Column="1" Grid.Row="1" HorizontalAlignment="Center"
+                Command="{Binding ViewGeneratedMedia}" Margin="5 2"
+                ToolTip.Tip="View Generated Media to pick a thumbnail for this item">
+            View Generated Media
+        </Button>
+
+        <Button Grid.Column="1" Grid.Row="2" HorizontalAlignment="Center"
+                Command="{Binding ViewAllMedia}" Margin="5 2"
+                ToolTip.Tip="View all media to select a thumbnail for this item">
+            Select From Any Media
+        </Button>
+    </Grid>
+
+
+</UserControl>

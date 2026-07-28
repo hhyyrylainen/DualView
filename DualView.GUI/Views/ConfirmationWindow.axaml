@@ -1,0 +1,29 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="150"
+        Width="450" Height="150"
+        x:Class="DualView.GUI.Views.ConfirmationWindow"
+        x:DataType="vm:ConfirmationWindowViewModel"
+        Icon="/Assets/logo.ico"
+        Title="{Binding Title}">
+
+    <Design.DataContext>
+        <vm:ConfirmationWindowViewModel />
+    </Design.DataContext>
+
+    <Grid Margin="3 3" RowDefinitions="*,Auto" ColumnDefinitions="*,Auto,*">
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="3" TextWrapping="Wrap" TextAlignment="Center" Text="{Binding Message}"
+                   Margin="3" VerticalAlignment="Center" />
+
+        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="5">
+            <Button Command="{Binding Accept}">Yes</Button>
+            <Button Command="{Binding Reject}">No</Button>
+            <Button Command="{Binding Cancel}" IsVisible="{Binding ShowCancel}">
+                Cancel
+            </Button>
+        </StackPanel>
+    </Grid>
+</Window>

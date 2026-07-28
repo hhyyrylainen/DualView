@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+        Width="520" Height="420"
+        MinHeight="200" MinWidth="300"
+        x:Class="DualView.GUI.Views.EditMediaFoldersWindow"
+        x:DataType="vm:EditMediaFoldersWindowViewModel"
+        Icon="/Assets/logo.ico"
+        Title="Edit Media Folders">
+
+    <Design.DataContext>
+        <vm:EditMediaFoldersWindowViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*,Auto" Margin="8">
+        <StackPanel Orientation="Vertical" Spacing="6">
+            <TextBlock Text="Current folders for this media:" FontWeight="Bold" />
+            <ItemsControl ItemsSource="{Binding ExistingFolders}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border BorderBrush="Gray" BorderThickness="1" Margin="0 2" Padding="4">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}" TextWrapping="Wrap"
+                                           VerticalAlignment="Center" />
+                                <CheckBox Grid.Column="1" HorizontalAlignment="Right"
+                                          IsChecked="{Binding Selected}">
+                                    Keep In Folder
+                                </CheckBox>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <Border Height="10" />
+            <TextBlock>Or add to a new folder path:</TextBlock>
+            <TextBox Text="{Binding NewFolderPath}" PlaceholderText="/path/to/new/folder" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+            <Button x:Name="CancelButton">Cancel</Button>
+            <Button x:Name="ApplyButton">Apply</Button>
+        </StackPanel>
+    </Grid>
+
+</Window>

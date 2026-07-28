@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="450" d:DesignHeight="250"
+        Width="450" Height="250"
+        x:Class="DualView.GUI.Views.ConnectionFailedWindow"
+        x:DataType="vm:ConnectionFailedViewModel"
+        Icon="/Assets/logo.ico"
+        Title="Failed to connect to DualView Backend">
+
+    <Design.DataContext>
+        <vm:ConnectionFailedViewModel/>
+    </Design.DataContext>
+
+    <StackPanel Margin="3 3">
+        <TextBlock TextWrapping="Wrap" TextAlignment="Center">
+            The DualView GUI cannot connect to the backend service which is required for normal functions.
+            Please make sure the backend is started and the GUI config file is correct.
+            See the data folder for logs:
+        </TextBlock>
+        <TextBlock Text="{Binding DataFolder}" TextAlignment="Center" Margin="3 10"/>
+
+        <TextBlock TextWrapping="Wrap" Text="{Binding ExtraMessage}"
+                   TextAlignment="Center" Margin="0 15"/>
+    </StackPanel>
+</Window>

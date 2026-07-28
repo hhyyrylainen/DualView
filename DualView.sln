@@ -4,7 +4,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Server", "DualView
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Client", "DualView.Client\DualView.Client.csproj", "{D2BF7F16-43DA-470F-9696-6734E3B1289F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dualview.Shared", "Dualview.Shared\Dualview.Shared.csproj", "{3FD7084E-7D06-4939-9657-0D755E067EFE}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Shared", "DualView.Shared\DualView.Shared.csproj", "{3FD7084E-7D06-4939-9657-0D755E067EFE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Backend", "Backend\Backend.csproj", "{269B1A44-266C-4F90-95C3-F0356F2FD15C}"
 EndProject
@@ -16,7 +16,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.GUI", "DualView.GU
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.GUI.Tests", "DualView.GUI.Tests\DualView.GUI.Tests.csproj", "{D93DFF75-10D1-42C1-9969-F4389726E6A2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dualview.Server.Tests", "DualView.Server.Tests\Dualview.Server.Tests.csproj", "{987B3E0C-384A-4683-82E1-F6B856BB8528}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Server.Tests", "DualView.Server.Tests\DualView.Server.Tests.csproj", "{987B3E0C-384A-4683-82E1-F6B856BB8528}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DualView.Shared.Tests", "DualView.Shared.Tests\DualView.Shared.Tests.csproj", "{5FBFE45A-49ED-4CD6-A8DA-0ACC64050960}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -60,5 +62,9 @@ Global
 		{987B3E0C-384A-4683-82E1-F6B856BB8528}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{987B3E0C-384A-4683-82E1-F6B856BB8528}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{987B3E0C-384A-4683-82E1-F6B856BB8528}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5FBFE45A-49ED-4CD6-A8DA-0ACC64050960}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5FBFE45A-49ED-4CD6-A8DA-0ACC64050960}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5FBFE45A-49ED-4CD6-A8DA-0ACC64050960}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5FBFE45A-49ED-4CD6-A8DA-0ACC64050960}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

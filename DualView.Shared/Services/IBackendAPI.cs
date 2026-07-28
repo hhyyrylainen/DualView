@@ -1,0 +1,23 @@
+using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
+
+namespace DualView.Shared.Services;
+
+/// <summary>
+///   Client access to all the backend APIs that aren't covered by the database interface.
+/// </summary>
+public interface IBackendAPI
+{
+    public Task<ConfiguredMediaDTO> ImportMedia(string fileName, Stream data, string targetFolder,
+        bool importAlphaAsMask = false);
+
+    // Operation operations
+    public Task<OperationStatusUpdate> GetOperationStatus(long operationId);
+    public Task<bool> PauseOperation(long operationId);
+    public Task<bool> ResumeOperation(long operationId);
+    public Task<bool> CancelOperation(long operationId);
+
+    // Local model import
+    /*public Task<long> StartLocalModelImport(RemoteModelType type, string targetFolder, string fileName,
+        string modelName, int runnerId, Stream data, string? baseModel = null);*/
+}

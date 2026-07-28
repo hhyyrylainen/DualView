@@ -1,0 +1,99 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="450"
+        Width="600" Height="500"
+        MinHeight="200" MinWidth="200"
+        x:Class="DualView.GUI.Views.MediaEditSelectorWindow"
+        x:DataType="vm:MediaEditSelectorWindowViewModel"
+        Icon="/Assets/logo.ico"
+        Title="DualView - Select Media Config To Edit">
+
+    <Design.DataContext>
+        <vm:MediaEditSelectorWindowViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*">
+        <TabControl Margin="3" IsVisible="{Binding !Loading}">
+            <TabItem Header="Edit This">
+                <StackPanel Orientation="Vertical">
+                    <StackPanel Orientation="Vertical" IsVisible="{Binding !IsPrime}">
+                        <TextBlock>Name:</TextBlock>
+                        <TextBlock Text="{Binding Name}" />
+                        <Border Height="15"></Border>
+                        <Button HorizontalAlignment="Center" VerticalAlignment="Bottom" Command="{Binding EditMain}">
+                            Edit This
+                        </Button>
+                    </StackPanel>
+                    <TextBlock IsVisible="{Binding IsPrime}" FontSize="24" HorizontalAlignment="Center"
+                               VerticalAlignment="Center" TextAlignment="Center"
+                               Text="Prime Config Can't Be Modified,&#10;Create a new One">
+                    </TextBlock>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="Create New Variant">
+                <StackPanel Orientation="Vertical">
+                    <Border Height="10"></Border>
+                    <TextBlock>New Variant Name</TextBlock>
+                    <TextBox Text="{Binding NewName}" PlaceholderText="New config name" />
+
+                    <Border Height="20"></Border>
+                    <TextBlock>New item must be in at least one folder</TextBlock>
+                    <Border Height="10"></Border>
+                    <ItemsControl ItemsSource="{Binding NewFolders}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border BorderBrush="Gray" BorderThickness="1" Margin="0 2" Padding="2">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center" />
+                                        <CheckBox Grid.Column="1" HorizontalAlignment="Right"
+                                                  IsChecked="{Binding Selected}">
+                                            Add To Folder
+                                        </CheckBox>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Height="10"></Border>
+                    <TextBlock>Or if no suitable folder, add to a custom one:</TextBlock>
+                    <TextBox Text="{Binding NewExtraFolderToAdd}" PlaceholderText="Path to new folder to add" />
+
+                    <Border Height="25"></Border>
+                    <Button HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                            Command="{Binding CreateNewAndEdit}">
+                        Create and Edit
+                    </Button>
+                </StackPanel>
+            </TabItem>
+            <TabItem Header="Siblings">
+                <StackPanel Orientation="Vertical">
+                    <TextBlock Margin="5">Select a sibling to edit (prime config can't be edited):</TextBlock>
+                    <CheckBox Margin="3" FontSize="12" IsChecked="{Binding CloseAfterSelecting}">
+                        Close after first edit selection
+                    </CheckBox>
+
+                    <ItemsControl ItemsSource="{Binding SiblingItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" Margin="0 5">
+                                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" HorizontalAlignment="Right" Command="{Binding OnSelect}"
+                                            IsEnabled="{Binding Enabled}">
+                                        Edit
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+        <TextBlock IsVisible="{Binding Loading}" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center">Loading...</TextBlock>
+    </Grid>
+
+</Window>

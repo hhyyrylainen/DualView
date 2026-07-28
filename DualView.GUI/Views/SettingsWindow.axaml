@@ -1,0 +1,160 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="using:DualView.GUI.Controls"
+        mc:Ignorable="d" d:DesignWidth="650" d:DesignHeight="850"
+        Width="800" Height="850"
+        MinHeight="300" MinWidth="450"
+        x:Class="DualView.GUI.Views.SettingsWindow"
+        x:DataType="vm:SettingsWindowViewModel"
+        Icon="/Assets/logo.ico"
+        Title="DualView - Settings">
+
+    <Design.DataContext>
+        <vm:SettingsWindowViewModel />
+    </Design.DataContext>
+
+    <SplitView IsPaneOpen="{Binding SidePanelOpen}"
+               DisplayMode="Inline"
+               OpenPaneLength="250">
+        <SplitView.Pane>
+            <Panel>
+                <StackPanel IsVisible="{Binding SidePanelOpen}">
+                    <Grid ColumnDefinitions="Auto, *, Auto">
+                        <ContentControl Grid.Column="0" DataContext="{Binding Hamburger}">
+                            <controls:HamburgerMenuControl />
+                        </ContentControl>
+
+                        <Button Grid.Column="2" Command="{Binding CloseSidePanel}">&lt;</Button>
+                    </Grid>
+                    <Border Height="2" Margin="0 5"></Border>
+                    <StackPanel>
+                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
+                                      IsChecked="{Binding TabIsGeneral}"
+                                      Command="{Binding SelectGeneral}">
+                            <Label HorizontalAlignment="Center">General</Label>
+                        </ToggleButton>
+                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
+                                      IsChecked="{Binding TabIsTasks}"
+                                      Command="{Binding SelectTasks}">
+                            <Label HorizontalAlignment="Center">Tasks</Label>
+                        </ToggleButton>
+                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
+                                      IsChecked="{Binding TabIsInput}"
+                                      Command="{Binding SelectInput}">
+                            <Label HorizontalAlignment="Center">Input</Label>
+                        </ToggleButton>
+                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
+                                      IsChecked="{Binding TabIsOutput}"
+                                      Command="{Binding SelectOutput}">
+                            <Label HorizontalAlignment="Center">Output</Label>
+                        </ToggleButton>
+                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
+                                      IsChecked="{Binding TabIsMisc}"
+                                      Command="{Binding SelectMisc}">
+                            <Label HorizontalAlignment="Center">Misc.</Label>
+                        </ToggleButton>
+                    </StackPanel>
+                </StackPanel>
+
+            </Panel>
+        </SplitView.Pane>
+        <Grid ColumnDefinitions="Auto, Auto, *, Auto">
+            <StackPanel IsVisible="{Binding !SidePanelOpen}">
+                <StackPanel>
+                    <Button Command="{Binding OpenSidePanel}">&gt;</Button>
+                </StackPanel>
+            </StackPanel>
+
+            <Border Grid.Column="1" Width="3" />
+            <Border Grid.Column="3" Width="3" />
+
+            <Grid ColumnDefinitions="*" RowDefinitions="Auto,*,Auto" Grid.Column="2">
+                <ScrollViewer IsVisible="{Binding TabIsGeneral}" Grid.Row="1">
+                    <StackPanel Margin="0 0 4 0">
+
+                        <Border MinHeight="5"></Border>
+                    </StackPanel>
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding TabIsTasks}" Grid.Row="1">
+                    <StackPanel Margin="0 0 4 0">
+
+                    </StackPanel>
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding TabIsInput}" Grid.Row="1">
+                    <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto"
+                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                        <TextBlock Text="Input Folder" Grid.ColumnSpan="3"
+                                   FontSize="20"
+                                   HorizontalAlignment="Center" />
+
+                        <Label Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="3">Media storage folder:</Label>
+                        <TextBox Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="3"
+                                 ToolTip.Tip="A custom location where media (images etc.) are stored (including prompt images and generated ones)"
+                                 Text="{Binding LocalMediaStorageLocation}"
+                                 PlaceholderText="Custom media folder" />
+
+                        <Button Grid.Column="0" Grid.Row="3" Margin="5" Name="MediaInputPick">Pick a folder</Button>
+                    </Grid>
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding TabIsOutput}" Grid.Row="1">
+                    <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <TextBlock Text="Output Folder" Grid.ColumnSpan="3"
+                                   FontSize="20"
+                                   HorizontalAlignment="Center" />
+                    </Grid>
+                </ScrollViewer>
+                <ScrollViewer IsVisible="{Binding TabIsMisc}" Grid.Row="1">
+                    <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto"
+                          RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto">
+                        <TextBlock Text="Miscellaneous" Grid.ColumnSpan="3"
+                                   FontSize="20"
+                                   HorizontalAlignment="Center" />
+
+                        <Border Grid.Column="0" Grid.Row="1" MinHeight="15" />
+
+                        <Label Grid.Column="0" Grid.Row="2" VerticalAlignment="Center">AIRunManager URL:</Label>
+                        <TextBox Grid.Column="1" Grid.Row="2" Grid.ColumnSpan="2"
+                                 Text="{Binding AIRunManagerUrl}"
+                                 PlaceholderText="AIRunManager URL" />
+
+                        <Label Grid.Column="0" Grid.Row="3" VerticalAlignment="Center">AIRunManager Access Key:</Label>
+                        <TextBox Grid.Column="1" Grid.Row="3" Grid.ColumnSpan="2"
+                                 Text="{Binding AIRunManagerAccessKey}"
+                                 PlaceholderText="Enter Civitai API key" PasswordChar="*"
+                                 RevealPassword="{Binding ShowRunManagerKey}" />
+
+                        <CheckBox Grid.Column="1" Grid.Row="4" IsChecked="{Binding ShowRunManagerKey}">
+                            Show Key
+                        </CheckBox>
+
+                        <Label Grid.Column="0" Grid.Row="10" VerticalAlignment="Center"
+                               ToolTip.Tip="Specifies how much audio is buffered before playback starts. Higher values increase latency but reduce crackling.">
+                            Audio buffering (ms):
+                        </Label>
+                        <ButtonSpinner Grid.Column="1" Grid.Row="10" Grid.ColumnSpan="2" ButtonSpinnerLocation="Right"
+                                       Margin="0 2"
+                                       Name="AudioBufferingSpinner">
+                            <TextBox Text="{Binding AudioBufferingMsText}" BorderBrush="Transparent"></TextBox>
+                        </ButtonSpinner>
+
+                        <Border Grid.Column="0" Grid.Row="11" MinHeight="25"></Border>
+                    </Grid>
+                </ScrollViewer>
+                <StackPanel Grid.Row="2" HorizontalAlignment="Center" Orientation="Horizontal"
+                            IsVisible="{Binding UnsavedChanges}">
+                    <Button Command="{Binding SaveChanges}"
+                            Background="{DynamicResource ToggleButtonBackgroundChecked}"
+                            Foreground="{DynamicResource ToggleButtonForegroundChecked}">
+                        Save Changes
+                    </Button>
+                    <Button Command="{Binding ReloadSettings}">Cancel</Button>
+                </StackPanel>
+            </Grid>
+
+
+        </Grid>
+    </SplitView>
+</Window>

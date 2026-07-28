@@ -2,14 +2,44 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="DualView.GUI.App"
              xmlns:local="using:DualView.GUI"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             xmlns:converters="using:DualView.GUI.Converters"
+             RequestedThemeVariant="Light">
+    <!-- "Default" ThemeVariant follows the system theme variant.
+             "Dark" or "Light" are other available options. -->
 
     <Application.DataTemplates>
-        <local:ViewLocator/>
+        <local:ViewLocator />
     </Application.DataTemplates>
-  
+
     <Application.Styles>
         <FluentTheme />
     </Application.Styles>
+
+    <Application.Resources>
+        <converters:EnumToBoolConverter x:Key="EnumToBoolConverter" />
+        <SolidColorBrush x:Key="ThemePopupBackgroundBrush" Color="#DDDDDD" />
+
+        <SolidColorBrush x:Key="ErrorBrush" Color="Red" />
+        <SolidColorBrush x:Key="DangerousBrush" Color="#FF4455" />
+
+        <SolidColorBrush x:Key="LightText" Color="Gray" />
+
+        <SolidColorBrush x:Key="LightBackground" Color="#EFEFEF" />
+
+        <SolidColorBrush x:Key="ImageBackground" Color="#FAFAFA" />
+        <SolidColorBrush x:Key="SelectedImage" Color="AliceBlue" />
+
+        <SolidColorBrush x:Key="BusA" Color="LightSkyBlue" />
+        <SolidColorBrush x:Key="BusB" Color="PaleVioletRed" />
+        <SolidColorBrush x:Key="BusC" Color="PaleGoldenrod" />
+        <SolidColorBrush x:Key="BusD" Color="LightGray" />
+
+        <!-- We don't use theme variants as inbuilt dark theme seems pretty bad
+        <ResourceDictionary x:Key="ThemeDictionaries.Light">
+            <SolidColorBrush x:Key="ThemePopupBackgroundBrush" Color="#CCCCCC" />
+        </ResourceDictionary>
+        <ResourceDictionary x:Key="ThemeDictionaries.Dark">
+            <SolidColorBrush x:Key="ThemePopupBackgroundBrush" Color="#2A2A2A" />
+        </ResourceDictionary>-->
+    </Application.Resources>
 </Application>

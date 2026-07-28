@@ -1,0 +1,121 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="using:DualView.GUI.Controls"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        Width="1200" Height="800"
+        MinHeight="200" MinWidth="600"
+        x:Class="DualView.GUI.Views.ImportWindow"
+        x:DataType="vm:ImportWindowViewModel"
+        DragDrop.AllowDrop="True"
+        Icon="/Assets/logo.ico"
+        Title="DualView - Import Media">
+
+    <Design.DataContext>
+        <vm:ImportWindowViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,Auto,*,40" DragDrop.AllowDrop="True" Background="Transparent">
+        <!-- Config -->
+        <StackPanel Grid.Row="0" Margin="5">
+            <TextBlock>Import to:</TextBlock>
+            <TextBox AcceptsReturn="False" PlaceholderText="Target path..." Text="{Binding TargetImportPath}" />
+
+            <Border Height="10"></Border>
+
+            <TextBlock>Secondary folder (optional):</TextBlock>
+            <TextBox AcceptsReturn="False" PlaceholderText="Target path..." Text="{Binding ExtraPathToAddTo}"
+                     ToolTip.Tip="If set, then after importing to the primary path, the media items are also automatically added to this path" />
+
+            <Border Height="10"></Border>
+
+            <TextBlock>Auto-include to dataset by name (optional):</TextBlock>
+            <TextBox AcceptsReturn="False" PlaceholderText="Dataset name..." Text="{Binding DatasetForAutoIncludeName}"
+                     ToolTip.Tip="When set: import will read sidecar .txt files next to images, set dataset main text from common prefix, add images to the dataset, and initialize empty tags from the .txt contents" />
+
+            <Button Margin="15" Command="{Binding OpenMediaWindow}">Check Collections</Button>
+
+            <StackPanel Spacing="30" Orientation="Horizontal">
+                <CheckBox IsChecked="{Binding DeleteAfterImport}">
+                    Delete original files after import
+                </CheckBox>
+                <CheckBox IsChecked="{Binding ImportWithoutCaptions}">
+                    Import to dataset without captions
+                </CheckBox>
+                <CheckBox IsChecked="{Binding AddDatasetDuplicates}">
+                    Allow adding dataset duplicates
+                </CheckBox>
+            </StackPanel>
+
+            <CheckBox IsChecked="{Binding ImportAlphaAsMask}">
+                Import alpha channel as mask if present
+            </CheckBox>
+        </StackPanel>
+
+        <Grid Grid.Row="1" ColumnDefinitions="*,Auto,*" Margin="5 15 5 5">
+            <TextBlock Grid.Column="1" VerticalAlignment="Bottom">Items:</TextBlock>
+            <Button Grid.Column="2" Name="BrowseItemsButton" HorizontalAlignment="Right">Browse</Button>
+        </Grid>
+
+        <!-- Items scroll view -->
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding MediaToImport}" Padding="10">
+                <!-- Use WrapPanel so items flow correctly -->
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:MediaViewer Width="128" Height="196" Margin="5" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+
+        <!-- Bottom bar with status and buttons -->
+        <Grid Grid.Row="3"
+              ColumnDefinitions="Auto, Auto, *, Auto, Auto, Auto"
+              Background="#F0F0F0">
+
+            <ContentControl Grid.Column="0" Margin="6,0"
+                            VerticalAlignment="Center" DataContext="{Binding Hamburger}">
+                <controls:HamburgerMenuControl />
+            </ContentControl>
+
+            <!-- Status text -->
+            <TextBlock Grid.Column="2"
+                       Text="{Binding StatusText}"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       Margin="10,0,0,0" />
+
+            <!-- Action buttons -->
+            <Button Grid.Column="3"
+                    Content="Remove All"
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Command="{Binding Clear}"
+                    ToolTip.Tip="Remove all items without importing them" />
+
+            <Button Grid.Column="4"
+                    Content="Clear Selection"
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Command="{Binding DeselectAll}" />
+
+            <Button Grid.Column="5"
+                    Content="Import"
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Command="{Binding StartImport}"
+                    ToolTip.Tip="Import all selected media to the specified folder" />
+        </Grid>
+    </Grid>
+</Window>

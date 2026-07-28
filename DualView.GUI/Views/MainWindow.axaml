@@ -3,11 +3,14 @@
         xmlns:vm="using:DualView.GUI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="using:DualView.GUI.Controls"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="DualView.GUI.Views.MainWindow"
+        Width="600" Height="800"
+        MinWidth="300" MinHeight="200"
         x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="DualView.GUI">
+        Icon="/Assets/logo.ico"
+        Title="DualView - Collection">
 
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
@@ -15,6 +18,56 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Greeting}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+    <Grid RowDefinitions="*, Auto">
+        <!-- Main content area -->
+        <!-- Important to not follow focus as otherwise it just jumps all over the place when items are interacted with and new ones added -->
+        <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      BringIntoViewOnFocusChange="False">
+            <!-- TODO: main flow container view
+            <ItemsControl ItemsSource="{Binding MainTasks}" Padding="1 5 10 10">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:JobGroupViewer Margin="0 5" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            -->
+        </ScrollViewer>
 
+        <!-- Bottom bar with status and buttons -->
+        <Grid Grid.Row="1"
+              ColumnDefinitions="Auto, Auto, *, Auto, Auto, Auto, Auto, Auto, Auto"
+              Background="#F0F0F0"
+              Height="40"
+              ZIndex="2">
+
+            <ContentControl Grid.Column="0" Margin="6,0"
+                            VerticalAlignment="Center" DataContext="{Binding Hamburger}">
+                <controls:HamburgerMenuControl />
+            </ContentControl>
+
+            <!-- Status text -->
+            <TextBlock Grid.Column="1"
+                       Text="{Binding StatusText}"
+                       VerticalAlignment="Center"
+                       Margin="10,0,0,0" />
+
+            <!-- Spacer -->
+            <Grid Grid.Column="2" />
+
+            <!-- Action buttons -->
+            <Button Grid.Column="4"
+                    Content="Media"
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Command="{Binding OpenMediaManager}" />
+
+            <Button Grid.Column="8"
+                    Content="Settings"
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Command="{Binding OpenSettings}" />
+        </Grid>
+    </Grid>
 </Window>

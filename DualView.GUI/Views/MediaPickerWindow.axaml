@@ -1,0 +1,137 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="using:DualView.GUI.Controls"
+        mc:Ignorable="d" d:DesignWidth="1250" d:DesignHeight="300"
+        x:Class="DualView.GUI.Views.MediaPickerWindow"
+        x:DataType="vm:MediaPickerWindowViewModel"
+        MinWidth="1200" MinHeight="300"
+        Width="1200" Height="700"
+        Icon="/Assets/logo.ico"
+        Title="Pick Media">
+
+    <Design.DataContext>
+        <vm:MediaPickerWindowViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="10" ColumnDefinitions="Auto,*,Auto,*">
+        <SplitView Grid.ColumnSpan="4" IsPaneOpen="{Binding SidePanelOpen}"
+                   DisplayMode="Inline"
+                   OpenPaneLength="300"
+                   Grid.Row="1">
+            <SplitView.Pane>
+                <Grid RowDefinitions="Auto,*,Auto,Auto">
+                    <Grid ColumnDefinitions="*,Auto,*">
+                        <TextBlock Grid.Column="1" HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   FontSize="20">
+                            Folders
+                        </TextBlock>
+                        <Button Grid.Column="2" HorizontalAlignment="Right"
+                                Command="{Binding CloseSidePanel}">
+                            &lt;
+                        </Button>
+                    </Grid>
+                    <ScrollViewer Grid.Row="1">
+                        <TreeView ItemsSource="{Binding Folders}"
+                                  SelectionMode="Single" SelectedItem="{Binding SelectedFolderNode}">
+                            <TreeView.ItemTemplate>
+                                <TreeDataTemplate ItemsSource="{Binding SubNodes}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Image Width="16" Height="16"
+                                               Source="/Assets/Wenrexa Basket.png"
+                                               Stretch="Uniform" Margin="0 0 3 0" />
+                                        <TextBlock Text="{Binding Name}" />
+                                    </StackPanel>
+                                </TreeDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </ScrollViewer>
+                </Grid>
+            </SplitView.Pane>
+
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,*">
+                <Button Grid.Row="0" Grid.Column="0" Command="{Binding OpenSidePanel}"
+                        VerticalAlignment="Top"
+                        IsVisible="{Binding !SidePanelOpen}" MinHeight="34">
+                    &gt;
+                </Button>
+
+                <Grid Grid.Row="0" Grid.Column="1"
+                      ColumnDefinitions="Auto,Auto, Auto, Auto, Auto, *, Auto, Auto, Auto"
+                      ColumnSpacing="4"
+                      Background="#F0F0F0" MinHeight="34">
+
+                    <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="8 0 0 0">Items on Page:</TextBlock>
+
+                    <ComboBox Grid.Column="1" SelectedValue="{Binding PageSize}"
+                              ItemsSource="{Binding PageSizeOptions}" MinWidth="80" />
+
+                    <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="5 0 0 0">Sort by:</TextBlock>
+
+                    <ComboBox Grid.Column="3" SelectedValue="{Binding SortColumn}"
+                              ItemsSource="{Binding SortColumnOptions}" MinWidth="135" />
+
+                    <ComboBox Grid.Column="4" SelectedValue="{Binding SortDirection}"
+                              ItemsSource="{Binding SortDirectionOptions}"
+                              MinWidth="125" />
+
+                    <TextBox Grid.Column="5" Text="{Binding SearchText}" PlaceholderText="Client-side search..."
+                             MinWidth="200"
+                             VerticalAlignment="Center" />
+
+                    <Button Grid.Column="6" IsEnabled="{Binding CanNavigateBackwards}"
+                            Command="{Binding GoToPreviousPage}">
+                        Previous
+                    </Button>
+                    <StackPanel Grid.Column="7" VerticalAlignment="Center" Orientation="Horizontal">
+                        <TextBlock Text="{Binding ItemPage}" VerticalAlignment="Center" />
+                        <TextBlock Text="/" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding MaxPages}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <Button Grid.Column="8" IsEnabled="{Binding CanNavigateForwards}"
+                            Command="{Binding GoToNextPage}">
+                        Next
+                    </Button>
+                </Grid>
+
+                <ScrollViewer Grid.Row="1" Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <ItemsControl ItemsSource="{Binding FolderItems}" Padding="0 5 10 5">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <controls:MediaViewer Width="128" Height="196" Margin="5" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </SplitView>
+
+        <Grid Grid.Row="2" Grid.Column="0" ColumnDefinitions="Auto,*,Auto,Auto,*,Auto">
+            <ContentControl DataContext="{Binding Hamburger}">
+                <controls:HamburgerMenuControl />
+            </ContentControl>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10"
+                    Margin="10">
+            <Button Command="{Binding Confirm}"
+                    IsEnabled="{Binding CanConfirm}">
+                OK
+            </Button>
+            <Button Command="{Binding Cancel}">Cancel</Button>
+        </StackPanel>
+    </Grid>
+</Window>
+

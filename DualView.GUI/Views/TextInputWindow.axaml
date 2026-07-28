@@ -1,0 +1,32 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        x:Class="DualView.GUI.Views.TextInputWindow"
+        Width="600" Height="200"
+        x:DataType="vm:TextInputWindowViewModel"
+        Icon="/Assets/logo.ico"
+        Title="{Binding Title}">
+
+    <Design.DataContext>
+        <vm:TextInputWindowViewModel />
+    </Design.DataContext>
+
+    <Grid Margin="3" RowDefinitions="Auto,Auto,Auto,*,Auto">
+        <TextBlock Text="{Binding ExplanationText}"
+                   IsVisible="{Binding ExplanationText,Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        <Border Grid.Row="0" Margin="3"/>
+        <TextBox Grid.Row="1" Margin="3" PlaceholderText="{Binding InputPlaceholder}"
+                 Text="{Binding Input}" ToolTip.Tip="{Binding InputToolTip}"/>
+        <TextBlock Grid.Row="2" Text="{Binding Error}"
+                   IsVisible="{Binding Error,Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                   Foreground="{DynamicResource ErrorBrush}"/>
+        <Border Grid.Row="3"/>
+        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="5">
+            <Button Name="OkButton">OK</Button>
+            <Button Name="CancelButton">Cancel</Button>
+        </StackPanel>
+    </Grid>
+</Window>

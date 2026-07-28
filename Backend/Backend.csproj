@@ -6,4 +6,29 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
+    <ItemGroup>
+      <PackageReference Include="AngleSharp" Version="1.6.0" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.10" />
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+      <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+      <PackageReference Include="NLog" Version="6.1.4" />
+      <PackageReference Include="NLog.Extensions.Logging" Version="6.1.4" />
+      <PackageReference Include="NLog.Targets.AtomicFile" Version="6.1.5" />
+      <PackageReference Include="SSH.NET" Version="2025.1.0" />
+      <PackageReference Include="Magick.NET-Q8-x64" Version="14.15.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="Migrations\" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\DualView.Shared\DualView.Shared.csproj" />
+    </ItemGroup>
+
+
 </Project>

@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DualView.GUI.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="50" d:DesignHeight="50"
+             x:Class="DualView.GUI.Controls.HamburgerMenuControl"
+             x:DataType="vm:HamburgerMenuViewModel">
+    <Border CornerRadius="4" Background="Transparent">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <Button Name="HamburgerButton"
+                    Width="36" Height="36"
+                    CornerRadius="4"
+                    Background="Transparent"
+                    BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                    ToolTip.Tip="{Binding ToolTipText}">
+                <Panel>
+                    <Image Width="36" Height="36"
+                           Source="/Assets/Colebemis-Feather-Menu.png"
+                           Stretch="Uniform" IsVisible="{Binding IsConnected}"/>
+                    <Image Width="36" Height="36"
+                           Source="/Assets/warning.png"
+                           Stretch="Uniform" IsVisible="{Binding !IsConnected}"/>
+                </Panel>
+            </Button>
+
+            <Popup Name="MenuPopup"
+                   PlacementTarget="{Binding #HamburgerButton}"
+                   Placement="Bottom"
+                   IsLightDismissEnabled="True">
+                <Border Background="{DynamicResource ThemePopupBackgroundBrush}"
+                        BorderBrush="Transparent"
+                        BorderThickness="1"
+                        Padding="4"
+                        CornerRadius="6">
+                    <ItemsControl ItemsSource="{Binding MenuItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Margin="0,2"
+                                        Padding="10,6"
+                                        Background="{DynamicResource ThemeControlLowBrush}"
+                                        BorderBrush="{DynamicResource ThemeBorderLowBrush}"
+                                        CornerRadius="4"
+                                        Command="{Binding Command}"
+                                        CommandParameter="{Binding Parameter}"
+                                        Content="{Binding Title}">
+                                    <Button.Styles>
+                                        <Style Selector="Button:pointerover">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource ThemeControlMidBrush}" />
+                                        </Style>
+                                        <Style Selector="Button:pressed">
+                                            <Setter Property="Background"
+                                                    Value="{DynamicResource ThemeControlHighBrush}" />
+                                        </Style>
+                                    </Button.Styles>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Border>
+            </Popup>
+        </StackPanel>
+    </Border>
+</UserControl>

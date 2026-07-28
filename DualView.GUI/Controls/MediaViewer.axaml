@@ -1,0 +1,38 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:vm="using:DualView.GUI.ViewModels"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:controls="clr-namespace:DualView.GUI.Controls"
+             mc:Ignorable="d" d:DesignWidth="96" d:DesignHeight="128"
+             MinWidth="64" MinHeight="92"
+             x:Class="DualView.GUI.Controls.MediaViewer"
+             x:DataType="vm:MediaViewerViewModel">
+
+    <Design.DataContext>
+        <vm:MediaViewerViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*,Auto" Background="{Binding BackgroundBrush}">
+        <Grid.ContextMenu>
+            <ContextMenu>
+                <MenuItem Header="View" Command="{Binding OnViewResource}" IsVisible="{Binding HasViewAction}" />
+                <MenuItem Header="Edit" Command="{Binding OnEditResource}" IsVisible="{Binding HasEditAction}" />
+                <MenuItem Header="View Thumbnail" Command="{Binding OnViewThumbnail}"
+                          IsVisible="{Binding HasThumbnailAction}" />
+                <MenuItem Header="Select" Command="{Binding SelectItem}" IsVisible="{Binding AllowSelection}" />
+                <MenuItem Header="Move to Folder" Command="{Binding OnFolderMove}" IsVisible="{Binding HasFolderMoveAction}" />
+                <MenuItem Header="Add to Folder" Command="{Binding OnFolderAdd}" IsVisible="{Binding HasFolderAddAction}" />
+                <MenuItem Header="Manage Folders" Command="{Binding OnFolderManager}" IsVisible="{Binding HasFolderManagerAction}" />
+            </ContextMenu>
+        </Grid.ContextMenu>
+        <controls:CustomImageControl Source="{Binding CurrentFrameBitmap}"
+                                     ExtraOverlayImage="{Binding ExtraOverlayImage}"
+                                     Margin="4 4 4 3" MinWidth="32" MinHeight="32" Name="MainDisplay"
+                                     IsVisibleInViewport="{Binding IsVisible, Mode=OneWayToSource}" />
+
+        <TextBlock Grid.Row="1" Text="{Binding Name}" MaxLines="3" TextWrapping="Wrap" HorizontalAlignment="Center"
+                   Margin="0" TextAlignment="Center" IsVisible="{Binding ShowName}" />
+    </Grid>
+
+</UserControl>
