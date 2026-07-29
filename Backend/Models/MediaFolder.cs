@@ -52,6 +52,14 @@ public class MediaFolder : UpdateableModel, IDTOProvider<MediaFolderDTO>,
     {
         var pathElements = path.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+        if (pathElements.Length == 0)
+        {
+            if (path == "/")
+                return null;
+
+            throw new ArgumentException("Empty path");
+        }
+
         MediaFolder? current = null;
         bool root = true;
         foreach (var pathElement in pathElements)
@@ -79,9 +87,6 @@ public class MediaFolder : UpdateableModel, IDTOProvider<MediaFolderDTO>,
             current = next ?? throw new Exception("Logic error in path handling");
             root = false;
         }
-
-        if (current == null)
-            throw new ArgumentException("Empty path");
 
         return current;
     }
