@@ -46,6 +46,8 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
 
     public bool IsDeleted { get; set; }
 
+    public bool IsTemporary { get; set; }
+
     // TODO: remove this as DualView won't use it
     /// <summary>
     ///   When set to on, won't be deleted automatically from job results when the jobs expire
@@ -106,6 +108,7 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
             Id = Id,
             ImportedAt = ImportedAt,
             IsDeleted = IsDeleted,
+            IsTemporary = IsTemporary,
             Keep = Keep,
             MediaType = MediaType,
             Width = Width,
