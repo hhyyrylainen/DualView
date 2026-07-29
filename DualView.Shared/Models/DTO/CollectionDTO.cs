@@ -11,4 +11,6 @@ public class CollectionDTO(string name)
     public string Name { get; set; } = name;
 
     public long FolderId { get; set; }
+
+    public DateTime UpdatedAt { get; set; }
 }
