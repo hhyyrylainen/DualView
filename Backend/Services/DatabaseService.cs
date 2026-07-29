@@ -6,6 +6,7 @@ using DualView.Shared.Services;
 using DualView.Shared.Utils;
 using Backend.Database;
 using Backend.Models;
+using Backend.Utilities;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
@@ -17,18 +18,23 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     private readonly AppDbContext dbContext;
     private readonly IEntityUpdateNotifier updateNotifier;
     private readonly IAppEvents appEvents;
+    private readonly IDataFolderService dataFolderService;
+    private readonly IMediaProcessingService mediaProcessingService;
 
     private readonly TimeSpan oldChatThreshold = TimeSpan.FromHours(24);
 
     private bool disposed;
 
     public DatabaseService(ILogger<DatabaseService> logger, AppDbContext dbContext,
-        IEntityUpdateNotifier updateNotifier, IAppEvents appEvents)
+        IEntityUpdateNotifier updateNotifier, IAppEvents appEvents, IDataFolderService dataFolderService,
+        IMediaProcessingService mediaProcessingService)
     {
         this.logger = logger;
         this.dbContext = dbContext;
         this.updateNotifier = updateNotifier;
         this.appEvents = appEvents;
+        this.dataFolderService = dataFolderService;
+        this.mediaProcessingService = mediaProcessingService;
     }
 
     public async Task InitializeDatabaseAsync()
@@ -220,30 +226,100 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             return;
 
         media.IsDeleted = true;
+        media.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
+        await updateNotifier.NotifyMediaUpdated(mediaId);
     }
 
     public async Task RestoreMediaAsync(long mediaId)
     {
         var media = await dbContext.MediaFiles
-                         .FirstOrDefaultAsync(m => m.Id == mediaId) ??
-                     throw new ArgumentException("Media file not found");
+                        .FirstOrDefaultAsync(m => m.Id == mediaId) ??
+                    throw new ArgumentException("Media file not found");
 
         if (!media.IsDeleted)
             return;
 
         logger.LogInformation("Restoring media file {Id}", mediaId);
         media.IsDeleted = false;
+        media.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
+        await updateNotifier.NotifyMediaUpdated(mediaId);
+    }
+
+    public async Task PurgeMediaAsync(long mediaId)
+    {
+        var media = await dbContext.MediaFiles.FindAsync(mediaId) ?? throw new ArgumentException("Media not found");
+        if (!media.IsDeleted)
+            throw new InvalidOperationException("Cannot purge non-deleted media");
+
+        var settings = await GetAppSettingsAsync();
+        var baseStorage = settings.LocalMediaStorageLocation ?? dataFolderService.GetDataFolderPath();
+
+        // Delete physical files
+        mediaProcessingService.NotifyMediaFileChanged(media, baseStorage);
+
+        var originalPath = Path.Join(baseStorage, media.PathRelativeToStorage());
+        if (File.Exists(originalPath))
+        {
+            try
+            {
+                File.Delete(originalPath);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to delete original media file during purge");
+            }
+        }
+
+        dbContext.MediaFiles.Remove(media);
+        await SaveAsync();
+        await updateNotifier.NotifyMediaUpdated(mediaId);
     }
 
     public async Task<List<MediaFile>> GetDeletedMediaAsync(int limit)
     {
         return await dbContext.MediaFiles
             .Where(m => m.IsDeleted)
-            .OrderByDescending(m => m.ImportedAt)
+            .OrderByDescending(m => m.UpdatedAt)
             .Take(limit)
             .ToListAsync();
+    }
+
+    public async Task<List<MediaFolder>> GetDeletedMediaFoldersAsync(int limit)
+    {
+        return await dbContext.MediaFolders
+            .Where(f => f.IsDeleted)
+            .OrderByDescending(f => f.UpdatedAt)
+            .Take(limit)
+            .ToListAsync();
+    }
+
+    public async Task<List<Collection>> GetDeletedCollectionsAsync(int limit)
+    {
+        return await dbContext.Collections
+            .Where(c => c.IsDeleted)
+            .OrderByDescending(c => c.UpdatedAt)
+            .Take(limit)
+            .ToListAsync();
+    }
+
+    async Task<List<MediaFileDTO>> IClientDatabaseService.GetDeletedMediaAsync(int limit)
+    {
+        var media = await GetDeletedMediaAsync(limit);
+        return media.ConvertToDTO<MediaFile, MediaFileDTO>();
+    }
+
+    async Task<List<MediaFolderDTO>> IClientDatabaseService.GetDeletedMediaFoldersAsync(int limit)
+    {
+        var folders = await GetDeletedMediaFoldersAsync(limit);
+        return folders.ConvertToDTO<MediaFolder, MediaFolderDTO>();
+    }
+
+    async Task<List<CollectionDTO>> IClientDatabaseService.GetDeletedCollectionsAsync(int limit)
+    {
+        var collections = await GetDeletedCollectionsAsync(limit);
+        return collections.ConvertToDTO<Collection, CollectionDTO>();
     }
 
     public async Task<List<MediaFile>> GetMediaFileSiblingsAsync(long mediaId)
@@ -259,7 +335,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     async Task<List<MediaFileDTO>> IClientDatabaseService.GetMediaFileSiblingsAsync(long mediaId)
     {
-        return (await GetMediaFileSiblingsAsync(mediaId)).Select(m => m.GetDTO()).ToList();
+        return (await GetMediaFileSiblingsAsync(mediaId)).ConvertToDTO<MediaFile, MediaFileDTO>();
     }
 
     public async Task<MediaFileDTO> CreateMediaFileAsync(MediaFileDTO mediaFile, long collectionId)
@@ -290,6 +366,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         existing.CropTop = media.CropTop;
         existing.CropRight = media.CropRight;
         existing.CropBottom = media.CropBottom;
+        existing.UpdatedAt = DateTime.UtcNow;
 
         await SaveAsync();
     }
@@ -350,6 +427,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         return new Tuple<List<MediaFileDTO>, int>(items, total);
     }
+
     public async Task<List<Collection>> GetCollectionsInFolderAsync(long folderId)
     {
         return await dbContext.Collections.Where(c => c.FolderId == folderId).ToListAsync();
@@ -371,9 +449,71 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyCollectionUpdated(collection.Id);
     }
 
+    public async Task DeleteMediaFolderAsync(long folderId)
+    {
+        var folder = await dbContext.MediaFolders.FindAsync(folderId) ??
+                     throw new ArgumentException("Folder not found");
+        folder.IsDeleted = true;
+        folder.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFoldersUpdated();
+    }
+
+    public async Task RestoreMediaFolderAsync(long folderId)
+    {
+        var folder = await dbContext.MediaFolders.FindAsync(folderId) ??
+                     throw new ArgumentException("Folder not found");
+        folder.IsDeleted = false;
+        folder.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFoldersUpdated();
+    }
+
+    public async Task PurgeMediaFolderAsync(long folderId)
+    {
+        var folder = await dbContext.MediaFolders.FindAsync(folderId) ??
+                     throw new ArgumentException("Folder not found");
+        if (!folder.IsDeleted)
+            throw new InvalidOperationException("Cannot purge non-deleted folder");
+
+        dbContext.MediaFolders.Remove(folder);
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFoldersUpdated();
+    }
+
+    public async Task DeleteCollectionAsync(long collectionId)
+    {
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        collection.IsDeleted = true;
+        collection.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFolderContentsUpdated(collection.FolderId);
+    }
+
     public async Task DeleteCollectionAsync(Collection collection)
     {
-        collection.IsDeleted = true;
+        await DeleteCollectionAsync(collection.Id);
+    }
+
+    public async Task RestoreCollectionAsync(long collectionId)
+    {
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        collection.IsDeleted = false;
+        collection.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFolderContentsUpdated(collection.FolderId);
+    }
+
+    public async Task PurgeCollectionAsync(long collectionId)
+    {
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        if (!collection.IsDeleted)
+            throw new InvalidOperationException("Cannot purge non-deleted collection");
+
+        dbContext.Collections.Remove(collection);
         await SaveAsync();
         await updateNotifier.NotifyMediaFolderContentsUpdated(collection.FolderId);
     }
@@ -414,7 +554,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .MaxAsync() + 1;
 
         await AddMediaToCollection(mediaItem.Id, collectionId, sequenceNumber);
-        
+
         return mediaItem;
     }
 
@@ -530,6 +670,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var tag = await dbContext.Tags.FindAsync(id) ?? throw new ArgumentException("Tag not found");
         tag.IsDeleted = true;
+        tag.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyTagsUpdated();
     }
@@ -553,6 +694,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (description != null)
             modifier.Description = description;
 
+        modifier.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
     }
@@ -561,6 +703,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var modifier = await dbContext.TagModifiers.FindAsync(id) ?? throw new ArgumentException("Modifier not found");
         modifier.IsDeleted = true;
+        modifier.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
     }
@@ -609,7 +752,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (tagId == impliedTagId)
             return;
 
-        var alreadyExists = await dbContext.TagImplies.AnyAsync(i => i.PrimaryTagId == tagId && i.ToApplyTagId == impliedTagId);
+        var alreadyExists =
+            await dbContext.TagImplies.AnyAsync(i => i.PrimaryTagId == tagId && i.ToApplyTagId == impliedTagId);
         if (alreadyExists)
             return;
 
@@ -621,7 +765,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task RemoveTagImplicationAsync(long tagId, long impliedTagId)
     {
-        var imply = await dbContext.TagImplies.FirstOrDefaultAsync(i => i.PrimaryTagId == tagId && i.ToApplyTagId == impliedTagId);
+        var imply = await dbContext.TagImplies.FirstOrDefaultAsync(i =>
+            i.PrimaryTagId == tagId && i.ToApplyTagId == impliedTagId);
         if (imply != null)
         {
             dbContext.TagImplies.Remove(imply);
@@ -728,7 +873,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task UpdateDownloadGalleryAsync(long id, string? targetPath, string? galleryName, bool? isDownloaded,
         string? tagsString)
     {
-        var gallery = await dbContext.DownloadGalleries.FindAsync(id) ?? throw new ArgumentException("Gallery not found");
+        var gallery = await dbContext.DownloadGalleries.FindAsync(id) ??
+                      throw new ArgumentException("Gallery not found");
 
         if (targetPath != null)
             gallery.TargetPath = targetPath;
@@ -742,14 +888,17 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (tagsString != null)
             gallery.TagsString = tagsString;
 
+        gallery.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyDownloadGalleryUpdated(id);
     }
 
     public async Task DeleteDownloadGalleryAsync(long id)
     {
-        var gallery = await dbContext.DownloadGalleries.FindAsync(id) ?? throw new ArgumentException("Gallery not found");
+        var gallery = await dbContext.DownloadGalleries.FindAsync(id) ??
+                      throw new ArgumentException("Gallery not found");
         gallery.IsDeleted = true;
+        gallery.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyDownloadGalleriesUpdated();
     }
@@ -811,9 +960,107 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .FirstOrDefaultAsync(t => t.Id == id);
     }
 
+    public async Task<Tag?> GetTagByNameOrAliasAsync(string name)
+    {
+        var tag = await GetTagByNameAsync(name);
+        if (tag != null)
+            return tag;
+
+        var alias = await dbContext.TagAliases.Include(a => a.Tag).FirstOrDefaultAsync(a => a.Name == name);
+        return alias?.Tag;
+    }
+
+    public async Task<TagModifier?> GetTagModifierByNameOrAliasAsync(string name)
+    {
+        var modifier = await GetTagModifierByNameAsync(name);
+        if (modifier != null)
+            return modifier;
+
+        var alias = await dbContext.TagModifierAliases.Include(a => a.Modifier)
+            .FirstOrDefaultAsync(a => a.Name == name);
+        return alias?.Modifier;
+    }
+
+    public async Task<TagBreakRule?> GetTagBreakRuleByStrAsync(string str)
+    {
+        // For now, exact match as in C++
+        return await dbContext.TagBreakRules.Include(r => r.ActualTag)
+            .Include(r => r.Modifiers)
+            .FirstOrDefaultAsync(r => r.TagString == str);
+    }
+
+    public async Task<string?> GetTagSuperAliasAsync(string alias)
+    {
+        var superAlias = await dbContext.TagSuperAliases.FindAsync(alias);
+        return superAlias?.Expanded;
+    }
+
+    public async Task<List<string>> SelectTagNamesWildcardAsync(string pattern, int maxCount = 50)
+    {
+        return await dbContext.Tags
+            .Where(t => t.Name.Contains(pattern))
+            .OrderBy(t => t.Name)
+            .Take(maxCount)
+            .Select(t => t.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<string>> SelectTagAliasesWildcardAsync(string pattern, int maxCount = 50)
+    {
+        return await dbContext.TagAliases
+            .Where(a => a.Name.Contains(pattern))
+            .OrderBy(a => a.Name)
+            .Take(maxCount)
+            .Select(a => a.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<string>> SelectTagModifierNamesWildcardAsync(string pattern, int maxCount = 50)
+    {
+        return await dbContext.TagModifiers
+            .Where(m => m.Name.Contains(pattern))
+            .OrderBy(m => m.Name)
+            .Take(maxCount)
+            .Select(m => m.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<string>> SelectTagBreakRulesByStrWildcardAsync(string pattern, int maxCount = 50)
+    {
+        return await dbContext.TagBreakRules
+            .Where(r => r.TagString.Contains(pattern))
+            .OrderBy(r => r.TagString)
+            .Take(maxCount)
+            .Select(r => r.TagString)
+            .ToListAsync();
+    }
+
+    public async Task<List<string>> SelectTagSuperAliasWildcardAsync(string pattern, int maxCount = 50)
+    {
+        return await dbContext.TagSuperAliases
+            .Where(s => s.Alias.Contains(pattern))
+            .OrderBy(s => s.Alias)
+            .Take(maxCount)
+            .Select(s => s.Alias)
+            .ToListAsync();
+    }
+
     public async Task<MediaImportInfo?> GetMediaImportInfoAsync(long mediaId)
     {
         return await dbContext.MediaImportInfos.FirstOrDefaultAsync(i => i.MediaFileId == mediaId);
+    }
+
+    public async Task<List<MediaImportInfo>> GetPendingImportsAsync()
+    {
+        return await dbContext.MediaImportInfos
+            .Where(i => i.Status == ImportStatus.Pending)
+            .OrderByDescending(i => i.ImportDate)
+            .ToListAsync();
+    }
+
+    async Task<List<MediaImportInfoDTO>> IClientDatabaseService.GetPendingImportsAsync()
+    {
+        return (await GetPendingImportsAsync()).ConvertToDTO<MediaImportInfo, MediaImportInfoDTO>();
     }
 
     public async Task<List<DownloadGallery>> GetDownloadGalleriesAsync()
@@ -939,7 +1186,43 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     async Task<Tuple<List<ConfiguredMediaInfo>, int>> IClientDatabaseService.GetMediaFolderContents(long folderId,
         int itemPage, int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection)
     {
-        return new Tuple<List<ConfiguredMediaInfo>, int>(new List<ConfiguredMediaInfo>(), 0);
+        // Fetch subfolders and collections
+        var subfolders = await dbContext.MediaFolders
+            .Where(f => f.ParentId == folderId && !f.IsDeleted)
+            .OrderBy(f => f.Name)
+            .ToListAsync();
+
+        var collections = await dbContext.Collections
+            .Where(c => c.FolderId == folderId && !c.IsDeleted)
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+
+        var allItems = new List<ConfiguredMediaInfo>();
+
+        foreach (var folder in subfolders)
+        {
+            allItems.Add(new ConfiguredMediaInfo(folder.Name, folder.Id, true, 0, MediaType.Png, 512, 512, false)
+            {
+                IsFolder = true
+            });
+        }
+
+        foreach (var collection in collections)
+        {
+            // For collections, we might want to find a primary media file for preview
+            // For now, just use dummy
+            allItems.Add(new ConfiguredMediaInfo(collection.Name, collection.Id, true, 0, MediaType.Png, 512, 512,
+                false)
+            {
+                IsCollection = true
+            });
+        }
+
+        // TODO: handle paging properly for combined results
+        int totalItems = allItems.Count;
+        var pagedItems = allItems.Skip(itemPage * pageSize).Take(pageSize).ToList();
+
+        return new Tuple<List<ConfiguredMediaInfo>, int>(pagedItems, (int)Math.Ceiling(totalItems / (double)pageSize));
     }
 
     Task IClientDatabaseService.AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder)
@@ -988,11 +1271,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     async Task<MediaFileDTO?> IClientDatabaseService.GetMediaFileAsync(long mediaId)
     {
         return (await GetMediaByIdAsync(mediaId))?.GetDTO();
-    }
-
-    async Task<List<MediaFileDTO>> IClientDatabaseService.GetDeletedMediaAsync(int limit)
-    {
-        return (await GetDeletedMediaAsync(limit)).Select(m => m.GetDTO()).ToList();
     }
 
     public void Dispose()

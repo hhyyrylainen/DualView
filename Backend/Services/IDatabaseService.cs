@@ -45,6 +45,8 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task MakeSureMediaIsSetToKeep(long mediaId);
 
     public Task<List<MediaFile>> GetDeletedMediaAsync(int limit);
+    public Task<List<MediaFolder>> GetDeletedMediaFoldersAsync(int limit);
+    public Task<List<Collection>> GetDeletedCollectionsAsync(int limit);
 
     /// <summary>
     ///   Creates a new media file and adds it to a collection
@@ -82,8 +84,20 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<AppliedTag>> GetCollectionAppliedTagsAsync(long collectionId);
     public Task<AppliedTag?> GetAppliedTagAsync(long id);
 
+    public Task<Tag?> GetTagByNameOrAliasAsync(string name);
+    public Task<TagModifier?> GetTagModifierByNameOrAliasAsync(string name);
+    public Task<TagBreakRule?> GetTagBreakRuleByStrAsync(string str);
+    public Task<string?> GetTagSuperAliasAsync(string alias);
+
+    public Task<List<string>> SelectTagNamesWildcardAsync(string pattern, int maxCount = 50);
+    public Task<List<string>> SelectTagAliasesWildcardAsync(string pattern, int maxCount = 50);
+    public Task<List<string>> SelectTagModifierNamesWildcardAsync(string pattern, int maxCount = 50);
+    public Task<List<string>> SelectTagBreakRulesByStrWildcardAsync(string pattern, int maxCount = 50);
+    public Task<List<string>> SelectTagSuperAliasWildcardAsync(string pattern, int maxCount = 50);
+
     // Import & Galleries
     public Task<MediaImportInfo?> GetMediaImportInfoAsync(long mediaId);
+    public Task<List<MediaImportInfo>> GetPendingImportsAsync();
     public Task<List<DownloadGallery>> GetDownloadGalleriesAsync();
     public Task<DownloadGallery?> GetDownloadGalleryAsync(long id);
     public Task<DownloadGallery?> GetDownloadGalleryByUrlAsync(string url);
