@@ -28,6 +28,7 @@
         </Grid.ContextMenu>
         <controls:CustomImageControl Source="{Binding CurrentFrameBitmap}"
                                      ExtraOverlayImage="{Binding ExtraOverlayImage}"
+                                     BackgroundSource="{Binding BackgroundSource}"
                                      Margin="4 4 4 3" MinWidth="32" MinHeight="32" Name="MainDisplay"
                                      IsVisibleInViewport="{Binding IsVisible, Mode=OneWayToSource}" />
 

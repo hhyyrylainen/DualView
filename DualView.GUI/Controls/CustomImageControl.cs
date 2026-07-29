@@ -25,6 +25,10 @@ public class CustomImageControl : Control, IBrushPreviewTarget
         AvaloniaProperty.RegisterDirect<CustomImageControl, Bitmap?>(
             nameof(ExtraOverlayImage), o => o.ExtraOverlayImage, (o, v) => o.ExtraOverlayImage = v);
 
+    public static readonly DirectProperty<CustomImageControl, Bitmap?> BackgroundSourceProperty =
+        AvaloniaProperty.RegisterDirect<CustomImageControl, Bitmap?>(
+            nameof(BackgroundSource), o => o.BackgroundSource, (o, v) => o.BackgroundSource = v);
+
     /// <summary>
     ///   Used to detect when this is actually visible in the viewport and only load data when needed.
     /// </summary>
@@ -58,6 +62,16 @@ public class CustomImageControl : Control, IBrushPreviewTarget
         set
         {
             SetAndRaise(ExtraOverlayImageProperty, ref field, value);
+            InvalidateVisual();
+        }
+    }
+
+    public Bitmap? BackgroundSource
+    {
+        get;
+        set
+        {
+            SetAndRaise(BackgroundSourceProperty, ref field, value);
             InvalidateVisual();
         }
     }
@@ -344,15 +358,24 @@ public class CustomImageControl : Control, IBrushPreviewTarget
 
     public override void Render(DrawingContext context)
     {
+        var background = BackgroundSource;
         var source = Source;
-        if (source == null)
+        if (source == null && background == null)
             return;
 
         var overlay = ExtraOverlayImage;
-        var sourceSize = source.Size;
+        var sourceSize = source?.Size ?? background!.Size;
         var destRect = GetImageDestinationRect();
 
-        context.DrawImage(source, new Rect(sourceSize), destRect);
+        if (background != null)
+        {
+            context.DrawImage(background, new Rect(background.Size), destRect);
+        }
+
+        if (source != null)
+        {
+            context.DrawImage(source, new Rect(source.Size), destRect);
+        }
 
         if (overlay != null)
         {
@@ -415,12 +438,15 @@ public class CustomImageControl : Control, IBrushPreviewTarget
 
     private Rect GetImageDestinationRect()
     {
-        var source = Source ??
-                     throw new InvalidOperationException(
-                         "Cannot calculate destination rectangle without a source image.");
+        var source = Source;
+        var background = BackgroundSource;
+
+        if (source == null && background == null)
+            throw new InvalidOperationException(
+                "Cannot calculate destination rectangle without a source or background image.");
 
         var viewPort = new Rect(Bounds.Size);
-        var sourceSize = source.Size;
+        var sourceSize = source?.Size ?? background!.Size;
 
         double baseScale = Math.Min(viewPort.Width / sourceSize.Width, viewPort.Height / sourceSize.Height);
         Size baseDestSize = sourceSize * baseScale;
