@@ -11,6 +11,9 @@ public interface IRealtimeDataUpdateService
     /// </summary>
     public event Action<long, int, int, string>? OnChatMessageTextAppend;
 
+    public event Action? OnMediaFolderUpdated;
+    public event Action<long>? OnMediaUpdated;
+
     public bool IsConnected { get; }
 
     /// <summary>

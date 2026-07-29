@@ -20,30 +20,12 @@ public interface ITagParser
     ///   Finds a tag by name or alias.
     /// </summary>
     public Task<Tag?> FindTag(string name);
-}
 
-public class TagParser : ITagParser
-{
-    private readonly IDatabaseService databaseService;
-
-    public TagParser(IDatabaseService databaseService)
-    {
-        this.databaseService = databaseService;
-    }
-
-    public async Task<AppliedTag?> ParseTag(string tagString)
-    {
-        // TODO: Port recursive parsing logic from C++ (DualView::ParseTagFromString)
-        // 1. Exact match (Tags/Aliases)
-        // 2. Modifiers
-        // 3. Composites
-        // 4. Heuristics
-        return null;
-    }
-
-    public async Task<Tag?> FindTag(string name)
-    {
-        // TODO: Implementation
-        return null;
-    }
+    /// <summary>
+    ///   Gets autocomplete suggestions for a partially typed tag string.
+    /// </summary>
+    /// <param name="tagString">The partial tag string</param>
+    /// <param name="maxCount">Maximum number of suggestions to return</param>
+    /// <returns>A list of suggested tag strings</returns>
+    public Task<List<string>> GetSuggestions(string tagString, int maxCount = 100);
 }

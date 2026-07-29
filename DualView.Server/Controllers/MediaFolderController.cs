@@ -1,8 +1,11 @@
 using System.ComponentModel.DataAnnotations;
+using Backend.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Requests;
+using DualView.Shared.Services;
 using Backend.Services;
+using Backend.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DualView.Server.Controllers;
@@ -103,6 +106,33 @@ public class MediaFolderController : Controller
             return Json(null);
 
         return folder.GetDTO();
+    }
+
+    [HttpGet("deleted")]
+    public async Task<ActionResult<List<MediaFolderDTO>>> GetDeleted([FromQuery] int limit = 100)
+    {
+        return (await databaseService.GetDeletedMediaFoldersAsync(limit)).ConvertToDTO<MediaFolder, MediaFolderDTO>();
+    }
+
+    [HttpPost("{id:long}/restore")]
+    public async Task<IActionResult> Restore([Required] long id)
+    {
+        await databaseService.RestoreMediaFolderAsync(id);
+        return Ok();
+    }
+
+    [HttpPost("{id:long}/purge")]
+    public async Task<IActionResult> Purge([Required] long id)
+    {
+        await databaseService.PurgeMediaFolderAsync(id);
+        return Ok();
+    }
+
+    [HttpDelete("{id:long}")]
+    public async Task<IActionResult> Delete([Required] long id)
+    {
+        await databaseService.DeleteMediaFolderAsync(id);
+        return Ok();
     }
 
     [HttpPost("collection/{collectionId:long}/addMedia")]

@@ -16,4 +16,14 @@ public class RealTimeUpdateNotifier : IRealTimeDataHub
     {
         await hubContext.Clients.All.OnChatMessageTextAppend(chatId, messageIndex, messageGeneration, newText);
     }
+
+    public async Task OnMediaFolderUpdated()
+    {
+        await hubContext.Clients.All.OnMediaFolderUpdated();
+    }
+
+    public async Task OnMediaUpdated(long id)
+    {
+        await hubContext.Clients.All.OnMediaUpdated(id);
+    }
 }

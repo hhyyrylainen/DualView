@@ -275,6 +275,12 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     }
 
+    public Bitmap? BackgroundSource
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
     // Design time constructor
     public MediaViewerViewModel()
     {
@@ -566,6 +572,31 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
 
         if (media == null || disposed || token.IsCancellationRequested)
             return;
+
+        // Set background icon if it is a folder or collection
+        if (MediaToShow is ServerMediaSource serverSource)
+        {
+            if (serverSource.Info.IsFolder)
+            {
+                BackgroundSource = CustomImageControl.CreateBitmap(
+                    await EmbeddedResourceImage.GetResource(EmbeddedResourceImage.FolderIcon)
+                        .GetCurrentFrameAsync(token));
+            }
+            else if (serverSource.Info.IsCollection)
+            {
+                BackgroundSource = CustomImageControl.CreateBitmap(
+                    await EmbeddedResourceImage.GetResource(EmbeddedResourceImage.CollectionIcon)
+                        .GetCurrentFrameAsync(token));
+            }
+            else
+            {
+                BackgroundSource = null;
+            }
+        }
+        else
+        {
+            BackgroundSource = null;
+        }
 
         var wantedStatus =
             ShowingThumbnail ? IVisualMediaSource.LoadType.Thumbnail : IVisualMediaSource.LoadType.FullSize;

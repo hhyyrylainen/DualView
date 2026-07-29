@@ -21,6 +21,9 @@ public class ConfiguredMediaInfo(
     public int Height { get; set; } = height;
     public bool MaskEnabled { get; set; } = maskEnabled;
 
+    public bool IsFolder { get; set; }
+    public bool IsCollection { get; set; }
+
     public ConfiguredMediaInfo(MediaFileDTO media) : this(media.OriginalFileName, media.Id, true, media.Id,
         media.MediaType, media.Width, media.Height, false)
     {
@@ -34,6 +37,8 @@ public class ConfiguredMediaDTO(string name, string hashSha3)
     public bool Prime => true;
     public long MediaFileId => Id;
     public bool MaskEnabled => false;
+    public bool IsFolder => false;
+    public bool IsCollection => false;
     public float Scale { get; set; } = 1;
     public DateTime UpdatedAt { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -74,4 +79,7 @@ public interface IConfiguredMediaInfo
     int Width { get; }
     int Height { get; }
     bool MaskEnabled { get; }
+
+    bool IsFolder { get; }
+    bool IsCollection { get; }
 }

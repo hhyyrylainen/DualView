@@ -5,6 +5,8 @@ namespace DualView.Shared.Services;
 public abstract class RealTimeUpdateServiceBase : IRealtimeDataUpdateService
 {
     public event Action<long, int, int, string>? OnChatMessageTextAppend;
+    public event Action? OnMediaFolderUpdated;
+    public event Action<long>? OnMediaUpdated;
 
     private readonly HashSet<string> wantedListeners = new();
 
@@ -46,5 +48,15 @@ public abstract class RealTimeUpdateServiceBase : IRealtimeDataUpdateService
             {
                 OnChatMessageTextAppend?.Invoke(chatId, runnerId, messageId, text);
             });
+
+        hubConnection.On(nameof(IRealTimeDataHub.OnMediaFolderUpdated), () =>
+        {
+            OnMediaFolderUpdated?.Invoke();
+        });
+
+        hubConnection.On(nameof(IRealTimeDataHub.OnMediaUpdated), (long id) =>
+        {
+            OnMediaUpdated?.Invoke(id);
+        });
     }
 }

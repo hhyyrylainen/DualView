@@ -17,7 +17,9 @@ public interface IBackendAPI
     public Task<bool> ResumeOperation(long operationId);
     public Task<bool> CancelOperation(long operationId);
 
-    // Local model import
-    /*public Task<long> StartLocalModelImport(RemoteModelType type, string targetFolder, string fileName,
-        string modelName, int runnerId, Stream data, string? baseModel = null);*/
+    // Maintenance
+    public Task<long> StartImageExistCheck();
+    public Task<long> StartDeleteThumbnails();
+    public Task<long> StartPurgeIncorrectlyDeleted();
+    public Task<long> StartFixOrphanedResources();
 }

@@ -46,8 +46,17 @@ public interface IDatabaseCommonService
 
     public Task<bool> IsMediaSafeToDeleteAsync(long mediaId);
     public Task DeleteMediaAsync(long mediaId);
-
     public Task RestoreMediaAsync(long mediaId);
+    public Task PurgeMediaAsync(long mediaId);
+
+    public Task DeleteMediaFolderAsync(long folderId);
+    public Task RestoreMediaFolderAsync(long folderId);
+    public Task PurgeMediaFolderAsync(long folderId);
+
+    public Task DeleteCollectionAsync(long collectionId);
+    public Task RestoreCollectionAsync(long collectionId);
+    public Task PurgeCollectionAsync(long collectionId);
+
     public Task<bool> SetMediaRatingAsync(long mediaId, bool isFavorited, int stars);
 
     // Tags

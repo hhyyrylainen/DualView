@@ -1,7 +1,10 @@
 using System.ComponentModel.DataAnnotations;
+using Backend.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Services;
 using Backend.Services;
+using Backend.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DualView.Server.Controllers;
@@ -146,8 +149,13 @@ public class MediaController : Controller
     [HttpGet("deleted")]
     public async Task<ActionResult<List<MediaFileDTO>>> GetDeletedMedia([FromQuery] int limit = 100)
     {
-        var deleted = await databaseService.GetDeletedMediaAsync(limit);
-        return deleted.Select(m => m.GetDTO()).ToList();
+        return (await databaseService.GetDeletedMediaAsync(limit)).ConvertToDTO<MediaFile, MediaFileDTO>();
+    }
+
+    [HttpGet("pendingImports")]
+    public async Task<ActionResult<List<MediaImportInfoDTO>>> GetPendingImports()
+    {
+        return (await databaseService.GetPendingImportsAsync()).ConvertToDTO<MediaImportInfo, MediaImportInfoDTO>();
     }
 
     [HttpPost("{mediaId:long}/restore")]

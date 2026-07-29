@@ -10,6 +10,8 @@ public class StubRealTimeDataService : IRealtimeDataUpdateService
     // We don't care about these events as this is a stub
 #pragma warning disable CS0067
     public event Action<long, int, int, string>? OnChatMessageTextAppend;
+    public event Action? OnMediaFolderUpdated;
+    public event Action<long>? OnMediaUpdated;
 #pragma warning restore CS0067
 
     /// <summary>

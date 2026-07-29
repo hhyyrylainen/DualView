@@ -189,9 +189,63 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                new List<MediaFileDTO>();
     }
 
+    public async Task<List<MediaFolderDTO>> GetDeletedMediaFoldersAsync(int limit)
+    {
+        return await HttpClient.GetFromJsonAsync<List<MediaFolderDTO>>($"api/v1/mediaFolder/deleted?limit={limit}") ??
+               new List<MediaFolderDTO>();
+    }
+
+    public async Task<List<CollectionDTO>> GetDeletedCollectionsAsync(int limit)
+    {
+        return await HttpClient.GetFromJsonAsync<List<CollectionDTO>>($"api/v1/collection/deleted?limit={limit}") ??
+               new List<CollectionDTO>();
+    }
+
     public async Task RestoreMediaAsync(long mediaId)
     {
         var response = await HttpClient.PostAsync($"api/v1/media/{mediaId}/restore", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task PurgeMediaAsync(long mediaId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/media/{mediaId}/purge", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteMediaFolderAsync(long folderId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/mediaFolder/{folderId}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RestoreMediaFolderAsync(long folderId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/mediaFolder/{folderId}/restore", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task PurgeMediaFolderAsync(long folderId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/mediaFolder/{folderId}/purge", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task DeleteCollectionAsync(long collectionId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/collection/{collectionId}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RestoreCollectionAsync(long collectionId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/restore", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task PurgeCollectionAsync(long collectionId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/purge", null);
         response.EnsureSuccessStatusCode();
     }
 
@@ -395,6 +449,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     }
 
     // Import & Galleries
+    public async Task<List<MediaImportInfoDTO>> GetPendingImportsAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<MediaImportInfoDTO>>("api/v1/media/pendingImports") ??
+               new List<MediaImportInfoDTO>();
+    }
+
     public async Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId)
     {
         return await HttpClient.GetFromJsonAsync<MediaImportInfoDTO?>($"api/v1/media/{mediaId}/importInfo");

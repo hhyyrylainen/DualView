@@ -20,6 +20,8 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
 
     protected readonly IConfiguredMediaInfo MediaInfo;
 
+    public IConfiguredMediaInfo Info => MediaInfo;
+
     public ServerMediaSource(IConfiguredMediaInfo mediaInfo, IServiceProvider videoPlayerServiceProvider) : base(
         videoPlayerServiceProvider)
     {

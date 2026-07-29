@@ -46,6 +46,8 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
     }
 
     public ObservableCollection<DeletedMediaGroupViewModel> DeletedMedia { get; } = new();
+    public ObservableCollection<DeletedFolderViewModel> DeletedFolders { get; } = new();
+    public ObservableCollection<DeletedCollectionViewModel> DeletedCollections { get; } = new();
 
     public HamburgerMenuViewModel Hamburger { get; }
 
@@ -80,6 +82,12 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
                 break;
             case 1:
                 RefreshMedia();
+                break;
+            case 2:
+                _ = LoadFolders();
+                break;
+            case 3:
+                _ = LoadCollections();
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
@@ -162,7 +170,8 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
                     foreach (var m in g)
                     {
                         group.Configurations.Add(
-                            new DeletedMediaConfigViewModel(new ConfiguredMediaDTO(m), StartMediaRestore, serviceProvider!));
+                            new DeletedMediaConfigViewModel(new ConfiguredMediaDTO(m), StartMediaRestore,
+                                serviceProvider!));
                     }
 
                     return group;
@@ -219,6 +228,90 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
         {
             logger?.LogError(e, "Failed to restore media config {Id}", configId);
             windowService?.ShowErrorWindow($"Failed to restore media config {configId}", e);
+        }
+    }
+
+    private async Task LoadFolders()
+    {
+        if (databaseService == null) return;
+        try
+        {
+            var folders = await databaseService.GetDeletedMediaFoldersAsync(100);
+            Dispatcher.UIThread.Post(() =>
+            {
+                DeletedFolders.Clear();
+                foreach (var f in folders)
+                    DeletedFolders.Add(new DeletedFolderViewModel(f, StartFolderRestore));
+            });
+        }
+        catch (Exception e)
+        {
+            logger?.LogError(e, "Failed to load deleted folders");
+        }
+    }
+
+    private void StartFolderRestore(long id)
+    {
+        _ = PerformFolderRestore(id);
+    }
+
+    private async Task PerformFolderRestore(long id)
+    {
+        if (databaseService == null) return;
+        try
+        {
+            await databaseService.RestoreMediaFolderAsync(id);
+            Dispatcher.UIThread.Post(() =>
+            {
+                var folder = DeletedFolders.FirstOrDefault(f => f.Id == id);
+                if (folder != null) DeletedFolders.Remove(folder);
+            });
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to restore folder", e);
+        }
+    }
+
+    private async Task LoadCollections()
+    {
+        if (databaseService == null) return;
+        try
+        {
+            var collections = await databaseService.GetDeletedCollectionsAsync(100);
+            Dispatcher.UIThread.Post(() =>
+            {
+                DeletedCollections.Clear();
+                foreach (var c in collections)
+                    DeletedCollections.Add(new DeletedCollectionViewModel(c, StartCollectionRestore));
+            });
+        }
+        catch (Exception e)
+        {
+            logger?.LogError(e, "Failed to load deleted collections");
+        }
+    }
+
+    private void StartCollectionRestore(long id)
+    {
+        _ = PerformCollectionRestore(id);
+    }
+
+    private async Task PerformCollectionRestore(long id)
+    {
+        if (databaseService == null) return;
+        try
+        {
+            await databaseService.RestoreCollectionAsync(id);
+            Dispatcher.UIThread.Post(() =>
+            {
+                var collection = DeletedCollections.FirstOrDefault(c => c.Id == id);
+                if (collection != null) DeletedCollections.Remove(collection);
+            });
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to restore collection", e);
         }
     }
 
@@ -281,5 +374,23 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
         {
             Viewer.Dispose();
         }
+    }
+
+    public class DeletedFolderViewModel(MediaFolderDTO folder, Action<long> onRequestRestore) : ViewModelBase
+    {
+        public long Id => folder.Id;
+        public string Name => folder.Name;
+        public string DeletedAt => folder.UpdatedAt.ToLocalTime().ToString("g");
+
+        public void Restore() => onRequestRestore(Id);
+    }
+
+    public class DeletedCollectionViewModel(CollectionDTO collection, Action<long> onRequestRestore) : ViewModelBase
+    {
+        public long Id => collection.Id;
+        public string Name => collection.Name;
+        public string DeletedAt => collection.UpdatedAt.ToLocalTime().ToString("g");
+
+        public void Restore() => onRequestRestore(Id);
     }
 }

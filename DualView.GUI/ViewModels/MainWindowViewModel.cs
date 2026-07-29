@@ -126,6 +126,16 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         windowService?.ShowSingletonWindow<RestoreDeletedWindowViewModel>();
     }
 
+    public void OpenTagManager()
+    {
+        windowService?.ShowSingletonWindow<TagManagerWindowViewModel>();
+    }
+
+    public void OpenMaintenanceTools()
+    {
+        windowService?.ShowSingletonWindow<MaintenanceToolsWindowViewModel>();
+    }
+
     public void Dispose()
     {
         if (backendStatusService != null)
@@ -165,9 +175,17 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Import Media", Command = new RelayCommand(OpenImportWindow) });
 
+        // TODO: implement duplicate finding window (planned for later)
+        /*Hamburger.MenuItems.Add(new HamburgerMenuItem
+            { Title = "Find Duplicates", Command = new RelayCommand(OpenDuplicateFinder) });*/
+
 
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Settings", Command = new RelayCommand(OpenSettings) });
+        Hamburger.MenuItems.Add(new HamburgerMenuItem
+            { Title = "Tag Manager", Command = new RelayCommand(OpenTagManager) });
+        Hamburger.MenuItems.Add(new HamburgerMenuItem
+            { Title = "Maintenance Tools", Command = new RelayCommand(OpenMaintenanceTools) });
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Restore Deleted", Command = new RelayCommand(OpenRestoreDeleted) });
 

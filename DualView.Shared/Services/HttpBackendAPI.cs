@@ -57,25 +57,53 @@ public class HttpBackendAPI : IBackendAPI
         return response.IsSuccessStatusCode;
     }
 
-    /*public async Task<long> StartLocalModelImport(RemoteModelType type, string targetFolder, string fileName,
-        string modelName, int runnerId, Stream data, string? baseModel = null)
+    public async Task<long> StartImageExistCheck()
     {
-        using var content = new MultipartFormDataContent();
-        content.Add(new StringContent(((int)type).ToString()), "type");
-        content.Add(new StringContent(targetFolder), "targetFolder");
-        content.Add(new StringContent(fileName), "fileName");
-        content.Add(new StringContent(modelName), "modelName");
-        content.Add(new StringContent(runnerId.ToString()), "runnerId");
-        if (!string.IsNullOrWhiteSpace(baseModel))
-            content.Add(new StringContent(baseModel), "baseModel");
-        content.Add(new StreamContent(data), "file", fileName);
-
-        var response = await HttpClient.PostAsync("api/v1/ModelImport/local", content);
+        var response = await HttpClient.PostAsync("api/v1/maintenance/checkFiles", null);
         response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<long>();
+    }
 
-        var id = await response.Content.ReadFromJsonAsync<long?>();
-        if (id == null)
-            throw new Exception("Failed to deserialize operation id");
-        return id.Value;
-    }*/
+    public async Task<long> StartDeleteThumbnails()
+    {
+        var response = await HttpClient.PostAsync("api/v1/maintenance/deleteThumbnails", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<long>();
+    }
+
+    public async Task<long> StartPurgeIncorrectlyDeleted()
+    {
+        var response = await HttpClient.PostAsync("api/v1/maintenance/purgeIncorrectlyDeleted", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<long>();
+    }
+
+    public async Task<long> StartFixOrphanedResources()
+    {
+        var response = await HttpClient.PostAsync("api/v1/maintenance/fixOrphaned", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<long>();
+    }
+
+    /*public async Task<long> StartLocalModelImport(RemoteModelType type, string targetFolder, string fileName,
+    string modelName, int runnerId, Stream data, string? baseModel = null)
+{
+    using var content = new MultipartFormDataContent();
+    content.Add(new StringContent(((int)type).ToString()), "type");
+    content.Add(new StringContent(targetFolder), "targetFolder");
+    content.Add(new StringContent(fileName), "fileName");
+    content.Add(new StringContent(modelName), "modelName");
+    content.Add(new StringContent(runnerId.ToString()), "runnerId");
+    if (!string.IsNullOrWhiteSpace(baseModel))
+        content.Add(new StringContent(baseModel), "baseModel");
+    content.Add(new StreamContent(data), "file", fileName);
+
+    var response = await HttpClient.PostAsync("api/v1/ModelImport/local", content);
+    response.EnsureSuccessStatusCode();
+
+    var id = await response.Content.ReadFromJsonAsync<long?>();
+    if (id == null)
+        throw new Exception("Failed to deserialize operation id");
+    return id.Value;
+}*/
 }

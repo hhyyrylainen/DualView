@@ -8,11 +8,15 @@ namespace DualView.Server.Services;
 public class EntityUpdateNotifier : IEntityUpdateNotifier
 {
     private readonly IHubContext<DataHub, IDataHub> hubContext;
+    private readonly IHubContext<RealTimeDataHub, IRealTimeDataHub> realTimeHubContext;
     private readonly ILogger<EntityUpdateNotifier> logger;
 
-    public EntityUpdateNotifier(IHubContext<DataHub, IDataHub> hubContext, ILogger<EntityUpdateNotifier> logger)
+    public EntityUpdateNotifier(IHubContext<DataHub, IDataHub> hubContext,
+        IHubContext<RealTimeDataHub, IRealTimeDataHub> realTimeHubContext,
+        ILogger<EntityUpdateNotifier> logger)
     {
         this.hubContext = hubContext;
+        this.realTimeHubContext = realTimeHubContext;
         this.logger = logger;
     }
 
@@ -104,6 +108,7 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
     {
         logger.LogDebug("Broadcasting media folders update to all clients");
         await hubContext.Clients.All.MediaFoldersUpdated();
+        await realTimeHubContext.Clients.All.OnMediaFolderUpdated();
     }
 
     public async Task NotifyMediaFolderContentsUpdated(long folderId)
@@ -116,6 +121,7 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
     {
         logger.LogDebug("Broadcasting media update to all clients");
         await hubContext.Clients.All.MediaUpdated(id);
+        await realTimeHubContext.Clients.All.OnMediaUpdated(id);
     }
 
     public async Task NotifyPromptFoldersUpdated()

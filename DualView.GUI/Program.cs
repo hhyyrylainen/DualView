@@ -222,6 +222,13 @@ sealed class Program
         services.AddTransient<MediaEditSelectorWindowViewModel>();
         services.AddTransient<MediaPickerWindowViewModel>();
         services.AddTransient<EditMediaFoldersWindowViewModel>();
+        services.AddTransient<TagManagerWindowViewModel>();
+        services.AddTransient<MaintenanceToolsWindowViewModel>();
+        services.AddTransient<RenameWindowViewModel>();
+        services.AddTransient<ReorderWindowViewModel>();
+        services.AddTransient<AddToFolderWindowViewModel>();
+        services.AddTransient<RemoveFromFoldersWindowViewModel>();
+        services.AddTransient<UploadWindowViewModel>();
     }
 
     private static void StartInitialServices(IServiceProvider serviceProvider)

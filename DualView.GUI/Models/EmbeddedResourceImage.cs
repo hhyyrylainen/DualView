@@ -12,7 +12,8 @@ namespace DualView.GUI.Models;
 /// </summary>
 public class EmbeddedResourceImage : IVisualMediaSource
 {
-    public const string FolderIcon = "Wenrexa Basket.png";
+    public const string FolderIcon = "file-folder.png";
+    public const string CollectionIcon = "folders.png";
 
     private static readonly Dictionary<string, EmbeddedResourceImage> Loaded = new();
 

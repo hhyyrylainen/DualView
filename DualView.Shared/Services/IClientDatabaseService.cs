@@ -20,6 +20,8 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task SaveMediaFileAsync(MediaFileDTO media);
 
     public Task<List<MediaFileDTO>> GetDeletedMediaAsync(int limit);
+    public Task<List<MediaFolderDTO>> GetDeletedMediaFoldersAsync(int limit);
+    public Task<List<CollectionDTO>> GetDeletedCollectionsAsync(int limit);
 
     // TODO: remove these when confirmed are unneeded
     // Compatibility methods
@@ -45,6 +47,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<List<AppliedTagDTO>> GetCollectionAppliedTagsAsync(long collectionId);
 
     // Import & Galleries
+    public Task<List<MediaImportInfoDTO>> GetPendingImportsAsync();
     public Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId);
     public Task<List<DownloadGalleryDTO>> GetAllDownloadGalleriesAsync();
     public Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id);
