@@ -2,7 +2,6 @@ using System.ComponentModel.DataAnnotations;
 using Backend.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
-using DualView.Shared.Services;
 using Backend.Services;
 using Backend.Utilities;
 using Microsoft.AspNetCore.Mvc;

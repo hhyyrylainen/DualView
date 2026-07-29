@@ -28,8 +28,10 @@ NLogConfigurator.Configure(logDirectory, AppComponent.Server);
 var logger = new NLogLoggingService("Main");
 logger.Info("Application server starting...");
 
+var serverConfig = new ServerConfigurationService(logger, dataFolderService);
+
 // Get the database file path
-string dbFilePath = dataFolderService.GetDatabaseFilePath();
+string dbFilePath = serverConfig.DatabaseFilePath ?? dataFolderService.GetDatabaseFilePath();
 logger.Info($"Using database at: {dbFilePath}");
 
 // Create a connection string with WAL mode enabled
@@ -123,6 +125,7 @@ builder.Services.AddSignalR();
 
 // Register data folder service
 builder.Services.AddSingleton<IDataFolderService>(dataFolderService);
+builder.Services.AddSingleton<IServerConfigurationService>(serverConfig);
 
 // Register other services
 builder.Services.AddSingleton<IAppEvents, AppEvents>();
@@ -230,7 +233,15 @@ backgroundJobs.Start();
 //
 // Main start of the application
 //
-app.Run();
+if (!string.IsNullOrEmpty(serverConfig.ListenUrl))
+{
+    logger.Info($"Overriding listen URL to: {serverConfig.ListenUrl}");
+    app.Run(serverConfig.ListenUrl);
+}
+else
+{
+    app.Run();
+}
 
 // Stop specific services that need some more care on shutdown
 var maintenanceStop = maintenanceJobs.Stop(TimeSpan.FromSeconds(60));
