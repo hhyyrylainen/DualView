@@ -6,6 +6,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using DualView.GUI.Models;
 using DualView.GUI.Services;
+using DualView.Shared.Models.DTO;
+using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
@@ -107,6 +109,39 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         Hamburger = new HamburgerMenuViewModel(backendStatusService);
 
         InitializeMenu();
+        _ = ReloadPendingImports();
+    }
+
+    public async Task ReloadPendingImports()
+    {
+        if (clientDatabaseService == null) return;
+
+        try
+        {
+            var imports = await clientDatabaseService.GetPendingImportsAsync();
+            
+            Dispatcher.UIThread.Post(() =>
+            {
+                MediaToImport.Clear();
+                foreach (var import in imports)
+                {
+                    // Need to fetch media info for preview
+                    // For now, assume we have it or use dummy
+                    var vm = new MediaViewerViewModel(logger!, windowService!)
+                    {
+                        Name = import.PreferredName ?? "Unnamed",
+                        MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(import.PreferredName ?? "Unnamed", import.MediaFileId, true, import.MediaFileId, MediaType.Png, 512, 512, false), serviceProvider!),
+                        ShowingThumbnail = true,
+                        AllowSelection = true
+                    };
+                    MediaToImport.Add(vm);
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            logger?.LogError(e, "Failed to reload pending imports");
+        }
     }
 
     public void OpenMediaWindow()
@@ -348,12 +383,23 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
             media.Dispose();
     }
 
+    public void OpenUploadWindow()
+    {
+        windowService?.ShowWindow<UploadWindowViewModel>();
+    }
+
     private void InitializeMenu()
     {
         MainWindowViewModel.AddDefaultMenuItems(Hamburger);
 
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Import", Command = new RelayCommand(StartImport) });
+
+        Hamburger.MenuItems.Add(new HamburgerMenuItem
+            { Title = "Upload Files", Command = new RelayCommand(OpenUploadWindow) });
+
+        Hamburger.MenuItems.Add(new HamburgerMenuItem
+            { Title = "Refresh Pending", Command = new RelayCommand(() => _ = ReloadPendingImports()) });
 
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Open Media Collection", Command = new RelayCommand(OpenMediaWindow) });
