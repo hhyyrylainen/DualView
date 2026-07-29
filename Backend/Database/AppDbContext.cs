@@ -26,6 +26,7 @@ public class AppDbContext : DbContext
     public DbSet<TagImply> TagImplies { get; set; }
     public DbSet<AppliedTag> AppliedTags { get; set; }
     public DbSet<TagBreakRule> TagBreakRules { get; set; }
+    public DbSet<TagSuperAlias> TagSuperAliases { get; set; }
 
     public DbSet<MediaImportInfo> MediaImportInfos { get; set; }
     public DbSet<IgnoredDuplicate> IgnoredDuplicates { get; set; }

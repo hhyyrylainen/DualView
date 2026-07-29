@@ -283,6 +283,9 @@ namespace Backend.Migrations
                     b.Property<bool>("IsFavorited")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsTemporary")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("Keep")
                         .HasColumnType("INTEGER");
 
@@ -570,6 +573,25 @@ namespace Backend.Migrations
                         .IsUnique();
 
                     b.ToTable("TagModifierAliases");
+                });
+
+            modelBuilder.Entity("Backend.Models.TagSuperAlias", b =>
+                {
+                    b.Property<string>("Alias")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Expanded")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Alias");
+
+                    b.HasIndex("Alias")
+                        .IsUnique();
+
+                    b.ToTable("TagSuperAliases");
                 });
 
             modelBuilder.Entity("DualView.Shared.Models.DualViewSettings", b =>
