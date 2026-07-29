@@ -8,7 +8,7 @@ public class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbContext>
     public AppDbContext CreateDbContext(string[] args)
     {
         var optionsBuilder = new DbContextOptionsBuilder<AppDbContext>();
-        optionsBuilder.UseSqlite("Data Source=airunmanager-dev.sqlite");
+        optionsBuilder.UseSqlite("Data Source=dualview-3-dev.sqlite");
 
         return new AppDbContext(optionsBuilder.Options);
     }

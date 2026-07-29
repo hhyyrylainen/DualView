@@ -45,7 +45,7 @@ public class DataFolderService : IDataFolderService
 
     public string GetDatabaseFilePath()
     {
-        return Path.Combine(GetDataFolderPath(), "airunmanager.sqlite");
+        return Path.Combine(GetDataFolderPath(), "dualview-3.sqlite");
     }
 
     public string GetLogsFolderPath()
