@@ -23,6 +23,12 @@ public interface IWindowService
         where TViewModel : class;
 
     /// <summary>
+    ///    Shows a new window for a given ViewModel type.
+    /// </summary>
+    public void ShowWindow<TViewModel>(Action<TViewModel>? onCreated = null)
+        where TViewModel : class;
+
+    /// <summary>
     ///   Shows a popup window with an error message. This can be called at any time from any thread for convenience.
     /// </summary>
     /// <param name="errorTitle">Short description of what went wrong</param>

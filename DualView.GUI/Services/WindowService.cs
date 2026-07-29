@@ -48,6 +48,16 @@ public sealed class WindowService : IWindowService
         return vm;
     }
 
+    public void ShowWindow<TViewModel>(Action<TViewModel>? onCreated = null)
+        where TViewModel : class
+    {
+        var serviceScope = services.CreateScope();
+        var vm = serviceScope.ServiceProvider.GetRequiredService<TViewModel>();
+        onCreated?.Invoke(vm);
+
+        PerformWindowCreation(vm, serviceScope);
+    }
+
     /// <summary>
     ///   Shows a window for the given ViewModel.
     /// </summary>
