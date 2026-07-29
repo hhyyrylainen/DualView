@@ -54,7 +54,7 @@ public class GUIConfigurationService : IGuiConfigurationService
 
     private class ConfigFileFormat
     {
-        public string BackendUrl { get; set; } = "http://localhost:7357";
+        public string BackendUrl { get; set; } = "http://localhost:7362";
 
         public string FfmpegLibPath { get; set; } = "";
     }
