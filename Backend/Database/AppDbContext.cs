@@ -105,6 +105,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<TagImply>(builder =>
         {
+            builder.HasQueryFilter(ti => !ti.PrimaryTag.IsDeleted && !ti.ToApplyTag.IsDeleted);
             builder.HasKey(ti => new { ti.PrimaryTagId, ti.ToApplyTagId });
 
             builder.HasOne(ti => ti.PrimaryTag)
@@ -120,6 +121,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<AppliedTag>(builder =>
         {
+            builder.HasQueryFilter(at => !at.Tag.IsDeleted);
             builder.HasOne(d => d.Tag).WithMany()
                 .HasForeignKey(d => d.TagId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -151,6 +153,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<MediaImportInfo>(builder =>
         {
+            builder.HasQueryFilter(mii => !mii.MediaFile.IsDeleted);
             builder.HasOne(d => d.DownloadGallery).WithMany(p => p.AssociatedImports)
                 .HasForeignKey(d => d.DownloadGalleryId)
                 .OnDelete(DeleteBehavior.SetNull);
@@ -158,6 +161,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<IgnoredDuplicate>(builder =>
         {
+            builder.HasQueryFilter(id => !id.MediaFile1.IsDeleted && !id.MediaFile2.IsDeleted);
             builder.HasKey(id => new { id.MediaFileId1, id.MediaFileId2 });
 
             builder.HasOne(id => id.MediaFile1).WithMany()
@@ -176,6 +180,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<CollectionItem>(builder =>
         {
+            builder.HasQueryFilter(ci => !ci.Collection.IsDeleted && !ci.MediaFile.IsDeleted);
             builder.HasKey(ci => new { ci.CollectionId, ci.MediaFileId });
 
             builder.HasOne(ci => ci.Collection)
@@ -185,6 +190,16 @@ public class AppDbContext : DbContext
             builder.HasOne(ci => ci.MediaFile)
                 .WithMany(m => m.InCollections)
                 .HasForeignKey(ci => ci.MediaFileId);
+        });
+
+        modelBuilder.Entity<TagAlias>(builder =>
+        {
+            builder.HasQueryFilter(ta => !ta.Tag.IsDeleted);
+        });
+
+        modelBuilder.Entity<TagModifierAlias>(builder =>
+        {
+            builder.HasQueryFilter(tma => !tma.Modifier.IsDeleted);
         });
     }
 }
