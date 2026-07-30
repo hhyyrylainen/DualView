@@ -236,6 +236,52 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return builder.ToString();
     }
 
+    public async Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId)
+    {
+        var collection = await dbContext.Collections.Include(c => c.Folders)
+            .FirstOrDefaultAsync(c => c.Id == collectionId);
+        if (collection == null)
+            throw new Exception("Collection not found");
+
+        var result = new List<FolderPathDTO>();
+        foreach (var folder in collection.Folders)
+        {
+            result.Add(new FolderPathDTO
+            {
+                Id = folder.Id,
+                Path = await GetMediaFolderPath(folder)
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId)
+    {
+        var folder = await dbContext.MediaFolders.Include(f => f.Parents)
+            .FirstOrDefaultAsync(f => f.Id == folderId);
+        if (folder == null)
+            throw new Exception("Folder not found");
+
+        var result = new List<FolderPathDTO>();
+        foreach (var parent in folder.Parents)
+        {
+            result.Add(new FolderPathDTO
+            {
+                Id = parent.Id,
+                Path = await GetMediaFolderPath(parent)
+            });
+        }
+
+        return result;
+    }
+
+    public async Task<string> GetMediaFolderPath(long folderId)
+    {
+        var folder = await dbContext.MediaFolders.FindAsync(folderId);
+        return await GetMediaFolderPath(folder);
+    }
+
     public async Task<MediaFolder> CreateMediaFolderAsync(string folderName, long parentId)
     {
         var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty());
