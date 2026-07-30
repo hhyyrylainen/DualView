@@ -16,5 +16,5 @@ public class MediaFolderInfo(string name) : IFolderInfo
     [Required]
     public string Name { get; set; } = name;
 
-    public long? ParentId { get; set; }
+    public List<long> ParentIds { get; set; } = new();
 }

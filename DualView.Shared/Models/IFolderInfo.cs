@@ -6,5 +6,5 @@ public interface IFolderInfo
 
     public string Name { get; }
 
-    public long? ParentId { get; }
+    public List<long> ParentIds { get; }
 }

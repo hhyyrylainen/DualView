@@ -10,7 +10,7 @@ public class CollectionDTO(string name)
     [Required]
     public string Name { get; set; } = name;
 
-    public long FolderId { get; set; }
+    public List<long> FolderIds { get; set; } = new();
 
     public DateTime UpdatedAt { get; set; }
 }
