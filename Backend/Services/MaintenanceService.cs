@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Security.Cryptography;
 using Backend.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ public class MaintenanceService : IMaintenanceService
 
     private readonly ILogger<MaintenanceService> logger;
     private readonly IServiceScopeFactory scopeFactory;
+    private readonly IOperationsStorage operationsStorage;
 
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private readonly CancellationTokenSource waitCancellationSource = new();
@@ -22,10 +24,12 @@ public class MaintenanceService : IMaintenanceService
 
     private bool run = true;
 
-    public MaintenanceService(ILogger<MaintenanceService> logger, IServiceScopeFactory scopeFactory)
+    public MaintenanceService(ILogger<MaintenanceService> logger, IServiceScopeFactory scopeFactory,
+        IOperationsStorage operationsStorage)
     {
         this.logger = logger;
         this.scopeFactory = scopeFactory;
+        this.operationsStorage = operationsStorage;
 
         allJobs.Add(new DeleteOldThumbnails());
         allJobs.Add(new DeleteOldProcessed());
@@ -54,6 +58,248 @@ public class MaintenanceService : IMaintenanceService
         });
 
         await task;
+    }
+
+    public async Task<long> StartImageExistCheck()
+    {
+        var id = operationsStorage.GetNextOperationId();
+        List<long>? allIds = null;
+        var errors = new List<string>();
+
+        var op = new Operations.MaintenanceOperation(id,
+            Operations.MaintenanceOperation.MaintenanceTask.CheckImageFiles,
+            logger, scopeFactory,
+            async (m) =>
+            {
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+                allIds = await db.GetAllMediaFileIdsAsync();
+                return allIds.Count;
+            },
+            async (m) =>
+            {
+                if (allIds == null || m.ProcessedCount >= allIds.Count)
+                    return false;
+
+                var mediaId = allIds[m.ProcessedCount];
+
+                // It's extremely inefficient to do this for every single media file, but it's better than nothing for now...
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+                var dataFolderService = scope.ServiceProvider.GetRequiredService<IDataFolderService>();
+
+                var media = await db.GetMediaByIdAsync(mediaId);
+                if (media == null)
+                    return m.ProcessedCount + 1 < allIds.Count;
+
+                var storage = await MediaImportHandler.GetBaseMediaFolder(db, dataFolderService);
+                var path = Path.Join(storage, media.PathRelativeToStorage());
+
+                if (!File.Exists(path))
+                {
+                    var error = $"File missing for media {media.Id} ({media.OriginalFileName}): {path}";
+                    logger.LogError(error);
+                    errors.Add(error);
+                    m.SetError();
+                }
+                else
+                {
+                    try
+                    {
+                        using var stream = File.OpenRead(path);
+                        var hashBytes = await SHA3_256.HashDataAsync(stream);
+                        var sha3 = Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+                        if (sha3 != media.HashSha3)
+                        {
+                            var error =
+                                $"Hash mismatch for media {media.Id} ({media.OriginalFileName}). Expected: {media.HashSha3}, Actual: {sha3}";
+                            logger.LogError(error);
+                            errors.Add(error);
+                            m.SetError();
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        var error =
+                            $"Failed to check hash for media {media.Id} ({media.OriginalFileName}): {e.Message}";
+                        logger.LogError(e, error);
+                        errors.Add(error);
+                        m.SetError();
+                    }
+                }
+
+                if (errors.Count > 0)
+                {
+                    m.Message = string.Join("\n", errors.TakeLast(5));
+                    if (errors.Count > 5)
+                        m.Message = $"... (total {errors.Count} errors)\n" + m.Message;
+                }
+
+                return m.ProcessedCount + 1 < allIds.Count;
+            });
+        operationsStorage.RegisterOperation(op);
+        _ = Task.Run(() => op.Run());
+        return id;
+    }
+
+    public async Task<long> StartDeleteThumbnails()
+    {
+        var id = operationsStorage.GetNextOperationId();
+        var op = new Operations.MaintenanceOperation(id,
+            Operations.MaintenanceOperation.MaintenanceTask.DeleteThumbnails,
+            logger, scopeFactory,
+            async (m) => 1,
+            async (m) =>
+            {
+                // Re-use logic from DeleteOldThumbnails but for all
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+                var storage = await MediaImportHandler.GetBaseMediaFolder(db,
+                    scope.ServiceProvider.GetRequiredService<IDataFolderService>());
+                var thumbnails = Path.Join(storage, "thumbnails");
+                if (Directory.Exists(thumbnails))
+                {
+                    Directory.Delete(thumbnails, true);
+                    Directory.CreateDirectory(thumbnails);
+                }
+
+                return false;
+            });
+        operationsStorage.RegisterOperation(op);
+        _ = Task.Run(() => op.Run());
+        return id;
+    }
+
+    public async Task<long> StartPurgeIncorrectlyDeleted()
+    {
+        // TODO: reimplement this operation at some point
+        var id = operationsStorage.GetNextOperationId();
+        var op = new Operations.MaintenanceOperation(id,
+            Operations.MaintenanceOperation.MaintenanceTask.PurgeIncorrectlyDeleted,
+            logger, scopeFactory,
+            async (m) => 0,
+            async (m) => false);
+        operationsStorage.RegisterOperation(op);
+        _ = Task.Run(() => op.Run());
+        return id;
+    }
+
+    public async Task<long> StartFixOrphanedResources()
+    {
+        var id = operationsStorage.GetNextOperationId();
+        var op = new Operations.MaintenanceOperation(id,
+            Operations.MaintenanceOperation.MaintenanceTask.FixOrphanedResources,
+            logger, scopeFactory,
+            async (m) => 3,
+            async (m) =>
+            {
+                using var scope = scopeFactory.CreateScope();
+                var db = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+
+                if (m.ProcessedCount == 0)
+                {
+                    var orphanedMedia = await db.GetOrphanedMediaFilesAsync();
+                    if (orphanedMedia.Count > 0)
+                    {
+                        var uncategorizedCollection = await db.GetCollectionAsync(Collection.UncategorizedCollectionId);
+                        if (uncategorizedCollection != null)
+                        {
+                            int sequenceNumber =
+                                await db.GetNextCollectionSequenceNumberAsync(Collection.UncategorizedCollectionId);
+                            foreach (var mediaId in orphanedMedia)
+                            {
+                                await db.AddMediaToCollection(mediaId, Collection.UncategorizedCollectionId,
+                                    sequenceNumber++);
+                            }
+
+                            m.Message =
+                                $"Added {orphanedMedia.Count} orphaned media files to Uncategorized collection.";
+                        }
+                        else
+                        {
+                            logger.LogWarning("Uncategorized collection not found during fix");
+                            m.Message = "Error: Uncategorized collection not found";
+                            m.SetError();
+                        }
+                    }
+                    else
+                    {
+                        m.Message = "No orphaned media files found.";
+                    }
+
+                    return true;
+                }
+
+                if (m.ProcessedCount == 1)
+                {
+                    var orphanedCollections = await db.GetOrphanedCollectionsAsync();
+                    if (orphanedCollections.Count > 0)
+                    {
+                        var rootFolder = await db.GetMediaFolderAsync(MediaFolder.RootFolderId);
+                        if (rootFolder != null)
+                        {
+                            foreach (var collection in orphanedCollections)
+                            {
+                                collection.Folders.Add(rootFolder);
+                                await db.SaveCollectionAsync(collection);
+                            }
+
+                            m.Message = (m.Message ?? "") +
+                                        $"\nAdded {orphanedCollections.Count} orphaned collections to Root folder.";
+                        }
+                        else
+                        {
+                            logger.LogWarning("Root folder not found during fix");
+                            m.Message = (m.Message ?? "") + "\nError: Root folder not found";
+                            m.SetError();
+                        }
+                    }
+                    else
+                    {
+                        m.Message = (m.Message ?? "") + "\nNo orphaned collections found.";
+                    }
+
+                    return true;
+                }
+
+                if (m.ProcessedCount == 2)
+                {
+                    var orphanedFolders = await db.GetOrphanedMediaFoldersAsync();
+                    if (orphanedFolders.Count > 0)
+                    {
+                        var rootFolder = await db.GetMediaFolderAsync(MediaFolder.RootFolderId);
+                        if (rootFolder != null)
+                        {
+                            foreach (var folder in orphanedFolders)
+                            {
+                                folder.Parents.Add(rootFolder);
+                                await db.SaveMediaFolderAsync(folder);
+                            }
+
+                            m.Message = (m.Message ?? "") +
+                                        $"\nAdded {orphanedFolders.Count} orphaned folders to Root folder.";
+                        }
+                        else
+                        {
+                            logger.LogWarning("Root folder not found during fix");
+                            m.Message = (m.Message ?? "") + "\nError: Root folder not found";
+                            m.SetError();
+                        }
+                    }
+                    else
+                    {
+                        m.Message = (m.Message ?? "") + "\nNo orphaned folders found.";
+                    }
+
+                    return false;
+                }
+
+                return false;
+            });
+        operationsStorage.RegisterOperation(op);
+        _ = Task.Run(() => op.Run());
+        return id;
     }
 
     private static TimeSpan GetJobRandomizationTime()
