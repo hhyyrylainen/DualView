@@ -528,6 +528,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.MediaFiles.FindAsync(id);
     }
 
+    public async Task<List<long>> GetAllMediaFileIdsAsync()
+    {
+        return await dbContext.MediaFiles.Select(m => m.Id).ToListAsync();
+    }
+
     public async Task SaveMediaFileAsync(MediaFile mediaFile)
     {
         await SaveAsync();

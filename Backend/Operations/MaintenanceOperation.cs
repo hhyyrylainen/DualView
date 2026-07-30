@@ -18,6 +18,8 @@ public class MaintenanceOperation : BaseOperationWithItemCount
     private readonly Func<MaintenanceOperation, Task<int>> countFunc;
     private readonly Func<MaintenanceOperation, Task<bool>> processFunc;
 
+    public string? Message { get; set; }
+
     public MaintenanceOperation(long id, MaintenanceTask taskType, ILogger logger,
         IServiceScopeFactory scopeFactory,
         Func<MaintenanceOperation, Task<int>> countFunc,
@@ -30,6 +32,8 @@ public class MaintenanceOperation : BaseOperationWithItemCount
 
     public override string Name => taskType.ToString();
 
+    public void SetError() => HasError = true;
+
     public override OperationStatusUpdate GetStatusUpdate()
     {
         return new OperationStatusUpdate(Id, $"Maintenance: {Name}")
@@ -37,7 +41,8 @@ public class MaintenanceOperation : BaseOperationWithItemCount
             CompletionFraction = Total > 0 ? (float)Processed / Total : 0,
             Completed = Completed,
             Paused = RunnerPaused,
-            Error = HasError
+            Error = HasError,
+            Message = Message,
         };
     }
 

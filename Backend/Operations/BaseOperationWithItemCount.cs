@@ -44,6 +44,9 @@ public abstract class BaseOperationWithItemCount : IRunningOperation
 
     public bool HasError { get; protected set; }
 
+    public int ProcessedCount => Processed;
+    public int TotalCount => Total;
+
     public abstract string Name { get; }
 
     public virtual void Cancel()
