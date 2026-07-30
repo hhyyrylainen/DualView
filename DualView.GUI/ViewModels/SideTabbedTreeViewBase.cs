@@ -8,6 +8,7 @@ using DualView.GUI.Services;
 using DualView.Shared.Models;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
+using DualView.Shared.Models.DTO;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.Logging;
@@ -303,7 +304,7 @@ public abstract class SideTabbedTreeViewBase : ViewModelBase, IDisposable
 
         try
         {
-            await CreateFolderAsync(folderName, parentId);
+            await CreateFolderAsync(folderName, parentId ?? MediaFolderInfo.RootFolderId);
             return true;
         }
         catch (Exception e)
@@ -353,7 +354,7 @@ public abstract class SideTabbedTreeViewBase : ViewModelBase, IDisposable
         }
     }
 
-    protected abstract Task CreateFolderAsync(string name, long? parentId);
+    protected abstract Task CreateFolderAsync(string name, long parentId);
     protected abstract Task<IEnumerable<IFolderInfo>> LoadFolderInfoAsync();
 
     protected abstract Task LoadFolderItems(bool searchChanged);

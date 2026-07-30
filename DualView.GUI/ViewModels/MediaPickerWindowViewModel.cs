@@ -181,7 +181,7 @@ public class MediaPickerWindowViewModel : SideTabbedTreeViewBase
     {
     }
 
-    protected override Task CreateFolderAsync(string name, long? parentId)
+    protected override Task CreateFolderAsync(string name, long parentId)
     {
         // As the user couldn't add media to a folder, it's not useful if this is called
         throw new NotSupportedException("It doesn't make much sense to create a folder in the media picker window");

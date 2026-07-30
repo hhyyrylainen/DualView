@@ -17,7 +17,7 @@ public interface IDatabaseCommonService
     // The relevant interfaces are IClientDatabaseService (client) and IDatabaseService (server).
 
     // Media
-    public Task<long> CreateMediaFolder(string folderName, long? parentId);
+    public Task<long> CreateMediaFolder(string folderName, long parentId);
     public Task<long> CreateCollection(string collectionName, long folderId);
 
     public Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber);

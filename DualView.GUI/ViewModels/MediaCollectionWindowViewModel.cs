@@ -107,7 +107,7 @@ public class MediaCollectionWindowViewModel : SideTabbedTreeViewBase
         }
     }
 
-    protected override Task CreateFolderAsync(string name, long? parentId)
+    protected override Task CreateFolderAsync(string name, long parentId)
     {
         return ClientDatabaseService!.CreateMediaFolder(name, parentId);
     }

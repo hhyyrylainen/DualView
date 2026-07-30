@@ -57,19 +57,18 @@ public class MediaFolderController : Controller
 
         // TODO: add an all-lowercase name to make searching easier
 
-        if (request.ParentFolderId != null)
-        {
-            if (await databaseService.GetMediaFolderAsync(request.ParentFolderId.Value) == null)
-                return BadRequest("Parent folder does not exist");
-        }
+        var parentId = request.ParentFolderId ?? MediaFolder.RootFolderId;
 
-        if (await databaseService.GetMediaFolderAsync(request.Name, request.ParentFolderId) != null)
+        if (await databaseService.GetMediaFolderAsync(parentId) == null)
+            return BadRequest("Parent folder does not exist");
+
+        if (await databaseService.GetMediaFolderAsync(request.Name, parentId) != null)
             return BadRequest("Folder with the same name already exists");
 
-        var id = await databaseService.CreateMediaFolder(request.Name, request.ParentFolderId);
+        var id = await databaseService.CreateMediaFolder(request.Name, parentId);
 
         logger.LogInformation("Created new media folder {Id} with name '{Name}' in folder {FolderId}", id, request.Name,
-            request.ParentFolderId);
+            parentId);
 
         return Ok(id.ToString());
     }

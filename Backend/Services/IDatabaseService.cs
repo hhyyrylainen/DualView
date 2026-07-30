@@ -23,7 +23,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<MediaFolder?> GetMediaFolderAsync(long id);
     public Task<MediaFolder?> GetMediaFolderAsync(string name, long? parentFolderId);
 
-    public Task<MediaFolder> CreateMediaFolderAsync(string folderName, long? parentId);
+    public Task<MediaFolder> CreateMediaFolderAsync(string folderName, long parentId);
     public Task SaveMediaFolderAsync(MediaFolder folder);
     public Task<MediaFolder?> GetMediaFolderFromPathAsync(string path);
 

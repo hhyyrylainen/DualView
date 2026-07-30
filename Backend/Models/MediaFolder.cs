@@ -10,7 +10,7 @@ namespace Backend.Models;
 public class MediaFolder : UpdateableModel, IDTOProvider<MediaFolderDTO>,
     IInfoProvider<MediaFolderInfo>, ISoftDelete
 {
-    public const long RootFolderId = 1;
+    public const long RootFolderId = MediaFolderInfo.RootFolderId;
 
     public MediaFolder(string name)
     {

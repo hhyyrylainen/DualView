@@ -90,21 +90,18 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyAppSettingsUpdated();
     }
 
-    public async Task<long> CreateMediaFolder(string folderName, long? parentId)
+    public async Task<long> CreateMediaFolder(string folderName, long parentId)
     {
         var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty());
 
-        if (parentId != null)
+        var parent = await dbContext.MediaFolders.FindAsync(parentId);
+        if (parent != null)
         {
-            var parent = await dbContext.MediaFolders.FindAsync(parentId.Value);
-            if (parent != null)
-            {
-                folder.Parents.Add(parent);
-            }
-            else
-            {
-                throw new Exception("Parent folder ID not found");
-            }
+            folder.Parents.Add(parent);
+        }
+        else
+        {
+            throw new Exception("Parent folder ID not found");
         }
 
         await dbContext.MediaFolders.AddAsync(folder);
@@ -198,15 +195,18 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return builder.ToString();
     }
 
-    public async Task<MediaFolder> CreateMediaFolderAsync(string folderName, long? parentId)
+    public async Task<MediaFolder> CreateMediaFolderAsync(string folderName, long parentId)
     {
         var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty());
 
-        if (parentId != null)
+        var parent = await dbContext.MediaFolders.FindAsync(parentId);
+        if (parent != null)
         {
-            var parent = await dbContext.MediaFolders.FindAsync(parentId.Value);
-            if (parent != null)
-                folder.Parents.Add(parent);
+            folder.Parents.Add(parent);
+        }
+        else
+        {
+            throw new Exception("Parent folder ID not found");
         }
 
         await dbContext.MediaFolders.AddAsync(folder);

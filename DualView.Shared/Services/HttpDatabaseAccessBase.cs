@@ -150,7 +150,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<long> CreateMediaFolder(string folderName, long? parentId)
+    public async Task<long> CreateMediaFolder(string folderName, long parentId)
     {
         var response = await HttpClient.PostAsJsonAsync("api/v1/mediaFolder",
             new CreateFolderRequest(folderName) { ParentFolderId = parentId });

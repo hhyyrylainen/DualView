@@ -10,6 +10,8 @@ public class MediaFolderDTO(string name) : MediaFolderInfo(name)
 
 public class MediaFolderInfo(string name) : IFolderInfo
 {
+    public const long RootFolderId = 1;
+
     public long Id { get; set; }
 
     [MaxLength(200)]
