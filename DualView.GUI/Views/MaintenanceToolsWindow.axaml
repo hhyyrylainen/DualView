@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="450"
+        x:Class="DualView.GUI.Views.MaintenanceToolsWindow"
+        x:DataType="vm:MaintenanceToolsWindowViewModel"
+        Title="Maintenance Tools">
+
+    <Design.DataContext>
+        <vm:MaintenanceToolsWindowViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto, *, Auto" Margin="10">
+        <!-- Buttons -->
+        <WrapPanel Orientation="Horizontal">
+            <Button Content="Check Image Files" Command="{Binding StartImageExistCheck}" IsEnabled="{Binding !IsRunning}" Margin="5" />
+            <Button Content="Delete All Thumbnails" Command="{Binding DeleteThumbnails}" IsEnabled="{Binding !IsRunning}" Margin="5" />
+            <Button Content="Fix Orphaned Resources" Command="{Binding FixOrphanedResources}" IsEnabled="{Binding !IsRunning}" Margin="5" />
+            <Button Content="Cancel" Command="{Binding Cancel}" IsEnabled="{Binding IsRunning}" Margin="5" />
+            <Button Content="Clear Results" Command="{Binding ClearResults}" Margin="5" />
+        </WrapPanel>
+
+        <!-- Results -->
+        <ListBox Grid.Row="1" ItemsSource="{Binding Results}" Margin="0,10,0,10">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <TextBlock Text="{Binding}" TextWrapping="Wrap" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Status and Progress -->
+        <StackPanel Grid.Row="2" Spacing="5">
+            <TextBlock Text="{Binding StatusText}" />
+            <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" />
+        </StackPanel>
+    </Grid>
+</Window>
