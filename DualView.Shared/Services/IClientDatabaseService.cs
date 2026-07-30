@@ -16,6 +16,10 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<MediaFileDTO?> GetMediaFileAsync(long mediaId);
     public Task<List<MediaFileDTO>> GetMediaFileSiblingsAsync(long mediaId);
 
+    public Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId);
+    public Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId);
+    public Task<string> GetMediaFolderPath(long folderId);
+
     public Task<MediaFileDTO> CreateMediaFileAsync(MediaFileDTO mediaFile, long collectionId);
     public Task SaveMediaFileAsync(MediaFileDTO media);
 

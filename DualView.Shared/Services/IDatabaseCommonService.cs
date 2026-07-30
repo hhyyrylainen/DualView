@@ -23,6 +23,9 @@ public interface IDatabaseCommonService
     public Task AddCollectionToFolder(long collectionId, long folderId);
     public Task AddFolderToFolder(long folderId, long parentFolderId);
 
+    public Task RemoveCollectionFromFolder(long collectionId, long folderId);
+    public Task RemoveFolderFromFolder(long folderId, long parentFolderId);
+
     public Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber);
     public Task RemoveMediaFromCollection(long mediaId, long collectionId);
 

@@ -8,6 +8,12 @@ public class MediaFolderDTO(string name) : MediaFolderInfo(name)
     public DateTime UpdatedAt { get; set; }
 }
 
+public class FolderPathDTO
+{
+    public long Id { get; set; }
+    public string Path { get; set; } = "";
+}
+
 public class MediaFolderInfo(string name) : IFolderInfo
 {
     public const long RootFolderId = 1;

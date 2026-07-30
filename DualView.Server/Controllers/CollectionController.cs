@@ -57,4 +57,17 @@ public class CollectionController : Controller
         await databaseService.AddCollectionToFolder(id, folderId);
         return Ok();
     }
+
+    [HttpDelete("{id:long}/removeFromFolder/{folderId:long}")]
+    public async Task<IActionResult> RemoveFromFolder([Required] long id, [Required] long folderId)
+    {
+        await databaseService.RemoveCollectionFromFolder(id, folderId);
+        return Ok();
+    }
+
+    [HttpGet("{id:long}/folderPaths")]
+    public async Task<ActionResult<List<FolderPathDTO>>> GetFolderPaths([Required] long id)
+    {
+        return await ((IClientDatabaseService)databaseService).GetCollectionFolderPaths(id);
+    }
 }

@@ -113,6 +113,23 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                new List<MediaFileDTO>();
     }
 
+    public async Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<FolderPathDTO>>($"api/v1/collection/{collectionId}/folderPaths") ??
+               new List<FolderPathDTO>();
+    }
+
+    public async Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<FolderPathDTO>>($"api/v1/mediaFolder/{folderId}/parentFolderPaths") ??
+               new List<FolderPathDTO>();
+    }
+
+    public async Task<string> GetMediaFolderPath(long folderId)
+    {
+        return await HttpClient.GetStringAsync($"api/v1/mediaFolder/{folderId}/path");
+    }
+
     public async Task<MediaFileDTO> CreateMediaFileAsync(MediaFileDTO mediaFile, long collectionId)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/media?collectionId={collectionId}", mediaFile);
@@ -176,6 +193,18 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task AddFolderToFolder(long folderId, long parentFolderId)
     {
         var response = await HttpClient.PostAsync($"api/v1/mediaFolder/{folderId}/addToFolder/{parentFolderId}", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RemoveCollectionFromFolder(long collectionId, long folderId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/collection/{collectionId}/removeFromFolder/{folderId}");
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RemoveFolderFromFolder(long folderId, long parentFolderId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/mediaFolder/{folderId}/removeFromFolder/{parentFolderId}");
         response.EnsureSuccessStatusCode();
     }
 

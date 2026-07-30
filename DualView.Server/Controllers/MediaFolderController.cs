@@ -3,6 +3,7 @@ using Backend.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Requests;
+using DualView.Shared.Services;
 using Backend.Services;
 using Backend.Utilities;
 using Microsoft.AspNetCore.Mvc;
@@ -138,6 +139,25 @@ public class MediaFolderController : Controller
     {
         await databaseService.AddFolderToFolder(id, parentFolderId);
         return Ok();
+    }
+
+    [HttpDelete("{id:long}/removeFromFolder/{parentFolderId:long}")]
+    public async Task<IActionResult> RemoveFromFolder([Required] long id, [Required] long parentFolderId)
+    {
+        await databaseService.RemoveFolderFromFolder(id, parentFolderId);
+        return Ok();
+    }
+
+    [HttpGet("{id:long}/parentFolderPaths")]
+    public async Task<ActionResult<List<FolderPathDTO>>> GetParentFolderPaths([Required] long id)
+    {
+        return await ((IClientDatabaseService)databaseService).GetFolderParentFolderPaths(id);
+    }
+
+    [HttpGet("{id:long}/path")]
+    public async Task<ActionResult<string>> GetPath([Required] long id)
+    {
+        return await ((IClientDatabaseService)databaseService).GetMediaFolderPath(id);
     }
 
     [HttpPost("collection/{collectionId:long}/addMedia")]
