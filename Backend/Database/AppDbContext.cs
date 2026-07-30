@@ -38,17 +38,45 @@ public class AppDbContext : DbContext
     {
         var dbContext = (AppDbContext)context;
 
-        // Create default folders
+        // Create default collections and folders
         var folder =
-            await dbContext.MediaFolders.FirstOrDefaultAsync(f => f.Name == "Uncategorized", cancellation);
+            await dbContext.MediaFolders.Include(f => f.ContainedCollections)
+                .FirstOrDefaultAsync(f => f.Id == MediaFolder.RootFolderId, cancellation);
 
         if (folder == null)
         {
-            folder = new MediaFolder("Uncategorized", null)
+            folder = new MediaFolder("Root")
             {
-                Id = MediaFolder.UncategorizedFolderId,
+                Id = MediaFolder.RootFolderId,
             };
             await dbContext.MediaFolders.AddAsync(folder, cancellation);
+            await dbContext.SaveChangesAsync(cancellation);
+        }
+        else if (folder.Name != "Root")
+        {
+            folder.Name = "Root";
+            folder.NameLowerCase = "root";
+            await dbContext.SaveChangesAsync(cancellation);
+        }
+
+        var collection =
+            await dbContext.Collections.FirstOrDefaultAsync(c => c.Id == Collection.UncategorizedCollectionId, cancellation);
+
+        if (collection == null)
+        {
+            collection = new Collection("Uncategorized")
+            {
+                Id = Collection.UncategorizedCollectionId,
+            };
+            await dbContext.Collections.AddAsync(collection, cancellation);
+            await dbContext.SaveChangesAsync(cancellation);
+        }
+
+        // Ensure the uncategorized collection is in the root folder.
+        // It is a bit less efficient to do it this way around but should be good enough (root folder shouldn't be that full).
+        if (folder.ContainedCollections.All(c => c.Id != Collection.UncategorizedCollectionId))
+        {
+            folder.ContainedCollections.Add(collection);
             await dbContext.SaveChangesAsync(cancellation);
         }
     }
@@ -77,13 +105,11 @@ public class AppDbContext : DbContext
         {
             builder.HasQueryFilter(m => !m.IsDeleted);
 
-            builder.HasMany(d => d.ContainedCollections).WithOne(p => p.Folder)
-                .HasForeignKey(p => p.FolderId)
-                .OnDelete(DeleteBehavior.Restrict);
+            builder.HasMany(d => d.ContainedCollections).WithMany(p => p.Folders)
+                .UsingEntity(j => j.ToTable("MediaFolderCollections"));
 
-            builder.HasMany(d => d.SubFolders).WithOne(p => p.Parent)
-                .HasForeignKey(p => p.ParentId)
-                .OnDelete(DeleteBehavior.Restrict);
+            builder.HasMany(d => d.SubFolders).WithMany(p => p.Parents)
+                .UsingEntity(j => j.ToTable("MediaFolderSubFolders"));
         });
 
         modelBuilder.Entity<Collection>(builder =>

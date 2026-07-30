@@ -92,7 +92,20 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<long> CreateMediaFolder(string folderName, long? parentId)
     {
-        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty(), parentId);
+        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty());
+
+        if (parentId != null)
+        {
+            var parent = await dbContext.MediaFolders.FindAsync(parentId.Value);
+            if (parent != null)
+            {
+                folder.Parents.Add(parent);
+            }
+            else
+            {
+                throw new Exception("Parent folder ID not found");
+            }
+        }
 
         await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();
@@ -102,7 +115,17 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<long> CreateCollection(string collectionName, long folderId)
     {
-        var collection = new Collection(collectionName.TrimOrThrowIfEmpty(), folderId);
+        var collection = new Collection(collectionName.TrimOrThrowIfEmpty());
+
+        var folder = await dbContext.MediaFolders.FindAsync(folderId);
+        if (folder != null)
+        {
+            collection.Folders.Add(folder);
+        }
+        else
+        {
+            throw new Exception("Folder ID not found");
+        }
 
         await dbContext.Collections.AddAsync(collection);
         await SaveAsync();
@@ -156,18 +179,20 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (folder == null)
             throw new ArgumentException("Initial folder must be specified");
 
+        if (folder.Id == MediaFolder.RootFolderId)
+            return "/";
+
         var builder = new StringBuilder();
 
-        while (folder != null)
+        while (folder != null && folder.Id != MediaFolder.RootFolderId)
         {
-            builder.Insert(0, '/');
             builder.Insert(0, folder.Name);
+            builder.Insert(0, '/');
 
-            var nextId = folder.ParentId;
-            if (nextId == null)
-                break;
-
-            folder = await dbContext.MediaFolders.FirstOrDefaultAsync(f => f.Id == nextId);
+            var currentFolder = folder;
+            folder = await dbContext.MediaFolders
+                .Where(f => f.SubFolders.Any(sf => sf.Id == currentFolder.Id))
+                .FirstOrDefaultAsync();
         }
 
         return builder.ToString();
@@ -175,7 +200,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<MediaFolder> CreateMediaFolderAsync(string folderName, long? parentId)
     {
-        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty(), parentId);
+        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty());
+
+        if (parentId != null)
+        {
+            var parent = await dbContext.MediaFolders.FindAsync(parentId.Value);
+            if (parent != null)
+                folder.Parents.Add(parent);
+        }
 
         await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();
@@ -375,21 +407,34 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         if (limitToParent != null)
         {
-            return await dbContext.MediaFolders.Where(f => f.ParentId == limitToParent).ToListAsync();
+            return await dbContext.MediaFolders.Where(f => f.Parents.Any(p => p.Id == limitToParent)).ToListAsync();
         }
 
-        return await dbContext.MediaFolders.ToListAsync();
+        return await dbContext.MediaFolders.Where(f => !f.Parents.Any()).ToListAsync();
     }
 
     public async Task<MediaFolder?> GetMediaFolderAsync(long id)
     {
-        return await dbContext.MediaFolders.FindAsync(id);
+        return await dbContext.MediaFolders.Include(f => f.Parents).FirstOrDefaultAsync(f => f.Id == id);
     }
 
     public async Task<MediaFolder?> GetMediaFolderAsync(string name, long? parentFolderId)
     {
+        if (parentFolderId == null)
+        {
+            // Note this is not even in the root folder, so this is kind of invalid data if this finds anything
+            return await dbContext.MediaFolders.FirstOrDefaultAsync(f =>
+                f.Name == name && !f.Parents.Any());
+        }
+
         return await dbContext.MediaFolders.FirstOrDefaultAsync(f =>
-            f.Name == name && f.ParentId == parentFolderId);
+            f.Name == name && f.Parents.Any(p => p.Id == parentFolderId));
+    }
+
+    public async Task SaveMediaFolderAsync(MediaFolder folder)
+    {
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFoldersUpdated();
     }
 
     public async Task<MediaFolder?> GetMediaFolderFromPathAsync(string path)
@@ -399,11 +444,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<Tuple<List<CollectionDTO>, int>> GetFolderCollections(long folderId, int page, int pageSize)
     {
-        var query = dbContext.Collections.Where(c => c.FolderId == folderId);
+        var query = dbContext.Collections.Where(c => c.Folders.Any(f => f.Id == folderId));
         var total = await query.CountAsync();
         var items = await query.OrderBy(c => c.Name)
             .Skip(page * pageSize)
             .Take(pageSize)
+            .Include(c => c.Folders)
             .Select(c => c.GetDTO())
             .ToListAsync();
 
@@ -430,17 +476,18 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<List<Collection>> GetCollectionsInFolderAsync(long folderId)
     {
-        return await dbContext.Collections.Where(c => c.FolderId == folderId).ToListAsync();
+        return await dbContext.Collections.Where(c => c.Folders.Any(f => f.Id == folderId)).ToListAsync();
     }
 
     public async Task<Collection?> GetCollectionByNameAndFolder(string name, long folderId)
     {
-        return await dbContext.Collections.FirstOrDefaultAsync(c => c.Name == name && c.FolderId == folderId);
+        return await dbContext.Collections.FirstOrDefaultAsync(c =>
+            c.Name == name && c.Folders.Any(f => f.Id == folderId));
     }
 
     public async Task<Collection?> GetCollectionAsync(long id)
     {
-        return await dbContext.Collections.FindAsync(id);
+        return await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == id);
     }
 
     public async Task SaveCollectionAsync(Collection collection)
@@ -483,12 +530,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task DeleteCollectionAsync(long collectionId)
     {
-        var collection = await dbContext.Collections.FindAsync(collectionId) ??
-                         throw new ArgumentException("Collection not found");
+        var collection =
+            await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == collectionId) ??
+            throw new ArgumentException("Collection not found");
         collection.IsDeleted = true;
         collection.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
-        await updateNotifier.NotifyMediaFolderContentsUpdated(collection.FolderId);
+        foreach (var folder in collection.Folders)
+        {
+            await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
+        }
     }
 
     public async Task DeleteCollectionAsync(Collection collection)
@@ -498,24 +549,34 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task RestoreCollectionAsync(long collectionId)
     {
-        var collection = await dbContext.Collections.FindAsync(collectionId) ??
-                         throw new ArgumentException("Collection not found");
+        var collection =
+            await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == collectionId) ??
+            throw new ArgumentException("Collection not found");
         collection.IsDeleted = false;
         collection.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
-        await updateNotifier.NotifyMediaFolderContentsUpdated(collection.FolderId);
+        foreach (var folder in collection.Folders)
+        {
+            await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
+        }
     }
 
     public async Task PurgeCollectionAsync(long collectionId)
     {
-        var collection = await dbContext.Collections.FindAsync(collectionId) ??
-                         throw new ArgumentException("Collection not found");
+        var collection =
+            await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == collectionId) ??
+            throw new ArgumentException("Collection not found");
         if (!collection.IsDeleted)
             throw new InvalidOperationException("Cannot purge non-deleted collection");
 
+        var folderIds = collection.Folders.Select(f => f.Id).ToList();
         dbContext.Collections.Remove(collection);
         await SaveAsync();
-        await updateNotifier.NotifyMediaFolderContentsUpdated(collection.FolderId);
+
+        foreach (var folderId in folderIds)
+        {
+            await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
+        }
     }
 
     public async Task<MediaFile?> GetMediaByHashAsync(string sha3)
@@ -531,6 +592,39 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<List<long>> GetAllMediaFileIdsAsync()
     {
         return await dbContext.MediaFiles.Select(m => m.Id).ToListAsync();
+    }
+
+    public async Task<List<long>> GetOrphanedMediaFilesAsync()
+    {
+        return await dbContext.MediaFiles
+            .Where(m => !m.InCollections.Any())
+            .Select(m => m.Id)
+            .ToListAsync();
+    }
+
+    public async Task<List<Collection>> GetOrphanedCollectionsAsync()
+    {
+        return await dbContext.Collections
+            .Include(c => c.Folders)
+            .Where(c => !c.Folders.Any())
+            .ToListAsync();
+    }
+
+    public async Task<List<MediaFolder>> GetOrphanedMediaFoldersAsync()
+    {
+        return await dbContext.MediaFolders
+            .Include(f => f.Parents)
+            .Where(f => f.Id != MediaFolder.RootFolderId && !f.Parents.Any())
+            .ToListAsync();
+    }
+
+    public async Task<int> GetNextCollectionSequenceNumberAsync(long collectionId)
+    {
+        return await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId)
+            .Select(ci => ci.SequenceNumber)
+            .DefaultIfEmpty(0)
+            .MaxAsync() + 1;
     }
 
     public async Task SaveMediaFileAsync(MediaFile mediaFile)
@@ -551,12 +645,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.MediaFiles.AddAsync(mediaItem);
         await SaveAsync();
 
-        // Get the next sequence number
-        var sequenceNumber = await dbContext.Set<CollectionItem>()
-            .Where(ci => ci.CollectionId == collectionId)
-            .Select(ci => ci.SequenceNumber)
-            .DefaultIfEmpty(0)
-            .MaxAsync() + 1;
+        var sequenceNumber = await GetNextCollectionSequenceNumberAsync(collectionId);
 
         await AddMediaToCollection(mediaItem.Id, collectionId, sequenceNumber);
 
@@ -1193,12 +1282,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         // Fetch subfolders and collections
         var subfolders = await dbContext.MediaFolders
-            .Where(f => f.ParentId == folderId && !f.IsDeleted)
+            .Where(f => f.Parents.Any(p => p.Id == folderId) && !f.IsDeleted)
             .OrderBy(f => f.Name)
             .ToListAsync();
 
         var collections = await dbContext.Collections
-            .Where(c => c.FolderId == folderId && !c.IsDeleted)
+            .Where(c => c.Folders.Any(f => f.Id == folderId) && !c.IsDeleted)
             .OrderBy(c => c.Name)
             .ToListAsync();
 

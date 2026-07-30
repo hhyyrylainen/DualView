@@ -12,11 +12,12 @@ namespace Backend.Models;
 [Index(nameof(NameLowerCase), IsUnique = true)]
 public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDelete
 {
-    public Collection(string name, long folderId)
+    public const long UncategorizedCollectionId = 1;
+
+    public Collection(string name)
     {
         Name = name;
         NameLowerCase = name.ToLowerInvariant();
-        FolderId = folderId;
     }
 
     [Key]
@@ -42,8 +43,7 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
 
     public bool IsDeleted { get; set; }
 
-    public long FolderId { get; set; }
-    public MediaFolder Folder { get; set; } = null!;
+    public ICollection<MediaFolder> Folders { get; set; } = new List<MediaFolder>();
 
     public ICollection<CollectionItem> Items { get; set; } = new List<CollectionItem>();
 
@@ -54,7 +54,7 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
         return new CollectionDTO(Name)
         {
             Id = Id,
-            FolderId = FolderId
+            FolderIds = Folders.Select(f => f.Id).ToList()
         };
     }
 }

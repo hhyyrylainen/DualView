@@ -24,6 +24,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<MediaFolder?> GetMediaFolderAsync(string name, long? parentFolderId);
 
     public Task<MediaFolder> CreateMediaFolderAsync(string folderName, long? parentId);
+    public Task SaveMediaFolderAsync(MediaFolder folder);
     public Task<MediaFolder?> GetMediaFolderFromPathAsync(string path);
 
     public Task<List<Collection>> GetCollectionsInFolderAsync(long folderId);
@@ -40,6 +41,11 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     public Task SaveMediaFileAsync(MediaFile mediaFile);
     public Task<List<long>> GetAllMediaFileIdsAsync();
+    public Task<List<long>> GetOrphanedMediaFilesAsync();
+    public Task<List<Collection>> GetOrphanedCollectionsAsync();
+    public Task<List<MediaFolder>> GetOrphanedMediaFoldersAsync();
+
+    public Task<int> GetNextCollectionSequenceNumberAsync(long collectionId);
 
     public Task<List<MediaFile>> GetMediaFileSiblingsAsync(long mediaId);
 
