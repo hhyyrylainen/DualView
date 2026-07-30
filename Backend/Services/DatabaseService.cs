@@ -171,6 +171,61 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyMediaFoldersUpdated();
     }
 
+    public async Task RemoveCollectionFromFolder(long collectionId, long folderId)
+    {
+        var collection = await dbContext.Collections.Include(c => c.Folders)
+            .FirstOrDefaultAsync(c => c.Id == collectionId);
+        if (collection == null)
+            throw new Exception("Collection not found");
+
+        var folder = collection.Folders.FirstOrDefault(f => f.Id == folderId);
+        if (folder == null)
+            return;
+
+        collection.Folders.Remove(folder);
+
+        bool addedToRoot = false;
+        if (collection.Folders.Count == 0)
+        {
+            var root = await dbContext.MediaFolders.FindAsync(MediaFolder.RootFolderId);
+            if (root != null)
+            {
+                collection.Folders.Add(root);
+                addedToRoot = true;
+            }
+        }
+
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
+
+        if (addedToRoot && folderId != MediaFolder.RootFolderId)
+            await updateNotifier.NotifyMediaFolderContentsUpdated(MediaFolder.RootFolderId);
+    }
+
+    public async Task RemoveFolderFromFolder(long folderId, long parentFolderId)
+    {
+        var folder = await dbContext.MediaFolders.Include(f => f.Parents)
+            .FirstOrDefaultAsync(f => f.Id == folderId);
+        if (folder == null)
+            throw new Exception("Folder not found");
+
+        var parent = folder.Parents.FirstOrDefault(p => p.Id == parentFolderId);
+        if (parent == null)
+            return;
+
+        folder.Parents.Remove(parent);
+
+        if (folder.Parents.Count == 0 && folder.Id != MediaFolder.RootFolderId)
+        {
+            var root = await dbContext.MediaFolders.FindAsync(MediaFolder.RootFolderId);
+            if (root != null)
+                folder.Parents.Add(root);
+        }
+
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFoldersUpdated();
+    }
+
     public async Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber)
     {
         var alreadyExists = await dbContext.Set<CollectionItem>().AnyAsync(ci =>
