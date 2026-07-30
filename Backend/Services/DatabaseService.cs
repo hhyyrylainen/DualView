@@ -130,6 +130,47 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return collection.Id;
     }
 
+    public async Task AddCollectionToFolder(long collectionId, long folderId)
+    {
+        var collection = await dbContext.Collections.Include(c => c.Folders)
+            .FirstOrDefaultAsync(c => c.Id == collectionId);
+        if (collection == null)
+            throw new Exception("Collection not found");
+
+        var folder = await dbContext.MediaFolders.FindAsync(folderId);
+        if (folder == null)
+            throw new Exception("Folder not found");
+
+        if (collection.Folders.Any(f => f.Id == folderId))
+            return;
+
+        collection.Folders.Add(folder);
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
+    }
+
+    public async Task AddFolderToFolder(long folderId, long parentFolderId)
+    {
+        if (folderId == parentFolderId)
+            throw new Exception("Cannot add a folder to itself");
+
+        var folder = await dbContext.MediaFolders.Include(f => f.Parents)
+            .FirstOrDefaultAsync(f => f.Id == folderId);
+        if (folder == null)
+            throw new Exception("Folder not found");
+
+        var parent = await dbContext.MediaFolders.FindAsync(parentFolderId);
+        if (parent == null)
+            throw new Exception("Parent folder not found");
+
+        if (folder.Parents.Any(p => p.Id == parentFolderId))
+            return;
+
+        folder.Parents.Add(parent);
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFoldersUpdated();
+    }
+
     public async Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber)
     {
         var alreadyExists = await dbContext.Set<CollectionItem>().AnyAsync(ci =>

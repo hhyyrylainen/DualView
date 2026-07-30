@@ -20,6 +20,9 @@ public interface IDatabaseCommonService
     public Task<long> CreateMediaFolder(string folderName, long parentId);
     public Task<long> CreateCollection(string collectionName, long folderId);
 
+    public Task AddCollectionToFolder(long collectionId, long folderId);
+    public Task AddFolderToFolder(long folderId, long parentFolderId);
+
     public Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber);
     public Task RemoveMediaFromCollection(long mediaId, long collectionId);
 

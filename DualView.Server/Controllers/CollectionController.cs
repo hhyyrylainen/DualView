@@ -50,4 +50,11 @@ public class CollectionController : Controller
         await databaseService.DeleteCollectionAsync(id);
         return Ok();
     }
+
+    [HttpPost("{id:long}/addToFolder/{folderId:long}")]
+    public async Task<IActionResult> AddToFolder([Required] long id, [Required] long folderId)
+    {
+        await databaseService.AddCollectionToFolder(id, folderId);
+        return Ok();
+    }
 }

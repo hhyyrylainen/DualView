@@ -167,6 +167,18 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return long.Parse(idString);
     }
 
+    public async Task AddCollectionToFolder(long collectionId, long folderId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/addToFolder/{folderId}", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task AddFolderToFolder(long folderId, long parentFolderId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/mediaFolder/{folderId}/addToFolder/{parentFolderId}", null);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber)
     {
         var response = await HttpClient.PostAsync(

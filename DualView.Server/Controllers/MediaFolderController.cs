@@ -133,6 +133,13 @@ public class MediaFolderController : Controller
         return Ok();
     }
 
+    [HttpPost("{id:long}/addToFolder/{parentFolderId:long}")]
+    public async Task<IActionResult> AddToFolder([Required] long id, [Required] long parentFolderId)
+    {
+        await databaseService.AddFolderToFolder(id, parentFolderId);
+        return Ok();
+    }
+
     [HttpPost("collection/{collectionId:long}/addMedia")]
     public async Task<IActionResult> AddMediaToCollection([Required] long collectionId,
         [Required] long mediaId, [Required] int sequenceNumber)
