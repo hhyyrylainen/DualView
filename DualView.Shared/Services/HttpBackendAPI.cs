@@ -13,12 +13,10 @@ public class HttpBackendAPI : IBackendAPI
         HttpClient = httpClient;
     }
 
-    public async Task<MediaFileDTO> ImportMedia(string fileName, Stream data, long targetCollectionId,
-        bool importAlphaAsMask = false)
+    public async Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName)
     {
         var response = await HttpClient.PostAsync(
-            $"api/v1/media/import?targetCollectionId={targetCollectionId}&" +
-            $"importAlphaAsMask={(importAlphaAsMask ? "true" : "false")}",
+            $"api/v1/media/import?sectionName={Uri.EscapeDataString(sectionName ?? "")}",
             new MultipartFormDataContent
             {
                 { new StreamContent(data), "file", fileName }

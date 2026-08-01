@@ -390,25 +390,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return folder;
     }
 
-    public async Task<bool> SetMediaKeepStatusAsync(long mediaId, bool keep)
-    {
-        var mediaFile = await GetMediaByIdAsync(mediaId);
-
-        if (mediaFile == null || mediaFile.IsDeleted)
-            throw new ArgumentException("Media not found");
-
-        bool changes = false;
-
-        if (mediaFile.Keep != keep)
-        {
-            mediaFile.Keep = keep;
-            await SaveMediaFileAsync(mediaFile);
-            changes = true;
-        }
-
-        return changes;
-    }
-
     public async Task<bool> IsMediaSafeToDeleteAsync(long mediaId)
     {
         var media = await dbContext.MediaFiles
@@ -418,10 +399,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (media == null)
             return false;
 
-        // For now, if it's in any collection, it's not safe to delete? 
-        // Or if it's marked as keep.
-        if (media.Keep)
-            return false;
+        // For now, if it's in any collection, it's not safe to delete
 
         return true;
     }
@@ -554,7 +532,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             Height = mediaFile.Height,
             FrameCount = mediaFile.FrameCount,
             FramesPerSecond = mediaFile.FramesPerSecond,
-            Keep = mediaFile.Keep,
             ParentMediaId = mediaFile.ParentMediaId
         };
 
@@ -567,7 +544,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var existing = await dbContext.MediaFiles.FindAsync(media.Id) ??
                        throw new ArgumentException("Media not found");
 
-        existing.Keep = media.Keep;
         existing.IsDeleted = media.IsDeleted;
         existing.CropLeft = media.CropLeft;
         existing.CropTop = media.CropTop;
@@ -822,10 +798,89 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyMediaUpdated(mediaFile.Id);
     }
 
-    public async Task MakeSureMediaIsSetToKeep(long mediaId)
+    public async Task<UploadSection> GetOrCreateUploadSectionAsync(string? sectionName)
     {
-        var media = await dbContext.MediaFiles.FindAsync(mediaId) ?? throw new ArgumentException("Media not found");
-        media.Keep = true;
+        if (string.IsNullOrWhiteSpace(sectionName))
+        {
+            var selected = await dbContext.UploadSections.FirstOrDefaultAsync(s => s.Selected);
+            if (selected != null)
+                return selected;
+
+            sectionName = "";
+        }
+
+        var lowercase = sectionName.ToLowerInvariant();
+        var existing = await dbContext.UploadSections.FirstOrDefaultAsync(s => s.NameLowercase == lowercase);
+
+        if (existing != null)
+            return existing;
+
+        // Insert at the start
+        var minIndex = await dbContext.UploadSections.Select(s => s.DisplayIndex).DefaultIfEmpty(0).MinAsync();
+
+        var newSection = new UploadSection(sectionName)
+        {
+            DisplayIndex = minIndex - 1,
+
+            // And auto-select if nothing is selected
+            Selected = !await dbContext.UploadSections.AnyAsync(s => s.Selected),
+        };
+
+        await dbContext.UploadSections.AddAsync(newSection);
+        await SaveAsync();
+
+        // TODO: notice event about sections being added
+
+        return newSection;
+    }
+
+    public async Task AddMediaToUploadSectionAsync(long mediaId, long sectionId, int index)
+    {
+        var item = new UploadSectionItem
+        {
+            UploadSectionId = sectionId,
+            MediaFileId = mediaId,
+            Index = index,
+        };
+
+        await dbContext.UploadSectionItems.AddAsync(item);
+
+        // TODO: notice event about section items being changed
+
+        await SaveAsync();
+    }
+
+    public async Task<int> GetNextUploadSectionIndexAsync(long sectionId)
+    {
+        return await dbContext.UploadSectionItems
+            .Where(i => i.UploadSectionId == sectionId)
+            .Select(i => i.Index)
+            .DefaultIfEmpty(0)
+            .MaxAsync() + 1;
+    }
+
+    public async Task SetMediaTemporaryStatusAsync(long mediaId, bool isTemporary)
+    {
+        var media =
+            await dbContext.MediaFiles.Include(m => m.InCollections).FirstOrDefaultAsync(m => m.Id == mediaId) ??
+            throw new ArgumentException("Media not found");
+
+        if (isTemporary)
+        {
+            if (media.InCollections.Count > 0)
+                throw new InvalidOperationException("Cannot mark media as temporary if it is in a collection already");
+        }
+
+        media.IsTemporary = isTemporary;
+        await SaveAsync();
+    }
+
+    public async Task BumpUploadSectionLastImportedAsync(long sectionId)
+    {
+        var section = await dbContext.UploadSections.FindAsync(sectionId) ??
+                      throw new ArgumentException("Section not found");
+        section.LastImported = DateTime.UtcNow;
+        section.BumpUpdatedAtTime();
         await SaveAsync();
     }
 
@@ -841,10 +896,27 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return mediaItem;
     }
 
+    public async Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, string? sectionName)
+    {
+        await dbContext.MediaFiles.AddAsync(mediaItem);
+        await SaveAsync();
+
+        var section = await GetOrCreateUploadSectionAsync(sectionName);
+
+        // We are adding a new item so mark the last usage as updated (the following methods will call DB save)
+        section.UpdatedAt = DateTime.UtcNow;
+
+        var index = await GetNextUploadSectionIndexAsync(section.Id);
+
+        await AddMediaToUploadSectionAsync(mediaItem.Id, section.Id, index);
+
+        return mediaItem;
+    }
+
     public async Task<List<MediaFile>> GetEligibleMediaFilesForPurgeAsync()
     {
         return await dbContext.MediaFiles
-            .Where(m => m.IsDeleted && !m.Keep)
+            .Where(m => m.IsDeleted)
             .ToListAsync();
     }
 
@@ -1017,7 +1089,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task DeleteTagAliasAsync(long tagId, string alias)
     {
-        var tagAlias = await dbContext.TagAliases.FirstOrDefaultAsync(a => a.TagId == tagId && a.Name == alias.ToLowerInvariant());
+        var tagAlias =
+            await dbContext.TagAliases.FirstOrDefaultAsync(a => a.TagId == tagId && a.Name == alias.ToLowerInvariant());
         if (tagAlias != null)
         {
             dbContext.TagAliases.Remove(tagAlias);
@@ -1037,7 +1110,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task DeleteTagModifierAliasAsync(long modifierId, string alias)
     {
         var modifierAlias =
-            await dbContext.TagModifierAliases.FirstOrDefaultAsync(a => a.ModifierId == modifierId && a.Name == alias.ToLowerInvariant());
+            await dbContext.TagModifierAliases.FirstOrDefaultAsync(a =>
+                a.ModifierId == modifierId && a.Name == alias.ToLowerInvariant());
         if (modifierAlias != null)
         {
             dbContext.TagModifierAliases.Remove(modifierAlias);

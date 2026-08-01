@@ -66,6 +66,12 @@ public interface IDatabaseCommonService
 
     public Task<bool> SetMediaRatingAsync(long mediaId, bool isFavorited, int stars);
 
+    // Upload Sections
+    public Task AddMediaToUploadSectionAsync(long mediaId, long sectionId, int index);
+    public Task<int> GetNextUploadSectionIndexAsync(long sectionId);
+    public Task SetMediaTemporaryStatusAsync(long mediaId, bool isTemporary);
+    public Task BumpUploadSectionLastImportedAsync(long sectionId);
+
     // Tags
     public Task<long> CreateTagAsync(string name, TagCategory category);
     public Task UpdateTagAsync(long id, string? name, string? description, TagCategory? category,

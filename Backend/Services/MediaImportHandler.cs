@@ -59,12 +59,110 @@ public class MediaImportHandler : IMediaImportHandler
 
     private static bool NeedsCropping(MediaFile media)
     {
-        return media.CropLeft > 0 || media.CropTop > 0 || media.CropRight > 0 || media.CropBottom > 0 ;
+        return media.CropLeft > 0 || media.CropTop > 0 || media.CropRight > 0 || media.CropBottom > 0;
     }
 
-    public async Task<MediaFile> ImportMedia(string fileName, Stream stream, long targetCollectionId, bool markAsKeep,
+    public async Task<MediaFile> ImportMedia(string fileName, Stream stream, string? sectionName)
+    {
+        if (!stream.CanSeek)
+            throw new ArgumentException("Current implementation of importing must be able to seek");
+
+        var type = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(fileName));
+
+        var storage = await GetBaseMediaFolder(databaseService, dataFolderService);
+        logger.LogInformation("Importing media to {Storage}", storage);
+        Directory.CreateDirectory(storage);
+
+        logger.LogInformation("Beginning import checks for {FileName}", fileName);
+
+        // Start by calculating the sha3 hash of the file so that we can check for duplicates
+        stream.Position = 0;
+        var hashBytes = await SHA3_256.HashDataAsync(stream);
+        var sha3 = Convert.ToHexString(hashBytes).ToLowerInvariant();
+
+        var existing = await databaseService.GetMediaByHashAsync(sha3);
+
+        if (existing != null)
+        {
+            logger.LogInformation("Hash is already imported: {Hash}", sha3);
+
+            // If it already exists, make sure it is added to the section as desired
+            try
+            {
+                var section = await databaseService.GetOrCreateUploadSectionAsync(sectionName);
+                var index = await databaseService.GetNextUploadSectionIndexAsync(section.Id);
+                await databaseService.AddMediaToUploadSectionAsync(existing.Id, section.Id, index);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to add media to upload section (it was already imported): {SectionName}",
+                    sectionName);
+                throw;
+            }
+
+            return existing;
+        }
+
+        if (!type.IsImage())
+        {
+            // Video
+            var videoMedia = await CreateVideoMedia(stream, fileName, sha3, type);
+            videoMedia.IsTemporary = true;
+
+            var result = await SaveFinalMedia(stream, sectionName, storage, videoMedia);
+
+            return result;
+        }
+
+        using var frames = new MagickImageCollection();
+
+        try
+        {
+            stream.Position = 0;
+            await frames.ReadAsync(stream);
+
+            if (frames.Count < 1)
+                throw new ArgumentException("No frames found in image");
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to read image frames");
+            throw;
+        }
+
+        if (frames.Count > 1)
+        {
+            type = type.MakeAnimated();
+
+            // Safety fallback
+            if (frames[0].AnimationDelay <= 0)
+                frames[0].AnimationDelay = 1;
+        }
+
+        var mediaItem = new MediaFile(fileName, sha3)
+        {
+            Width = (int)frames[0].Width,
+            Height = (int)frames[0].Height,
+            FrameCount = frames.Count,
+
+            // Assume uniform duration
+            FramesPerSecond = frames.Count > 1 ? 100.0f / frames[0].AnimationDelay : -1,
+            MediaType = type,
+
+            IsTemporary = true,
+        };
+
+        var finalResult = await SaveFinalMedia(stream, sectionName, storage, mediaItem);
+
+        return finalResult;
+    }
+
+    public async Task<MediaFile> ImportMediaDirect(string fileName, Stream stream, long targetCollectionId,
         long? parentMediaId = null)
     {
+        // This variant is used on the server to directly import media to a collection without going through
+        // the import window
+
         if (!stream.CanSeek)
             throw new ArgumentException("Current implementation of importing must be able to seek");
 
@@ -115,7 +213,7 @@ public class MediaImportHandler : IMediaImportHandler
         {
             // Video
 
-            var videoMedia = await CreateVideoMedia(stream, fileName, sha3, type, markAsKeep);
+            var videoMedia = await CreateVideoMedia(stream, fileName, sha3, type);
             videoMedia.ParentMediaId = parentMediaId;
 
             var result = await SaveFinalMedia(stream, targetCollectionId, storage, videoMedia);
@@ -158,7 +256,6 @@ public class MediaImportHandler : IMediaImportHandler
             FramesPerSecond = frames.Count > 1 ? 100.0f / frames[0].AnimationDelay : -1,
             MediaType = type,
 
-            Keep = markAsKeep,
             ParentMediaId = parentMediaId,
         };
 
@@ -179,8 +276,7 @@ public class MediaImportHandler : IMediaImportHandler
         return collection.Items.Select(i => i.SequenceNumber).DefaultIfEmpty(0).Max() + 1;
     }
 
-    private async Task<MediaFile> CreateVideoMedia(Stream stream, string fileName, string sha3, MediaType type,
-        bool markAsKeep)
+    private async Task<MediaFile> CreateVideoMedia(Stream stream, string fileName, string sha3, MediaType type)
     {
         // We need to use ffprobe on the file to get its info
 
@@ -235,11 +331,31 @@ public class MediaImportHandler : IMediaImportHandler
 
             FramesPerSecond = (float)video.FramesPerSecond,
             MediaType = type,
-
-            Keep = markAsKeep,
         };
 
         return mediaItem;
+    }
+
+    private async Task<MediaFile> SaveFinalMedia(Stream stream, string? sectionName, string storage,
+        MediaFile mediaItem)
+    {
+        var finalPath = Path.Join(storage, mediaItem.PathRelativeToStorage());
+
+        logger.LogInformation("Saving media to {Path}", finalPath);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(finalPath) ??
+                                  throw new Exception("Failed to detect target folder"));
+
+        // Now we can finally write the original file
+        await using var writer = File.Create(finalPath);
+        stream.Position = 0;
+        await stream.CopyToAsync(writer);
+
+        // Finally, can save the item (and this adds it to the upload section)
+        var newMedia = await databaseService.CreateMediaAsync(mediaItem, sectionName);
+
+        logger.LogInformation("Media imported successfully, id: {Id}", newMedia.Id);
+        return newMedia;
     }
 
     private async Task<MediaFile> SaveFinalMedia(Stream stream, long targetCollectionId, string storage,

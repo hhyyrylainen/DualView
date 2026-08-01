@@ -46,7 +46,7 @@ public class MediaController : Controller
     // TODO: when creating a collection the name should have preceding and trailing spaces stripped
 
     [HttpPost("import")]
-    public async Task<ActionResult<MediaFileDTO>> ImportMedia([FromQuery] [Required] long targetCollectionId,
+    public async Task<ActionResult<MediaFileDTO>> ImportMedia([FromQuery] string? sectionName,
         [Required] IFormFile file)
     {
         if (file.Length == 0)
@@ -58,9 +58,7 @@ public class MediaController : Controller
         // Access the stream from the uploaded file
         await using var stream = file.OpenReadStream();
 
-        // We want to keep all user-imported media permanently without auto delete
-        var media = await mediaImportHandler.ImportMedia(file.FileName, stream, targetCollectionId, true,
-            null);
+        var media = await mediaImportHandler.ImportMedia(file.FileName, stream, sectionName);
 
         return media.GetDTO();
     }
@@ -90,7 +88,6 @@ public class MediaController : Controller
             return NotFound();
 
         // Update properties
-        media.Keep = request.Keep;
         media.CropLeft = request.CropLeft;
         media.CropTop = request.CropTop;
         media.CropRight = request.CropRight;
@@ -111,25 +108,6 @@ public class MediaController : Controller
         return Ok();
     }
 
-    [HttpPost("{mediaId:long}/keepStatus")]
-    public async Task<ActionResult> SetKeepStatus([Required] long mediaId, [Required] bool keep)
-    {
-        try
-        {
-            if (await databaseService.SetMediaKeepStatusAsync(mediaId, keep))
-            {
-                logger.LogInformation("Set keep status for media {Id} to {Keep}", mediaId, keep);
-                return Created();
-            }
-
-            return Ok();
-        }
-        catch (ArgumentException)
-        {
-            return NotFound();
-        }
-    }
-
     [HttpGet("{mediaId:long}/safeToDelete")]
     public async Task<ActionResult<bool>> IsSafeToDelete([Required] long mediaId)
     {
@@ -143,6 +121,13 @@ public class MediaController : Controller
 
         logger.LogInformation("Deleted media {Id}", mediaId);
 
+        return Ok();
+    }
+
+    [HttpPost("{mediaId:long}/temporaryStatus")]
+    public async Task<ActionResult> SetTemporaryStatus([Required] long mediaId, [Required] bool isTemporary)
+    {
+        await databaseService.SetMediaTemporaryStatusAsync(mediaId, isTemporary);
         return Ok();
     }
 

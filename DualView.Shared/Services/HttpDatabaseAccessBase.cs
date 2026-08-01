@@ -358,6 +358,31 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return response.IsSuccessStatusCode;
     }
 
+    public async Task AddMediaToUploadSectionAsync(long mediaId, long sectionId, int index)
+    {
+        var response = await HttpClient.PostAsync(
+            $"api/v1/uploadSection/{sectionId}/addMedia?mediaId={mediaId}&index={index}", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task<int> GetNextUploadSectionIndexAsync(long sectionId)
+    {
+        return await HttpClient.GetFromJsonAsync<int>($"api/v1/uploadSection/{sectionId}/nextIndex");
+    }
+
+    public async Task SetMediaTemporaryStatusAsync(long mediaId, bool isTemporary)
+    {
+        var response =
+            await HttpClient.PostAsync($"api/v1/media/{mediaId}/temporaryStatus?isTemporary={isTemporary}", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task BumpUploadSectionLastImportedAsync(long sectionId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/uploadSection/{sectionId}/bumpLastImported", null);
+        response.EnsureSuccessStatusCode();
+    }
+
     // Tags
     public async Task<long> CreateTagAsync(string name, TagCategory category)
     {

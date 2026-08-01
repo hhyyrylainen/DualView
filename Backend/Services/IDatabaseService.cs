@@ -52,8 +52,6 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     public Task<List<MediaFile>> GetMediaFileSiblingsAsync(long mediaId);
 
-    public Task MakeSureMediaIsSetToKeep(long mediaId);
-
     public Task<List<MediaFile>> GetDeletedMediaAsync(int limit);
     public Task<List<MediaFolder>> GetDeletedMediaFoldersAsync(int limit);
     public Task<List<Collection>> GetDeletedCollectionsAsync(int limit);
@@ -65,8 +63,16 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     /// </summary>
     public Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, long collectionId);
 
+    /// <summary>
+    ///   Creates a new media file and adds it to an upload section
+    /// </summary>
+    public Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, string? sectionName);
+
     public Task<List<MediaFile>> GetEligibleMediaFilesForPurgeAsync();
     public Task PurgeMediaFileAsync(MediaFile mediaFile);
+
+    // Upload sections
+    public Task<UploadSection> GetOrCreateUploadSectionAsync(string? sectionName);
 
     // Backend maintenance jobs
     public Task<MaintenanceJobRecord?> GetMaintenanceRecord(string name);

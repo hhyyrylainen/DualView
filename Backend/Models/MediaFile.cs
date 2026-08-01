@@ -48,12 +48,6 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
 
     public bool IsTemporary { get; set; }
 
-    // TODO: remove this as DualView won't use it
-    /// <summary>
-    ///   When set to on, won't be deleted automatically from job results when the jobs expire
-    /// </summary>
-    public bool Keep { get; set; }
-
     // Media info
     public MediaType MediaType { get; set; }
     public int Width { get; set; }
@@ -86,6 +80,8 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
     public ICollection<CollectionItem> InCollections { get; set; } = new List<CollectionItem>();
 
     public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
+    
+    public ICollection<UploadSectionItem> InUploadSections { get; set; } = new List<UploadSectionItem>();
 
     // TODO: make this mandatory as all files should have info where they came from even if it has to have blank fields
     public MediaImportInfo? ImportInfo { get; set; }
@@ -109,7 +105,6 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
             ImportedAt = ImportedAt,
             IsDeleted = IsDeleted,
             IsTemporary = IsTemporary,
-            Keep = Keep,
             MediaType = MediaType,
             Width = Width,
             Height = Height,

@@ -116,6 +116,11 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         windowService?.ShowSingletonWindow<ImportWindowViewModel>();
     }
 
+    public void OpenUploadWindow()
+    {
+        windowService?.ShowSingletonWindow<UploadWindowViewModel>();
+    }
+
     public void OpenSettings()
     {
         windowService?.ShowSingletonWindow<SettingsWindowViewModel>();

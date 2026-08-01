@@ -17,6 +17,8 @@ public class AppDbContext : DbContext
 
     public DbSet<MediaFolder> MediaFolders { get; set; }
     public DbSet<Collection> Collections { get; set; }
+    public DbSet<UploadSection> UploadSections { get; set; }
+    public DbSet<UploadSectionItem> UploadSectionItems { get; set; }
     public DbSet<MediaFile> MediaFiles { get; set; }
 
     public DbSet<Tag> Tags { get; set; }
@@ -202,6 +204,28 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<DownloadGallery>(builder =>
         {
             builder.HasQueryFilter(m => !m.IsDeleted);
+        });
+
+        modelBuilder.Entity<UploadSection>(builder =>
+        {
+            builder.HasIndex(s => s.Selected)
+                .IsUnique()
+                .HasFilter("[Selected] = 1");
+        });
+
+        modelBuilder.Entity<UploadSectionItem>(builder =>
+        {
+            builder.HasKey(ci => new { ci.UploadSectionId, ci.MediaFileId });
+
+            builder.HasOne(ci => ci.UploadSection)
+                .WithMany(c => c.Items)
+                .HasForeignKey(ci => ci.UploadSectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasOne(ci => ci.MediaFile)
+                .WithMany(m => m.InUploadSections)
+                .HasForeignKey(ci => ci.MediaFileId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<CollectionItem>(builder =>

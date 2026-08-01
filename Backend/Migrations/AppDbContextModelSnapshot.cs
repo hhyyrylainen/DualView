@@ -583,6 +583,73 @@ namespace Backend.Migrations
                     b.ToTable("TagSuperAliases");
                 });
 
+            modelBuilder.Entity("Backend.Models.UploadSection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("DisplayIndex")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("KeepTarget")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastImported")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("NameLowercase")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("Selected")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("NameLowercase")
+                        .IsUnique();
+
+                    b.HasIndex("Selected")
+                        .IsUnique()
+                        .HasFilter("[Selected] = 1");
+
+                    b.ToTable("UploadSections");
+                });
+
+            modelBuilder.Entity("Backend.Models.UploadSectionItem", b =>
+                {
+                    b.Property<long>("UploadSectionId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<long>("MediaFileId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Index")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("UploadSectionId", "MediaFileId");
+
+                    b.HasIndex("MediaFileId");
+
+                    b.HasIndex("UploadSectionId", "Index")
+                        .IsUnique();
+
+                    b.ToTable("UploadSectionItems");
+                });
+
             modelBuilder.Entity("CollectionMediaFolder", b =>
                 {
                     b.Property<long>("ContainedCollectionsId")
@@ -852,6 +919,25 @@ namespace Backend.Migrations
                     b.Navigation("Modifier");
                 });
 
+            modelBuilder.Entity("Backend.Models.UploadSectionItem", b =>
+                {
+                    b.HasOne("Backend.Models.MediaFile", "MediaFile")
+                        .WithMany("InUploadSections")
+                        .HasForeignKey("MediaFileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Backend.Models.UploadSection", "UploadSection")
+                        .WithMany("Items")
+                        .HasForeignKey("UploadSectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("MediaFile");
+
+                    b.Navigation("UploadSection");
+                });
+
             modelBuilder.Entity("CollectionMediaFolder", b =>
                 {
                     b.HasOne("Backend.Models.Collection", null)
@@ -914,6 +1000,8 @@ namespace Backend.Migrations
                     b.Navigation("ImportInfo");
 
                     b.Navigation("InCollections");
+
+                    b.Navigation("InUploadSections");
                 });
 
             modelBuilder.Entity("Backend.Models.Tag", b =>
@@ -928,6 +1016,11 @@ namespace Backend.Migrations
             modelBuilder.Entity("Backend.Models.TagModifier", b =>
                 {
                     b.Navigation("Aliases");
+                });
+
+            modelBuilder.Entity("Backend.Models.UploadSection", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }
