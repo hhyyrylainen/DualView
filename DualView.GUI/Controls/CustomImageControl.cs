@@ -329,31 +329,64 @@ public class CustomImageControl : Control, IBrushPreviewTarget
 
     public static WriteableBitmap CreateBitmap(MagickImage frame)
     {
-        // The underlying ImageMagick buffer changes depending on if it has alpha or not
-        var avaloniaFormat = frame.HasAlpha ? PixelFormats.Rgba8888 : PixelFormats.Rgb24;
+        MagickImage workingFrame = frame;
+        bool cloned = false;
 
-        // TODO: a proper DPI value?
-        var dpi = new Vector(96, 96);
+        // Ensure the image is in a format Avalonia can handle directly from the buffer.
+        // We expect TrueColor (RGB, 3 bytes) or TrueColorAlpha (RGBA, 4 bytes) with 8-bit depth.
+        // Grayscale, Palette, or 16-bit images need conversion.
+        if (frame.Depth != 8 ||
+            frame.ColorSpace != ColorSpace.sRGB ||
+            (frame.HasAlpha && frame.ColorType != ColorType.TrueColorAlpha) ||
+            (!frame.HasAlpha && frame.ColorType != ColorType.TrueColor))
+        {
+            workingFrame = (MagickImage)frame.Clone();
+            cloned = true;
 
-        // Pixel size should be the raw pixel size
-        var size = new PixelSize((int)frame.Width, (int)frame.Height);
+            if (workingFrame.Depth != 8)
+                workingFrame.Depth = 8;
 
-        using var sourcePixels = frame.GetPixelsUnsafe();
-        var source = sourcePixels.GetAreaPointer(0, 0, frame.Width, frame.Height);
+            if (workingFrame.ColorSpace != ColorSpace.sRGB)
+                workingFrame.ColorSpace = ColorSpace.sRGB;
 
-        // And thus the size here depends on if there is alpha or not
-        int stride = (int)frame.Width * (frame.HasAlpha ? 4 : 3);
+            if (workingFrame.HasAlpha)
+            {
+                if (workingFrame.ColorType != ColorType.TrueColorAlpha)
+                    workingFrame.ColorType = ColorType.TrueColorAlpha;
+            }
+            else
+            {
+                if (workingFrame.ColorType != ColorType.TrueColor)
+                    workingFrame.ColorType = ColorType.TrueColor;
+            }
+        }
 
-        var bitmap = new WriteableBitmap(avaloniaFormat, AlphaFormat.Unpremul, source, size, dpi, stride);
+        try
+        {
+            // The underlying ImageMagick buffer changes depending on if it has alpha or not
+            var avaloniaFormat = workingFrame.HasAlpha ? PixelFormats.Rgba8888 : PixelFormats.Rgb24;
 
-#if DEBUG
-        // This causes just a tiny bit of inefficiency, so this isn't enabled
-        /*using var lockedBitmap = bitmap.Lock();
-        if (lockedBitmap.RowBytes != stride)
-            throw new Exception("Created bitmap has different stride, causing inefficiency in updates");*/
-#endif
+            // TODO: a proper DPI value?
+            var dpi = new Vector(96, 96);
 
-        return bitmap;
+            // Pixel size should be the raw pixel size
+            var size = new PixelSize((int)workingFrame.Width, (int)workingFrame.Height);
+
+            using var sourcePixels = workingFrame.GetPixelsUnsafe();
+            var source = sourcePixels.GetAreaPointer(0, 0, workingFrame.Width, workingFrame.Height);
+
+            // And thus the size here depends on if there is alpha or not
+            int stride = (int)workingFrame.Width * (workingFrame.HasAlpha ? 4 : 3);
+
+            var bitmap = new WriteableBitmap(avaloniaFormat, AlphaFormat.Unpremul, source, size, dpi, stride);
+
+            return bitmap;
+        }
+        finally
+        {
+            if (cloned)
+                workingFrame.Dispose();
+        }
     }
 
     public override void Render(DrawingContext context)
