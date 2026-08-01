@@ -578,19 +578,16 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
         {
             if (serverSource.Info.IsFolder)
             {
-                BackgroundSource = CustomImageControl.CreateBitmap(
-                    await EmbeddedResourceImage.GetResource(EmbeddedResourceImage.FolderIcon)
-                        .GetCurrentFrameAsync(token));
+                BackgroundSource = EmbeddedResourceImage.GetFolderIconConverted();
 
                 // Folders do not show any images for now
                 CurrentFrameBitmap = null;
                 return;
             }
-            else if (serverSource.Info.IsCollection)
+
+            if (serverSource.Info.IsCollection)
             {
-                BackgroundSource = CustomImageControl.CreateBitmap(
-                    await EmbeddedResourceImage.GetResource(EmbeddedResourceImage.CollectionIcon)
-                        .GetCurrentFrameAsync(token));
+                BackgroundSource = EmbeddedResourceImage.GetCollectionIconConverted();
             }
             else
             {
