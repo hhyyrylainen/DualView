@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using DualView.GUI.Controls;
 using ImageMagick;
 
 namespace DualView.GUI.Models;
@@ -16,6 +18,10 @@ public class EmbeddedResourceImage : IVisualMediaSource
     public const string CollectionIcon = "folders.png";
 
     private static readonly Dictionary<string, EmbeddedResourceImage> Loaded = new();
+
+    private static readonly SemaphoreSlim ReadyConvertedAvaloniaLock = new(1, 1);
+    private static Bitmap? folderIconConverted;
+    private static Bitmap? collectionIconConverted;
 
     private readonly MagickImage image;
     private readonly string resourceName;
@@ -54,6 +60,64 @@ public class EmbeddedResourceImage : IVisualMediaSource
                 return result;
 
             return Loaded[resourceName] = new EmbeddedResourceImage(resourceName);
+        }
+    }
+
+    public static Bitmap? GetFolderIconConverted()
+    {
+        ReadyConvertedAvaloniaLock.Wait();
+        try
+        {
+            if (folderIconConverted == null)
+            {
+                folderIconConverted = CustomImageControl.CreateBitmap(GetResource(FolderIcon).GetCurrentFrame());
+            }
+
+            return folderIconConverted;
+        }
+        finally
+        {
+            ReadyConvertedAvaloniaLock.Release();
+        }
+    }
+
+    public static Bitmap? GetCollectionIconConverted()
+    {
+        ReadyConvertedAvaloniaLock.Wait();
+        try
+        {
+            if (collectionIconConverted == null)
+            {
+                collectionIconConverted =
+                    CustomImageControl.CreateBitmap(GetResource(CollectionIcon).GetCurrentFrame());
+            }
+
+            return collectionIconConverted;
+        }
+        finally
+        {
+            ReadyConvertedAvaloniaLock.Release();
+        }
+    }
+
+    public static void OnShutdown()
+    {
+        ReadyConvertedAvaloniaLock.Wait();
+        try
+        {
+            folderIconConverted?.Dispose();
+            folderIconConverted = null;
+            collectionIconConverted?.Dispose();
+            collectionIconConverted = null;
+        }
+        finally
+        {
+            ReadyConvertedAvaloniaLock.Release();
+        }
+
+        lock (Loaded)
+        {
+            Loaded.Clear();
         }
     }
 

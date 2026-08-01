@@ -102,6 +102,17 @@ sealed class Program
 
             return -2;
         }
+        finally
+        {
+            try
+            {
+                EmbeddedResourceImage.OnShutdown();
+            }
+            catch (Exception e)
+            {
+                logger.Error(e, "Error during shutdown");
+            }
+        }
     }
 
     // Avalonia configuration, don't remove; also used by visual designer.
