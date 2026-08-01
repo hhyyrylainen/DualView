@@ -19,11 +19,8 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     private readonly IBackendAPI? backendAPI;
     private readonly ISignalRService? signalRService;
 
-    private bool keepMedia;
     private long currentConfiguredMediaId;
     private long currentMediaFileId;
-
-    private bool initialKeepLoad = true;
 
     public delegate void ClipboardTextSetRequested(string text);
 
@@ -86,16 +83,10 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     }
 
-    public bool KeepMedia
+    public bool IsTemporary
     {
-        get => keepMedia;
-        set
-        {
-            if (SetProperty(ref keepMedia, value))
-            {
-                _ = UpdateKeepStatus(value);
-            }
-        }
+        get;
+        private set => SetProperty(ref field, value);
     }
 
     public string ImageInfo
@@ -109,15 +100,15 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         Media.MediaToShow = source;
         Media.MediaOpenResources = extraData;
 
-        // Initialize keep state if this is a server media
+        // Initialize extra data
         if (source is ServerMediaSource serverMediaSource)
         {
-            _ = LoadKeepStatus(serverMediaSource.ServerId);
+            _ = LoadMediaFileStatus(serverMediaSource.ServerId);
         }
         else
         {
             HasServerMedia = false;
-            keepMedia = false;
+            IsTemporary = false;
             currentConfiguredMediaId = 0;
             currentMediaFileId = 0;
         }
@@ -267,7 +258,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task LoadKeepStatus(long configuredMediaId)
+    private async Task LoadMediaFileStatus(long configuredMediaId)
     {
         if (clientDatabaseService == null)
             return;
@@ -281,19 +272,10 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            if (initialKeepLoad)
-            {
-                initialKeepLoad = false;
-
-                // Set this directly to avoid an unnecessary backend call
-                keepMedia = media.MediaFile.Keep;
-                OnPropertyChanged(nameof(KeepMedia));
-            }
-
             currentConfiguredMediaId = media.Id;
             currentMediaFileId = media.MediaFile.Id;
             HasServerMedia = true;
-            KeepMedia = media.MediaFile.Keep;
+            IsTemporary = media.MediaFile.IsTemporary;
         }
         catch (Exception e)
         {
@@ -301,30 +283,12 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task UpdateKeepStatus(bool keep)
-    {
-        if (clientDatabaseService == null || !HasServerMedia || currentConfiguredMediaId == 0)
-            return;
-
-        try
-        {
-            await clientDatabaseService.SetMediaKeepStatusAsync(currentConfiguredMediaId, keep);
-        }
-        catch (Exception e)
-        {
-            windowService?.ShowErrorWindow("Failed to update keep status", e);
-
-            // Revert UI to previous state on failure
-            _ = LoadKeepStatus(currentConfiguredMediaId);
-        }
-    }
-
     private void OnMediaUpdated(long mediaFileId)
     {
         if (mediaFileId == currentMediaFileId)
         {
-            // Refresh keep state from the server
-            _ = LoadKeepStatus(currentConfiguredMediaId);
+            // Refresh state from the server
+            _ = LoadMediaFileStatus(currentConfiguredMediaId);
         }
     }
 

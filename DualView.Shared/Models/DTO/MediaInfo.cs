@@ -50,7 +50,6 @@ public class ConfiguredMediaDTO(string name, string hashSha3)
         Id = media.Id;
         ImportedAt = media.ImportedAt;
         IsDeleted = media.IsDeleted;
-        Keep = media.Keep;
         MediaType = media.MediaType;
         Width = media.Width;
         Height = media.Height;

@@ -43,14 +43,6 @@ public interface IDatabaseCommonService
     public Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
         FolderSortColumn sortColumn, SortDirection sortDirection);
 
-    /// <summary>
-    ///   Updates media keep status.
-    /// </summary>
-    /// <param name="mediaId">Media to update</param>
-    /// <param name="keep">New keep value</param>
-    /// <returns>True if modified, false if status was already right</returns>
-    public Task<bool> SetMediaKeepStatusAsync(long mediaId, bool keep);
-
     public Task<bool> IsMediaSafeToDeleteAsync(long mediaId);
     public Task DeleteMediaAsync(long mediaId);
     public Task RestoreMediaAsync(long mediaId);

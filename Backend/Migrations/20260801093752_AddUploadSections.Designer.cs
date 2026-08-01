@@ -3,6 +3,7 @@ using System;
 using Backend.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260801093752_AddUploadSections")]
+    partial class AddUploadSections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
@@ -279,6 +282,9 @@ namespace Backend.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsTemporary")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("Keep")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("LastViewed")
@@ -615,9 +621,6 @@ namespace Backend.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("DisplayIndex")
-                        .IsUnique();
 
                     b.HasIndex("NameLowercase")
                         .IsUnique();

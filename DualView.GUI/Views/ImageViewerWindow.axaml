@@ -46,18 +46,16 @@
                 Sound
             </CheckBox>
 
-            <CheckBox Grid.Column="4" IsChecked="{Binding KeepMedia}"
-                      IsVisible="{Binding HasServerMedia}"
-                      ToolTip.Tip="Media marked as keep is never automatically deleted due to being old">
-                Keep
-            </CheckBox>
+            <TextBox Grid.Column="4" IsVisible="{Binding IsTemporary}"
+                      ToolTip.Tip="Use the Import window to import this media to a collection to make it permanent; otherwise it will be deleted after a while">
+                Temporary Import
+            </TextBox>
 
             <Button Grid.Column="5"
                     Content="Close"
                     Margin="5,0"
                     VerticalAlignment="Center"
-                    Name="CloseButton"
-                    ToolTip.Tip="Remove all items without importing them" />
+                    Name="CloseButton" />
         </Grid>
     </Grid>
 </Window>

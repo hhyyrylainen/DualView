@@ -21,8 +21,6 @@ public class MediaFileDTO(string originalFileName, string hashSha3) : IMediaFile
 
     public bool IsTemporary { get; set; }
 
-    public bool Keep { get; set; }
-
     public MediaType MediaType { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
@@ -58,8 +56,6 @@ public interface IMediaFile
     public bool IsDeleted { get; set; }
 
     public bool IsTemporary { get; set; }
-
-    public bool Keep { get; set; }
 
     // Media info
     public MediaType MediaType { get; set; }
