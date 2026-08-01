@@ -581,6 +581,10 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
                 BackgroundSource = CustomImageControl.CreateBitmap(
                     await EmbeddedResourceImage.GetResource(EmbeddedResourceImage.FolderIcon)
                         .GetCurrentFrameAsync(token));
+
+                // Folders do not show any images for now
+                CurrentFrameBitmap = null;
+                return;
             }
             else if (serverSource.Info.IsCollection)
             {

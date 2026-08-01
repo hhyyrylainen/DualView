@@ -260,12 +260,8 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 var (content, _) = await databaseService.GetMediaFolderContents(currentFolderId!.Value, 0, 1000,
                     FolderSortColumn.Name, SortDirection.Ascending, searchText);
 
-                // Sort: folders first, then collections
-                var sortedContent = content.OrderByDescending(i => i.IsFolder)
-                    .ThenByDescending(i => i.IsCollection)
-                    .ThenBy(i => i.Name);
-
-                foreach (var item in sortedContent)
+                // Server sorts items already
+                foreach (var item in content)
                 {
                     newItems.Add(new MediaViewerViewModel(logger, windowService)
                     {

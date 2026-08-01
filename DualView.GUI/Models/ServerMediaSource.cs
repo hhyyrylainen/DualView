@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 using DualView.Shared.Models.DTO;
@@ -145,6 +146,16 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
             PrepareForNewMedia();
 
             var imageRequest = await SendRequest(GetThumbnailDownloadUrl());
+
+            if (imageRequest.StatusCode == HttpStatusCode.NotFound && MediaInfo.IsCollection)
+            {
+                // Collection with no thumbnail
+                var image = new MagickImage(MagickColors.Transparent, 1, 1);
+                LoadImage(image, null);
+                LoadStatus = IVisualMediaSource.LoadType.Thumbnail;
+                return;
+            }
+
             imageRequest.EnsureSuccessStatusCode();
 
             if (MediaInfo.MediaType.IsImage())
@@ -196,6 +207,12 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
 
     public virtual string GetThumbnailDownloadUrl()
     {
+        if (MediaInfo.IsCollection)
+        {
+            // TODO: implement collection thumbnail controller
+            return $"api/v1/Collection/{MediaInfo.Id}/thumbnail";
+        }
+
         return $"api/v1/MediaContent/{MediaInfo.Id}/thumbnail";
     }
 

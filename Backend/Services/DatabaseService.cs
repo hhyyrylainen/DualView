@@ -1619,9 +1619,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         foreach (var collection in collections)
         {
-            // For collections, we might want to find a primary media file for preview
-            // For now, just use dummy
-            // TODO: implement preview images for collections: pick either the first one or add a new property for selecting thumbnail manually which is used if set
+            // Collections have thumbnails, but the client queries them separately
             allItems.Add(new ConfiguredMediaInfo(collection.Name, collection.Id, 0, MediaType.Png, 512, 512)
             {
                 IsCollection = true,

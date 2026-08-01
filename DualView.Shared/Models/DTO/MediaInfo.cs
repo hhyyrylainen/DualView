@@ -1,24 +1,30 @@
+using System.Text.Json.Serialization;
 using DualView.Shared.Models.Enums;
 
 namespace DualView.Shared.Models.DTO;
 
-public class ConfiguredMediaInfo(
-    string name,
-    long id,
-    long mediaFileId,
-    MediaType mediaType,
-    int width,
-    int height) : IConfiguredMediaInfo
+public class ConfiguredMediaInfo : IConfiguredMediaInfo
 {
-    public string Name { get; set; } = name;
-    public long Id { get; set; } = id;
-    public long MediaFileId { get; set; } = mediaFileId;
-    public MediaType MediaType { get; set; } = mediaType;
-    public int Width { get; set; } = width;
-    public int Height { get; set; } = height;
+    public string Name { get; set; }
+    public long Id { get; set; }
+    public long MediaFileId { get; set; }
+    public MediaType MediaType { get; set; }
+    public int Width { get; set; }
+    public int Height { get; set; }
 
     public bool IsFolder { get; set; }
     public bool IsCollection { get; set; }
+
+    [JsonConstructor]
+    public ConfiguredMediaInfo(string name, long id, long mediaFileId, MediaType mediaType, int width, int height)
+    {
+        Name = name;
+        Id = id;
+        MediaFileId = mediaFileId;
+        MediaType = mediaType;
+        Width = width;
+        Height = height;
+    }
 
     public ConfiguredMediaInfo(MediaFileDTO media) : this(media.OriginalFileName, media.Id, media.Id,
         media.MediaType, media.Width, media.Height)
