@@ -361,7 +361,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     // Tags
     public async Task<long> CreateTagAsync(string name, TagCategory category)
     {
-        var response = await HttpClient.PostAsJsonAsync("api/v1/tag", new { name, category });
+        var response = await HttpClient.PostAsJsonAsync("api/v1/tag", new CreateTagRequest { Name = name, Category = category });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
@@ -370,7 +370,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         long? exampleMediaId)
     {
         var response = await HttpClient.PutAsJsonAsync($"api/v1/tag/{id}",
-            new { name, description, category, exampleMediaId });
+            new UpdateTagRequest { Name = name, Description = description, Category = category, ExampleMediaId = exampleMediaId });
         response.EnsureSuccessStatusCode();
     }
 
@@ -390,16 +390,27 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return await HttpClient.GetFromJsonAsync<TagDTO?>($"api/v1/tag/{id}");
     }
 
+    public async Task<List<TagDTO>> SearchTagsWildcardAsync(string search)
+    {
+        return await HttpClient.GetFromJsonAsync<List<TagDTO>>($"api/v1/tag/search?search={Uri.EscapeDataString(search)}") ??
+               new List<TagDTO>();
+    }
+
+    public async Task<TagDTO?> GetTagByNameAsync(string name)
+    {
+        return await HttpClient.GetFromJsonAsync<TagDTO?>($"api/v1/tag/byName?name={Uri.EscapeDataString(name)}");
+    }
+
     public async Task<long> CreateTagModifierAsync(string name)
     {
-        var response = await HttpClient.PostAsJsonAsync("api/v1/tagModifier", new { name });
+        var response = await HttpClient.PostAsJsonAsync("api/v1/tagModifier", new CreateModifierRequest { Name = name });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
 
     public async Task UpdateTagModifierAsync(long id, string? name, string? description)
     {
-        var response = await HttpClient.PutAsJsonAsync($"api/v1/tagModifier/{id}", new { name, description });
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/tagModifier/{id}", new UpdateModifierRequest { Name = name, Description = description });
         response.EnsureSuccessStatusCode();
     }
 
@@ -422,7 +433,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task CreateTagAliasAsync(long tagId, string alias)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/alias", new { alias });
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/alias", new CreateTagAliasRequest { Alias = alias });
         response.EnsureSuccessStatusCode();
     }
 
@@ -434,7 +445,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task CreateTagModifierAliasAsync(long modifierId, string alias)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/tagModifier/{modifierId}/alias", new { alias });
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tagModifier/{modifierId}/alias", new CreateTagModifierAliasRequest { Alias = alias });
         response.EnsureSuccessStatusCode();
     }
 
@@ -448,7 +459,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task AddTagImplicationAsync(long tagId, long impliedTagId)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/imply", new { impliedTagId });
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/imply", new AddImplicationRequest { ImpliedTagId = impliedTagId });
         response.EnsureSuccessStatusCode();
     }
 
@@ -463,7 +474,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         long? combinedWithAppliedTagId, string? combineWord)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/media/{mediaId}/appliedTag",
-            new { tagId, modifierIds, combinedWithAppliedTagId, combineWord });
+            new AddAppliedTagRequest { TagId = tagId, ModifierIds = modifierIds, CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
@@ -478,7 +489,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         long? combinedWithAppliedTagId, string? combineWord)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/appliedTag",
-            new { tagId, modifierIds, combinedWithAppliedTagId, combineWord });
+            new AddAppliedTagRequest { TagId = tagId, ModifierIds = modifierIds, CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }

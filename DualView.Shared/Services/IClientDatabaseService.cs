@@ -51,6 +51,10 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<List<AppliedTagDTO>> GetMediaAppliedTagsAsync(long mediaId);
     public Task<List<AppliedTagDTO>> GetCollectionAppliedTagsAsync(long collectionId);
 
+    // Tag search
+    public Task<List<TagDTO>> SearchTagsWildcardAsync(string search);
+    public Task<TagDTO?> GetTagByNameAsync(string name);
+
     // Import & Galleries
     public Task<List<MediaImportInfoDTO>> GetPendingImportsAsync();
     public Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId);

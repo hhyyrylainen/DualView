@@ -649,13 +649,18 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return new Tuple<List<MediaFileDTO>, int>(items, total);
     }
 
-    public async Task<List<MediaFileDTO>> GetCollectionContents(long collectionId)
+    public async Task<List<MediaFile>> GetCollectionContents(long collectionId)
     {
         return await dbContext.Set<CollectionItem>()
             .Where(ci => ci.CollectionId == collectionId)
             .OrderBy(ci => ci.SequenceNumber)
-            .Select(ci => ci.MediaFile.GetDTO())
+            .Select(ci => ci.MediaFile)
             .ToListAsync();
+    }
+
+    async Task<List<MediaFileDTO>> IClientDatabaseService.GetCollectionContents(long collectionId)
+    {
+        return (await GetCollectionContents(collectionId)).ConvertToDTO<MediaFile, MediaFileDTO>();
     }
 
     public async Task<List<Collection>> GetCollectionsInFolderAsync(long folderId)
@@ -915,7 +920,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     // Tags
     public async Task<long> CreateTagAsync(string name, TagCategory category)
     {
-        var tag = new Tag(name.TrimOrThrowIfEmpty(), category);
+        var tag = new Tag(name.TrimOrThrowIfEmpty().ToLowerInvariant(), category);
         await dbContext.Tags.AddAsync(tag);
         await SaveAsync();
         await updateNotifier.NotifyTagsUpdated();
@@ -928,7 +933,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var tag = await dbContext.Tags.FindAsync(id) ?? throw new ArgumentException("Tag not found");
 
         if (name != null)
-            tag.Name = name.TrimOrThrowIfEmpty();
+            tag.Name = name.TrimOrThrowIfEmpty().ToLowerInvariant();
 
         if (description != null)
             tag.Description = description;
@@ -955,7 +960,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<long> CreateTagModifierAsync(string name)
     {
-        var modifier = new TagModifier(name.TrimOrThrowIfEmpty());
+        var modifier = new TagModifier(name.TrimOrThrowIfEmpty().ToLowerInvariant());
         await dbContext.TagModifiers.AddAsync(modifier);
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
@@ -967,7 +972,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var modifier = await dbContext.TagModifiers.FindAsync(id) ?? throw new ArgumentException("Modifier not found");
 
         if (name != null)
-            modifier.Name = name.TrimOrThrowIfEmpty();
+            modifier.Name = name.TrimOrThrowIfEmpty().ToLowerInvariant();
 
         if (description != null)
             modifier.Description = description;
@@ -988,7 +993,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task CreateTagAliasAsync(long tagId, string alias)
     {
-        var tagAlias = new TagAlias(alias.TrimOrThrowIfEmpty(), tagId);
+        var tagAlias = new TagAlias(alias.TrimOrThrowIfEmpty().ToLowerInvariant(), tagId);
         await dbContext.TagAliases.AddAsync(tagAlias);
         await SaveAsync();
         await updateNotifier.NotifyTagUpdated(tagId);
@@ -996,7 +1001,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task DeleteTagAliasAsync(long tagId, string alias)
     {
-        var tagAlias = await dbContext.TagAliases.FirstOrDefaultAsync(a => a.TagId == tagId && a.Name == alias);
+        var tagAlias = await dbContext.TagAliases.FirstOrDefaultAsync(a => a.TagId == tagId && a.Name == alias.ToLowerInvariant());
         if (tagAlias != null)
         {
             dbContext.TagAliases.Remove(tagAlias);
@@ -1007,7 +1012,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task CreateTagModifierAliasAsync(long modifierId, string alias)
     {
-        var modifierAlias = new TagModifierAlias(alias.TrimOrThrowIfEmpty(), modifierId);
+        var modifierAlias = new TagModifierAlias(alias.TrimOrThrowIfEmpty().ToLowerInvariant(), modifierId);
         await dbContext.TagModifierAliases.AddAsync(modifierAlias);
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
@@ -1016,7 +1021,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task DeleteTagModifierAliasAsync(long modifierId, string alias)
     {
         var modifierAlias =
-            await dbContext.TagModifierAliases.FirstOrDefaultAsync(a => a.ModifierId == modifierId && a.Name == alias);
+            await dbContext.TagModifierAliases.FirstOrDefaultAsync(a => a.ModifierId == modifierId && a.Name == alias.ToLowerInvariant());
         if (modifierAlias != null)
         {
             dbContext.TagModifierAliases.Remove(modifierAlias);
@@ -1194,6 +1199,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<Tag?> GetTagByNameAsync(string name)
     {
+        name = name.ToLowerInvariant();
         return await dbContext.Tags.FirstOrDefaultAsync(t => t.Name == name);
     }
 
@@ -1209,6 +1215,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<TagModifier?> GetTagModifierByNameAsync(string name)
     {
+        name = name.ToLowerInvariant();
         return await dbContext.TagModifiers.FirstOrDefaultAsync(m => m.Name == name);
     }
 
@@ -1240,6 +1247,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<Tag?> GetTagByNameOrAliasAsync(string name)
     {
+        name = name.ToLowerInvariant();
         var tag = await GetTagByNameAsync(name);
         if (tag != null)
             return tag;
@@ -1250,6 +1258,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<TagModifier?> GetTagModifierByNameOrAliasAsync(string name)
     {
+        name = name.ToLowerInvariant();
         var modifier = await GetTagModifierByNameAsync(name);
         if (modifier != null)
             return modifier;
@@ -1269,12 +1278,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<string?> GetTagSuperAliasAsync(string alias)
     {
+        alias = alias.ToLowerInvariant();
         var superAlias = await dbContext.TagSuperAliases.FindAsync(alias);
         return superAlias?.Expanded;
     }
 
     public async Task<List<string>> SelectTagNamesWildcardAsync(string pattern, int maxCount = 50)
     {
+        pattern = pattern.ToLowerInvariant();
         return await dbContext.Tags
             .Where(t => t.Name.Contains(pattern))
             .OrderBy(t => t.Name)
@@ -1285,6 +1296,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<List<string>> SelectTagAliasesWildcardAsync(string pattern, int maxCount = 50)
     {
+        pattern = pattern.ToLowerInvariant();
         return await dbContext.TagAliases
             .Where(a => a.Name.Contains(pattern))
             .OrderBy(a => a.Name)
@@ -1295,6 +1307,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<List<string>> SelectTagModifierNamesWildcardAsync(string pattern, int maxCount = 50)
     {
+        pattern = pattern.ToLowerInvariant();
         return await dbContext.TagModifiers
             .Where(m => m.Name.Contains(pattern))
             .OrderBy(m => m.Name)
@@ -1315,12 +1328,34 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<List<string>> SelectTagSuperAliasWildcardAsync(string pattern, int maxCount = 50)
     {
+        pattern = pattern.ToLowerInvariant();
         return await dbContext.TagSuperAliases
             .Where(s => s.Alias.Contains(pattern))
             .OrderBy(s => s.Alias)
             .Take(maxCount)
             .Select(s => s.Alias)
             .ToListAsync();
+    }
+
+    public async Task<List<Tag>> SearchTagsWildcardAsync(string search)
+    {
+        var pattern = search.ToLowerInvariant();
+        return await dbContext.Tags
+            .Where(t => t.Name.Contains(pattern))
+            .OrderBy(t => t.Name)
+            .Take(100)
+            .ToListAsync();
+    }
+
+    async Task<List<TagDTO>> IClientDatabaseService.SearchTagsWildcardAsync(string search)
+    {
+        return (await SearchTagsWildcardAsync(search)).Select(t => t.GetDTO()).ToList();
+    }
+
+    async Task<TagDTO?> IClientDatabaseService.GetTagByNameAsync(string name)
+    {
+        var tag = await GetTagByNameOrAliasAsync(name);
+        return tag?.GetDTO();
     }
 
     public async Task<MediaImportInfo?> GetMediaImportInfoAsync(long mediaId)

@@ -1,9 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Backend.Models;
 using DualView.Shared.Models.DTO;
-using DualView.Shared.Models.Enums;
 using DualView.Shared.Requests;
-using DualView.Shared.Services;
 using Backend.Services;
 using Backend.Utilities;
 using Microsoft.AspNetCore.Mvc;
@@ -143,12 +141,12 @@ public class MediaFolderController : Controller
     [HttpGet("{id:long}/parentFolderPaths")]
     public async Task<ActionResult<List<FolderPathDTO>>> GetParentFolderPaths([Required] long id)
     {
-        return await ((IClientDatabaseService)databaseService).GetFolderParentFolderPaths(id);
+        return await databaseService.GetFolderParentFolderPaths(id);
     }
 
     [HttpGet("{id:long}/path")]
     public async Task<ActionResult<string>> GetPath([Required] long id)
     {
-        return await ((IClientDatabaseService)databaseService).GetMediaFolderPath(id);
+        return await databaseService.GetMediaFolderPath(id);
     }
 }

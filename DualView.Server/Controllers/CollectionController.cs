@@ -1,8 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
-using DualView.Shared.Services;
+using DualView.Shared.Requests;
+using Backend.Models;
 using Backend.Services;
+using Backend.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DualView.Server.Controllers;
@@ -28,7 +30,7 @@ public class CollectionController : Controller
     [HttpGet("deleted")]
     public async Task<ActionResult<List<CollectionDTO>>> GetDeleted([FromQuery] int limit = 100)
     {
-        return await ((IClientDatabaseService)databaseService).GetDeletedCollectionsAsync(limit);
+        return (await databaseService.GetDeletedCollectionsAsync(limit)).ConvertToDTO<Collection, CollectionDTO>();
     }
 
     [HttpPost("{id:long}/restore")]
@@ -69,7 +71,7 @@ public class CollectionController : Controller
     [HttpGet("{id:long}/folderPaths")]
     public async Task<ActionResult<List<FolderPathDTO>>> GetFolderPaths([Required] long id)
     {
-        return await ((IClientDatabaseService)databaseService).GetCollectionFolderPaths(id);
+        return await databaseService.GetCollectionFolderPaths(id);
     }
 
     [HttpGet("{id:long}/contents")]
@@ -83,7 +85,7 @@ public class CollectionController : Controller
     [HttpGet("{id:long}/allContents")]
     public async Task<ActionResult<List<MediaFileDTO>>> GetAllCollectionContents([Required] long id)
     {
-        return await ((IClientDatabaseService)databaseService).GetCollectionContents(id);
+        return (await databaseService.GetCollectionContents(id)).ConvertToDTO<MediaFile, MediaFileDTO>();
     }
 
     [HttpPost("{id:long}/reorder")]
@@ -107,5 +109,26 @@ public class CollectionController : Controller
     {
         await databaseService.RemoveMediaFromCollection(mediaId, id);
         return Ok();
+    }
+
+    [HttpPost("{id:long}/appliedTag")]
+    public async Task<ActionResult<long>> AddAppliedTag([Required] long id, [FromBody] AddAppliedTagRequest request)
+    {
+        var appliedTagId = await databaseService.AddAppliedTagToCollectionAsync(id, request.TagId, request.ModifierIds,
+            request.CombinedWithAppliedTagId, request.CombineWord);
+        return Ok(appliedTagId);
+    }
+
+    [HttpDelete("{id:long}/appliedTag/{appliedTagId:long}")]
+    public async Task<IActionResult> RemoveAppliedTag([Required] long id, [Required] long appliedTagId)
+    {
+        await databaseService.RemoveAppliedTagFromCollectionAsync(id, appliedTagId);
+        return Ok();
+    }
+
+    [HttpGet("{id:long}/appliedTag")]
+    public async Task<ActionResult<List<AppliedTagDTO>>> GetAppliedTags([Required] long id)
+    {
+        return (await databaseService.GetCollectionAppliedTagsAsync(id)).ConvertToDTO<AppliedTag, AppliedTagDTO>();
     }
 }

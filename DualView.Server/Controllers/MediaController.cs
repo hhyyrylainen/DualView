@@ -1,7 +1,8 @@
 using System.ComponentModel.DataAnnotations;
-using Backend.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Requests;
+using Backend.Models;
 using Backend.Services;
 using Backend.Utilities;
 using Microsoft.AspNetCore.Mvc;
@@ -204,5 +205,26 @@ public class MediaController : Controller
         }
 
         return File(stream, media.MediaType.ToMimeType(), false);
+    }
+
+    [HttpPost("{mediaId:long}/appliedTag")]
+    public async Task<ActionResult<long>> AddAppliedTag([Required] long mediaId, [FromBody] AddAppliedTagRequest request)
+    {
+        var id = await databaseService.AddAppliedTagToMediaAsync(mediaId, request.TagId, request.ModifierIds,
+            request.CombinedWithAppliedTagId, request.CombineWord);
+        return Ok(id);
+    }
+
+    [HttpDelete("{mediaId:long}/appliedTag/{appliedTagId:long}")]
+    public async Task<IActionResult> RemoveAppliedTag([Required] long mediaId, [Required] long appliedTagId)
+    {
+        await databaseService.RemoveAppliedTagFromMediaAsync(mediaId, appliedTagId);
+        return Ok();
+    }
+
+    [HttpGet("{mediaId:long}/appliedTag")]
+    public async Task<ActionResult<List<AppliedTagDTO>>> GetAppliedTags([Required] long mediaId)
+    {
+        return (await databaseService.GetMediaAppliedTagsAsync(mediaId)).ConvertToDTO<AppliedTag, AppliedTagDTO>();
     }
 }

@@ -1,4 +1,5 @@
 using DualView.Shared.Services;
+using DualView.Shared.Models.DTO;
 using Backend.Models;
 
 namespace Backend.Services;
@@ -32,6 +33,8 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     // Collections
     public Task<Collection?> GetCollectionAsync(long id);
+    public Task<List<MediaFile>> GetCollectionContents(long collectionId);
+    public Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId);
     public Task SaveCollectionAsync(Collection collection);
     public Task DeleteCollectionAsync(Collection collection);
 
@@ -54,6 +57,8 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<MediaFile>> GetDeletedMediaAsync(int limit);
     public Task<List<MediaFolder>> GetDeletedMediaFoldersAsync(int limit);
     public Task<List<Collection>> GetDeletedCollectionsAsync(int limit);
+    public Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId);
+    public Task<string> GetMediaFolderPath(long folderId);
 
     /// <summary>
     ///   Creates a new media file and adds it to a collection
@@ -96,6 +101,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<TagBreakRule?> GetTagBreakRuleByStrAsync(string str);
     public Task<string?> GetTagSuperAliasAsync(string alias);
 
+    public Task<List<Tag>> SearchTagsWildcardAsync(string search);
     public Task<List<string>> SelectTagNamesWildcardAsync(string pattern, int maxCount = 50);
     public Task<List<string>> SelectTagAliasesWildcardAsync(string pattern, int maxCount = 50);
     public Task<List<string>> SelectTagModifierNamesWildcardAsync(string pattern, int maxCount = 50);
