@@ -10,6 +10,8 @@ public partial class UploadWindow : Window
     public UploadWindow()
     {
         InitializeComponent();
+
+        Closed += (s, e) => (DataContext as UploadWindowViewModel)?.RemoveAll();
     }
 
     private async void OnAddFilesClick(object? sender, RoutedEventArgs e)
