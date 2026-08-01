@@ -7,14 +7,21 @@
         x:Class="DualView.GUI.Views.UploadWindow"
         x:DataType="vm:UploadWindowViewModel"
         Title="Upload Files"
-        Width="600" Height="400" WindowStartupLocation="CenterOwner">
+        Width="800" Height="500" WindowStartupLocation="CenterOwner">
 
     <Design.DataContext>
         <vm:UploadWindowViewModel />
     </Design.DataContext>
 
     <Grid RowDefinitions="Auto, *, Auto, Auto" Margin="10">
-        <Button Content="Add Files" Click="OnAddFilesClick" IsEnabled="{Binding !IsUploading}" />
+        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Stretch">
+            <Button Content="Add Files" Click="OnAddFilesClick" IsEnabled="{Binding !IsUploading}" />
+            <CheckBox IsChecked="{Binding DeleteAfterUpload}">Delete After Upload</CheckBox>
+
+            <TextBox PlaceholderText="Upload section name (optional, blank means current section)"
+                     Text="{Binding UploadSectionName}" HorizontalAlignment="Stretch" />
+        </StackPanel>
+
 
         <ListBox Grid.Row="1" ItemsSource="{Binding FilesToUpload}" Margin="0,10,0,10">
             <ListBox.ItemTemplate>
@@ -27,12 +34,16 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <ProgressBar Grid.Row="2" Value="{Binding TotalProgress}" Minimum="0" Maximum="1" 
+        <ProgressBar Grid.Row="2" Value="{Binding TotalProgress}" Minimum="0" Maximum="1"
                      IsVisible="{Binding IsUploading}" Margin="0,0,0,10" />
 
-        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-            <Button Content="Upload" Command="{Binding StartUpload}" IsEnabled="{Binding !IsUploading}" Classes="accent" />
-            <Button Content="Close" Click="OnCloseClick" />
-        </StackPanel>
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" HorizontalAlignment="Stretch" ColumnSpacing="10">
+            <CheckBox Grid.Column="0" IsChecked="{Binding RemoveAfterUpload}">Remove after upload</CheckBox>
+            <Button Grid.Column="2" Content="Remove Selected" Command="{Binding RemoveSelectedFiles}" />
+            <Button Grid.Column="3" Content="Select All" Command="{Binding SelectAll}" />
+            <Button Grid.Column="3" Content="Upload" Command="{Binding StartUpload}" IsEnabled="{Binding !IsUploading}"
+                    Classes="accent" />
+            <Button Grid.Column="4" Content="Close" Click="OnCloseClick" />
+        </Grid>
     </Grid>
 </Window>

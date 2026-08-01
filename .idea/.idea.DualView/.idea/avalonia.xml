@@ -16,6 +16,7 @@
         <entry key="DualView.GUI/Views/TagManagerWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
         <entry key="DualView.GUI/Views/TextEditWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
         <entry key="DualView.GUI/Views/TextInputWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
+        <entry key="DualView.GUI/Views/UploadWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
       </map>
     </option>
   </component>

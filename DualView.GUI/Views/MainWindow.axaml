@@ -63,11 +63,23 @@
                     VerticalAlignment="Center"
                     Command="{Binding OpenMediaManager}" />
 
-            <Button Grid.Column="8"
+            <Button Grid.Column="6"
                     Content="Settings"
                     Margin="5,0"
                     VerticalAlignment="Center"
                     Command="{Binding OpenSettings}" />
+
+            <Button Grid.Column="7"
+                    Content="Upload"
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Command="{Binding OpenUploadWindow}" />
+
+            <Button Grid.Column="8"
+                    Content="Import"
+                    Margin="5,0"
+                    VerticalAlignment="Center"
+                    Command="{Binding OpenImportWindow}" />
         </Grid>
     </Grid>
 </Window>
