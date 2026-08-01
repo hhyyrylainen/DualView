@@ -4,6 +4,7 @@
     <option name="projectPerEditor">
       <map>
         <entry key="DualView.GUI/App.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
+        <entry key="DualView.GUI/Views/AboutWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
         <entry key="DualView.GUI/Views/AddToFolderWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
         <entry key="DualView.GUI/Views/MainWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />
         <entry key="DualView.GUI/Views/MediaEditorWindow.axaml" value="DualView.Client.Tests/DualView.Client.Tests.csproj" />

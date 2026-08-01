@@ -22,8 +22,10 @@
 
         <ScrollViewer>
             <StackPanel>
-                <TextBlock>DualView 3 is an image viewer and manager that has a web interface and a desktop GUI.</TextBlock>
-                <TextBlock>DualView is licensed under the MIT license</TextBlock>
+                <TextBlock TextWrapping="Wrap">
+                    DualView 3 is an image viewer and manager that has a web interface and a desktop GUI.
+                </TextBlock>
+                <TextBlock TextWrapping="Wrap">DualView is licensed under the MIT license</TextBlock>
             </StackPanel>
         </ScrollViewer>
     </StackPanel>
