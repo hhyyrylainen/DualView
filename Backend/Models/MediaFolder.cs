@@ -3,7 +3,6 @@ using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using Backend.Services;
 using Backend.Utilities;
-using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
 
