@@ -18,7 +18,7 @@
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto, Auto, *, Auto">
+    <Grid RowDefinitions="Auto, Auto, Auto, *, Auto">
         <!-- Main content area -->
 
         <!-- Path display and "UP" button -->
@@ -43,8 +43,15 @@
             <CheckBox Grid.Column="1" Content="Recursive" IsChecked="{Binding IsRecursiveSearch}" />
         </Grid>
 
+        <!-- Collection header -->
+        <Grid Grid.Row="2" ColumnDefinitions="*, Auto" Margin="5 2 5 2" IsVisible="{Binding IsInCollection}">
+            <TextBlock Grid.Column="0" Text="{Binding CurrentCollectionName, StringFormat='Collection: {0}'}" 
+                       VerticalAlignment="Center" FontSize="18" FontWeight="Bold" TextWrapping="Wrap"/>
+            <Button Grid.Column="1" Content="Full View" Command="{Binding OpenFullView}" />
+        </Grid>
+
         <!-- Important to not follow focus as otherwise it just jumps all over the place when items are interacted with and new ones added -->
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+        <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       BringIntoViewOnFocusChange="False">
             <ItemsControl ItemsSource="{Binding MainItems}" Padding="1 5 10 10">
@@ -62,7 +69,7 @@
         </ScrollViewer>
 
         <!-- Bottom bar with status and buttons -->
-        <Grid Grid.Row="3"
+        <Grid Grid.Row="4"
               ColumnDefinitions="Auto, Auto, *, Auto, Auto, Auto, Auto, Auto, Auto"
               Background="#F0F0F0"
               Height="40"
@@ -78,6 +85,15 @@
                        Text="{Binding StatusText}"
                        VerticalAlignment="Center"
                        Margin="10,0,0,0" />
+
+            <!-- Pagination controls -->
+            <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                <Button Content="&lt;" Command="{Binding GoToPreviousPage}" IsEnabled="{Binding CanNavigateBackwards}" />
+                <TextBlock Text="{Binding CurrentPage}" VerticalAlignment="Center" Margin="5,0" />
+                <TextBlock Text="/" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding TotalPages}" VerticalAlignment="Center" Margin="5,0" />
+                <Button Content="&gt;" Command="{Binding GoToNextPage}" IsEnabled="{Binding CanNavigateForwards}" />
+            </StackPanel>
 
             <!-- Spacer -->
             <Grid Grid.Column="2" />

@@ -36,6 +36,10 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private long? currentFolderId;
     private long? currentCollectionId;
     private string searchText = string.Empty;
+    private string? previousPath;
+    private int currentPage = 1;
+    private int totalPages = 1;
+    private int pageSize = 100;
 
     // Default constructor for design-time
     public MainWindowViewModel()
@@ -100,7 +104,13 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     public string SearchText
     {
         get => searchText;
-        set => SetProperty(ref searchText, value);
+        set
+        {
+            if (SetProperty(ref searchText, value))
+            {
+                currentPage = 1;
+            }
+        }
     }
 
     public bool IsRecursiveSearch
@@ -110,14 +120,57 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref field, value))
             {
+                currentPage = 1;
                 _ = RefreshItems();
             }
         }
     }
 
+    public int CurrentPage
+    {
+        get => currentPage;
+        set
+        {
+            if (SetProperty(ref currentPage, value))
+            {
+                OnPropertyChanged(nameof(CanNavigateBackwards));
+                OnPropertyChanged(nameof(CanNavigateForwards));
+                _ = RefreshItems();
+            }
+        }
+    }
+
+    public int TotalPages
+    {
+        get => totalPages;
+        set
+        {
+            if (SetProperty(ref totalPages, value))
+            {
+                OnPropertyChanged(nameof(CanNavigateBackwards));
+                OnPropertyChanged(nameof(CanNavigateForwards));
+            }
+        }
+    }
+
+    public bool CanNavigateBackwards => currentPage > 1;
+    public bool CanNavigateForwards => currentPage < totalPages;
+
+    public string? CurrentCollectionName
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                OnPropertyChanged(nameof(IsInCollection));
+            }
+        }
+    }
+
+    public bool IsInCollection => currentCollectionId != null;
+
     public HamburgerMenuViewModel Hamburger { get; }
-
-
 
     public static void AddDefaultMenuItems(HamburgerMenuViewModel hamburger)
     {
@@ -155,7 +208,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         });
     }
 
-        public async Task Refresh()
+    public async Task Refresh()
     {
         await RefreshItems();
     }
@@ -165,6 +218,16 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         if (currentCollectionId != null)
         {
             currentCollectionId = null;
+            CurrentCollectionName = null;
+
+            if (!string.IsNullOrEmpty(previousPath))
+            {
+                CurrentPath = previousPath;
+                previousPath = null;
+            }
+
+            currentPage = 1;
+            OnPropertyChanged(nameof(CurrentPage));
             _ = RefreshItems();
             return;
         }
@@ -181,6 +244,10 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         {
             CurrentPath = currentPath.Substring(0, lastSlash);
         }
+
+        currentPage = 1;
+        OnPropertyChanged(nameof(CurrentPage));
+        _ = RefreshItems();
     }
 
     public async void NavigateToFolder(long id)
@@ -193,7 +260,15 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             var path = await databaseService.GetMediaFolderPath(id);
             currentFolderId = id;
             currentCollectionId = null;
+            CurrentCollectionName = null;
             CurrentPath = path;
+
+            // Directly set value to not cause another refresh
+            currentPage = 1;
+            OnPropertyChanged(nameof(CurrentPage));
+
+            // As we done just one guaranteed refresh here
+            _ = RefreshItems();
         }
         catch (Exception e)
         {
@@ -202,10 +277,38 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public void OpenCollection(long id)
+    public void OpenCollection(long id, string name)
     {
+        previousPath = currentPath;
         currentCollectionId = id;
+        CurrentCollectionName = name;
+        currentPage = 1;
+        OnPropertyChanged(nameof(CurrentPage));
         _ = RefreshItems();
+    }
+
+    public void GoToNextPage()
+    {
+        if (currentPage < totalPages)
+        {
+            CurrentPage = currentPage + 1;
+        }
+    }
+
+    public void GoToPreviousPage()
+    {
+        if (currentPage > 1)
+        {
+            CurrentPage = currentPage - 1;
+        }
+    }
+
+    public void OpenFullView()
+    {
+        if (currentCollectionId == null)
+            return;
+
+        windowService?.ShowSingletonWindow<MediaCollectionWindowViewModel>();
     }
 
     public async Task RefreshItems()
@@ -231,10 +334,14 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             }
 
             List<MediaViewerViewModel> newItems = new();
+            int totalItemsCount;
 
             if (currentCollectionId != null)
             {
-                var contents = await databaseService.GetCollectionContents(currentCollectionId.Value);
+                var (contents, totalItems) = await databaseService.GetCollectionContents(currentCollectionId.Value,
+                    currentPage - 1, pageSize, FolderSortColumn.Name, SortDirection.Ascending);
+
+                totalItemsCount = totalItems;
 
                 IEnumerable<MediaFileDTO> filteredItems = contents;
                 if (!string.IsNullOrWhiteSpace(searchText))
@@ -257,8 +364,10 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                var (content, _) = await databaseService.GetMediaFolderContents(currentFolderId!.Value, 0, 1000,
-                    FolderSortColumn.Name, SortDirection.Ascending, searchText);
+                var (content, totalItems) = await databaseService.GetMediaFolderContents(currentFolderId!.Value,
+                    currentPage - 1, pageSize, FolderSortColumn.Name, SortDirection.Ascending, searchText);
+
+                totalItemsCount = totalItems;
 
                 // Server sorts items already
                 foreach (var item in content)
@@ -276,6 +385,8 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                TotalPages = Math.Max(1, (int)Math.Ceiling((double)totalItemsCount / pageSize));
+
                 // TODO: make a smarter refresh
                 foreach (var item in MainItems)
                 {
@@ -454,7 +565,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 }
                 else if (serverSource.Info.IsCollection)
                 {
-                    viewModel.OpenCollection(serverSource.ServerId);
+                    viewModel.OpenCollection(serverSource.ServerId, serverSource.Info.Name);
                 }
                 else
                 {
