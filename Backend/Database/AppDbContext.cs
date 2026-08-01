@@ -215,6 +215,7 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<UploadSectionItem>(builder =>
         {
+            builder.HasQueryFilter(usi => !usi.MediaFile.IsDeleted);
             builder.HasKey(ci => new { ci.UploadSectionId, ci.MediaFileId });
 
             builder.HasOne(ci => ci.UploadSection)
