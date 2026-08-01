@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="150"
+        x:Class="DualView.GUI.Views.RenameWindow"
+        x:DataType="vm:RenameWindowViewModel"
+        Title="Rename Item"
+        Width="400" Height="150" WindowStartupLocation="CenterOwner">
+
+    <Design.DataContext>
+        <vm:RenameWindowViewModel />
+    </Design.DataContext>
+
+    <StackPanel Margin="10" Spacing="10">
+        <TextBox Text="{Binding NewName}" PlaceholderText="Enter new name..." />
+        
+        <TextBlock Text="{Binding ErrorMessage}" Foreground="Red" IsVisible="{Binding !IsValid}" TextWrapping="Wrap" />
+
+        <Button Content="Apply" Command="{Binding Apply}" IsEnabled="{Binding IsValid}" 
+                HorizontalAlignment="Right" Classes="accent" />
+    </StackPanel>
+</Window>
