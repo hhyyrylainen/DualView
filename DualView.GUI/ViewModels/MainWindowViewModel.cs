@@ -56,6 +56,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         // backgroundJobs.Schedule(RefreshBackendStatusString, TimeSpan.FromSeconds(1));
 
         // RefreshItems();
+        RefreshBackendStatusString();
     }
 
     public string StatusText
@@ -63,7 +64,6 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         get;
         set => SetProperty(ref field, value);
     } = "Contacting backend...";
-
 
     public HamburgerMenuViewModel Hamburger { get; }
 
@@ -162,9 +162,22 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         Hamburger.Dispose();
     }
 
+    private void RefreshBackendStatusString()
+    {
+        if (signalRService != null)
+        {
+            StatusText = GetBackendStatus(signalRService.IsConnected);
+        }
+    }
+
+    private string GetBackendStatus(bool connected)
+    {
+        return connected ? "Connected to backend" : "Disconnected from backend";
+    }
+
     private void OnBackendConnectionChanged(bool connected)
     {
-        Dispatcher.UIThread.Post(() => StatusText = connected ? "Connected to backend" : "Disconnected from backend");
+        Dispatcher.UIThread.Post(() => StatusText = GetBackendStatus(connected));
     }
 
     private void InitializeMenu()
@@ -178,7 +191,6 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         // TODO: implement duplicate finding window (planned for later)
         /*Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Find Duplicates", Command = new RelayCommand(OpenDuplicateFinder) });*/
-
 
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Settings", Command = new RelayCommand(OpenSettings) });
