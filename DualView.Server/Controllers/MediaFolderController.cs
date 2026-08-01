@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Backend.Models;
 using DualView.Shared.Models.DTO;
+using DualView.Shared.Models.Enums;
 using DualView.Shared.Requests;
 using Backend.Services;
 using Backend.Utilities;
@@ -148,5 +149,14 @@ public class MediaFolderController : Controller
     public async Task<ActionResult<string>> GetPath([Required] long id)
     {
         return await databaseService.GetMediaFolderPath(id);
+    }
+
+    [HttpGet("{folderId:long}/contents")]
+    public async Task<ActionResult<Tuple<List<ConfiguredMediaInfo>, int>>> GetMediaFolderContents([Required] long folderId,
+        [Required] int page, int pageSize = 100, FolderSortColumn sortColumn = FolderSortColumn.Name,
+        SortDirection sortDirection = SortDirection.Ascending, string? searchText = null)
+    {
+        return await databaseService.GetMediaFolderContents(folderId, page, pageSize, sortColumn, sortDirection,
+            searchText);
     }
 }

@@ -1,5 +1,6 @@
 using DualView.Shared.Services;
 using DualView.Shared.Models.DTO;
+using DualView.Shared.Models.Enums;
 using Backend.Models;
 
 namespace Backend.Services;
@@ -57,6 +58,9 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<Collection>> GetDeletedCollectionsAsync(int limit);
     public Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId);
     public Task<string> GetMediaFolderPath(long folderId);
+
+    public Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage, int pageSize,
+        FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null);
 
     /// <summary>
     ///   Creates a new media file and adds it to a collection

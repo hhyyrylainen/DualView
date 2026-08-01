@@ -34,12 +34,11 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<MediaConfigFolderInfo> GetConfiguredMediaFoldersAsync(long mediaConfigId);
     public Task<List<ConfiguredMediaDTO>> GetConfiguredMediaSiblingsAsync(long mediaConfigId);
     public Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage, int pageSize,
-        FolderSortColumn sortColumn, SortDirection sortDirection);
+        FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null);
     public Task AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder = false);
     public Task RemoveMediaFromFolder(long mediaConfigurationId, string folderPath);
     public Task<ConfiguredMediaDTO> CreateConfiguredMediaAsync(long mediaId, string configName, List<string> folders);
     public Task SaveConfiguredMediaAsync(ConfiguredMediaDTO media);
-    public Task<ConfiguredMediaDTO?> GetPrimeConfiguredMediaFromFileAsync(long mediaFileId);
     
     // Tags
     public Task<List<TagDTO>> GetAllTagsAsync();

@@ -1,10 +1,16 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
+using DualView.GUI.Models;
 using DualView.GUI.Services;
+using DualView.Shared.Models.DTO;
+using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,12 +30,26 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ISignalRService? signalRService;
     private readonly IBackendAPI? backendAPI;
     private readonly IServiceProvider? serviceProvider;
+    private readonly MainWindowMediaActions? mediaActions;
+
+    private string currentPath = "/";
+    private long? currentFolderId;
+    private long? currentCollectionId;
+    private string searchText = string.Empty;
 
     // Default constructor for design-time
     public MainWindowViewModel()
     {
         Hamburger = new HamburgerMenuViewModel();
         InitializeMenu();
+
+        // Add a test item to view in the designer
+        MainItems.Add(new MediaViewerViewModel
+        {
+            AllowSelection = false,
+            ShowingThumbnail = true,
+            Name = "Test item!",
+        });
     }
 
     [ActivatorUtilitiesConstructor]
@@ -46,6 +66,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         this.backendAPI = backendAPI;
         this.serviceProvider = serviceProvider;
 
+        mediaActions = new MainWindowMediaActions(this, windowService);
         Hamburger = new HamburgerMenuViewModel(backendStatusService);
 
         InitializeMenu();
@@ -55,9 +76,14 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         backendStatusService.OnStatusChanged += OnBackendConnectionChanged;
         // backgroundJobs.Schedule(RefreshBackendStatusString, TimeSpan.FromSeconds(1));
 
-        // RefreshItems();
+        signalRService.OnMediaFoldersUpdated += OnMediaFoldersUpdated;
+        signalRService.OnMediaFolderContentsUpdated += OnMediaFolderContentsUpdated;
+
+        _ = RefreshItems();
         RefreshBackendStatusString();
     }
+
+    public ObservableCollection<MediaViewerViewModel> MainItems { get; } = new();
 
     public string StatusText
     {
@@ -65,10 +91,33 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     } = "Contacting backend...";
 
+    public string CurrentPath
+    {
+        get => currentPath;
+        set => SetProperty(ref currentPath, value);
+    }
+
+    public string SearchText
+    {
+        get => searchText;
+        set => SetProperty(ref searchText, value);
+    }
+
+    public bool IsRecursiveSearch
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                _ = RefreshItems();
+            }
+        }
+    }
+
     public HamburgerMenuViewModel Hamburger { get; }
 
-    // TODO: items view as a flow container
-    public ObservableCollection<MediaViewerViewModel> MainItems { get; } = new();
+
 
     public static void AddDefaultMenuItems(HamburgerMenuViewModel hamburger)
     {
@@ -104,6 +153,150 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 (app?.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown();
             })
         });
+    }
+
+        public async Task Refresh()
+    {
+        await RefreshItems();
+    }
+
+    public void NavigateUp()
+    {
+        if (currentCollectionId != null)
+        {
+            currentCollectionId = null;
+            _ = RefreshItems();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(currentPath) || currentPath == "/")
+            return;
+
+        var lastSlash = currentPath.LastIndexOf('/');
+        if (lastSlash <= 0)
+        {
+            CurrentPath = "/";
+        }
+        else
+        {
+            CurrentPath = currentPath.Substring(0, lastSlash);
+        }
+    }
+
+    public async void NavigateToFolder(long id)
+    {
+        if (databaseService == null)
+            return;
+
+        try
+        {
+            var path = await databaseService.GetMediaFolderPath(id);
+            currentFolderId = id;
+            currentCollectionId = null;
+            CurrentPath = path;
+        }
+        catch (Exception e)
+        {
+            logger?.LogError(e, "Failed to navigate to folder {Id}", id);
+            windowService?.ShowErrorWindow("Failed to navigate to folder", e);
+        }
+    }
+
+    public void OpenCollection(long id)
+    {
+        currentCollectionId = id;
+        _ = RefreshItems();
+    }
+
+    public async Task RefreshItems()
+    {
+        if (databaseService == null || logger == null || windowService == null)
+            return;
+
+        try
+        {
+            if (currentCollectionId == null)
+            {
+                var folder = await databaseService.GetMediaFolderFromPathAsync(currentPath);
+                if (folder != null)
+                {
+                    currentFolderId = folder.Id;
+                }
+                else
+                {
+                    // If path is invalid, fall back to root
+                    currentFolderId = MediaFolderInfo.RootFolderId;
+                    CurrentPath = "/";
+                }
+            }
+
+            List<MediaViewerViewModel> newItems = new();
+
+            if (currentCollectionId != null)
+            {
+                var contents = await databaseService.GetCollectionContents(currentCollectionId.Value);
+
+                IEnumerable<MediaFileDTO> filteredItems = contents;
+                if (!string.IsNullOrWhiteSpace(searchText))
+                {
+                    filteredItems = contents.Where(i =>
+                        (i.OriginalFileName ?? "").Contains(searchText, StringComparison.OrdinalIgnoreCase));
+                }
+
+                foreach (var item in filteredItems)
+                {
+                    newItems.Add(new MediaViewerViewModel(logger, windowService)
+                    {
+                        Name = item.OriginalFileName,
+                        MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(item), serviceProvider!),
+                        MediaOpenResources = new ShowMediaInSeparateWindow(windowService),
+                        ShowingThumbnail = true,
+                        AllowSelection = false,
+                    });
+                }
+            }
+            else
+            {
+                var (content, _) = await databaseService.GetMediaFolderContents(currentFolderId!.Value, 0, 1000,
+                    FolderSortColumn.Name, SortDirection.Ascending, searchText);
+
+                // Sort: folders first, then collections
+                var sortedContent = content.OrderByDescending(i => i.IsFolder)
+                    .ThenByDescending(i => i.IsCollection)
+                    .ThenBy(i => i.Name);
+
+                foreach (var item in sortedContent)
+                {
+                    newItems.Add(new MediaViewerViewModel(logger, windowService)
+                    {
+                        Name = item.Name,
+                        MediaToShow = new ServerMediaSource(item, serviceProvider!),
+                        MediaOpenResources = mediaActions,
+                        ShowingThumbnail = true,
+                        AllowSelection = false,
+                    });
+                }
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                // TODO: make a smarter refresh
+                foreach (var item in MainItems)
+                {
+                    item.Dispose();
+                }
+
+                MainItems.Clear();
+                foreach (var item in newItems)
+                {
+                    MainItems.Add(item);
+                }
+            });
+        }
+        catch (Exception e)
+        {
+            logger?.LogError(e, "Failed to refresh items");
+        }
     }
 
     public void OpenMediaManager()
@@ -148,6 +341,12 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             backendStatusService.OnStatusChanged -= OnBackendConnectionChanged;
         }
 
+        if (signalRService != null)
+        {
+            signalRService.OnMediaFoldersUpdated -= OnMediaFoldersUpdated;
+            signalRService.OnMediaFolderContentsUpdated -= OnMediaFolderContentsUpdated;
+        }
+
         if (backgroundJobs != null)
         {
             // backgroundJobs.CancelJob(RefreshBackendStatusString);
@@ -185,6 +384,20 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         Dispatcher.UIThread.Post(() => StatusText = GetBackendStatus(connected));
     }
 
+    private void OnMediaFoldersUpdated()
+    {
+        // TODO: make this only refresh when the folder is in the current folder
+        _ = RefreshItems();
+    }
+
+    private void OnMediaFolderContentsUpdated(long folderId)
+    {
+        if (folderId == currentFolderId)
+        {
+            _ = RefreshItems();
+        }
+    }
+
     private void InitializeMenu()
     {
         AddDefaultMenuItems(Hamburger);
@@ -207,5 +420,76 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             { Title = "Restore Deleted", Command = new RelayCommand(OpenRestoreDeleted) });
 
         AddTrailingMenuItems(Hamburger, windowService);
+    }
+
+    private class MainWindowMediaActions : IMediaAssociatedWindows
+    {
+        private readonly MainWindowViewModel viewModel;
+        private readonly IWindowService windowService;
+
+        public MainWindowMediaActions(MainWindowViewModel viewModel, IWindowService windowService)
+        {
+            this.viewModel = viewModel;
+            this.windowService = windowService;
+        }
+
+        public IMediaAssociatedWindows.DoubleClickAction DefaultDoubleClickAction =>
+            IMediaAssociatedWindows.DoubleClickAction.OpenView;
+
+        public bool HasViewAction => true;
+        public bool HasThumbnailAction => false;
+        public bool HasEditAction => true;
+        public bool HasMoveToFolderAction => false;
+        public bool HasAddToFolderAction => false;
+        public bool HasManageFoldersAction { get; private set; }
+
+        public void RefreshAvailableOptions(IVisualMediaSource? mediaSource)
+        {
+            HasManageFoldersAction = mediaSource is ServerMediaSource;
+        }
+
+        public void ShowView(IVisualMediaSource? mediaSource)
+        {
+            if (mediaSource is ServerMediaSource serverSource)
+            {
+                if (serverSource.Info.IsFolder)
+                {
+                    viewModel.NavigateToFolder(serverSource.ServerId);
+                }
+                else if (serverSource.Info.IsCollection)
+                {
+                    viewModel.OpenCollection(serverSource.ServerId);
+                }
+                else
+                {
+                    // For normal media, we want to open it in a viewer
+                    windowService.ShowMediaViewer(mediaSource.Clone());
+                }
+            }
+        }
+
+        public void ShowThumbnail(IVisualMediaSource mediaSource)
+        {
+            windowService.ShowMediaViewer(mediaSource.Clone());
+        }
+
+        public void StartEditAction(IVisualMediaSource mediaSource)
+        {
+            if (mediaSource is ServerMediaSource serverMediaSource)
+            {
+                windowService.ShowMediaEditSetup(serverMediaSource.ServerId);
+            }
+        }
+
+        public void StartMoveAction(IVisualMediaSource mediaSource) => throw new NotSupportedException();
+        public void StartAddToFolderAction(IVisualMediaSource mediaSource) => throw new NotSupportedException();
+
+        public void StartManageFoldersAction(IVisualMediaSource mediaSource)
+        {
+            if (mediaSource is ServerMediaSource serverMediaSource)
+            {
+                windowService.ShowEditMediaFolders(serverMediaSource.ServerId);
+            }
+        }
     }
 }

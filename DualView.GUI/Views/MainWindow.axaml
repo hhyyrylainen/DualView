@@ -15,28 +15,54 @@
     <Design.DataContext>
         <!-- This only sets the DataContext for the previewer in an IDE,
              to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainWindowViewModel/>
+        <vm:MainWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="*, Auto">
+    <Grid RowDefinitions="Auto, Auto, *, Auto">
         <!-- Main content area -->
+
+        <!-- Path display and "UP" button -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto, *" Margin="5 5 5 0">
+            <TextBlock Grid.Column="0" VerticalAlignment="Center">Path:</TextBlock>
+            <Button Grid.Column="1" Content="UP" Command="{Binding NavigateUp}" Margin="0 0 5 0" />
+            <TextBox Grid.Column="2" Text="{Binding CurrentPath}" VerticalAlignment="Center">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding Refresh}" />
+                </TextBox.KeyBindings>
+            </TextBox>
+        </Grid>
+
+        <!-- Search box and recursive search -->
+        <Grid Grid.Row="1" ColumnDefinitions="*, Auto" Margin="5 2 5 2">
+            <!-- TODO: make this update search also on typing (but with rate limiting / debouncing) -->
+            <TextBox Grid.Column="0" Text="{Binding SearchText}" PlaceholderText="Search..." Margin="0 0 5 0">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding Refresh}" />
+                </TextBox.KeyBindings>
+            </TextBox>
+            <CheckBox Grid.Column="1" Content="Recursive" IsChecked="{Binding IsRecursiveSearch}" />
+        </Grid>
+
         <!-- Important to not follow focus as otherwise it just jumps all over the place when items are interacted with and new ones added -->
-        <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled"
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       BringIntoViewOnFocusChange="False">
-            <!-- TODO: main flow container view
-            <ItemsControl ItemsSource="{Binding MainTasks}" Padding="1 5 10 10">
+            <ItemsControl ItemsSource="{Binding MainItems}" Padding="1 5 10 10">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <controls:JobGroupViewer Margin="0 5" />
+                        <controls:MediaViewer Margin="5" Width="128" Height="196" />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
-            -->
         </ScrollViewer>
 
         <!-- Bottom bar with status and buttons -->
-        <Grid Grid.Row="1"
+        <Grid Grid.Row="3"
               ColumnDefinitions="Auto, Auto, *, Auto, Auto, Auto, Auto, Auto, Auto"
               Background="#F0F0F0"
               Height="40"

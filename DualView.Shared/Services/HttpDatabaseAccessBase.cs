@@ -320,10 +320,18 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     }
 
     public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
-        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection)
+        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null)
     {
-        // This is tricky, maybe just return empty or error
-        return new Tuple<List<ConfiguredMediaInfo>, int>(new List<ConfiguredMediaInfo>(), 0);
+        var url = $"api/v1/mediaFolder/{folderId}/contents?page={itemPage}&pageSize={pageSize}&sortColumn={sortColumn}&" +
+                  $"sortDirection={sortDirection}";
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            url += $"&searchText={Uri.EscapeDataString(searchText)}";
+        }
+
+        return await HttpClient.GetFromJsonAsync<Tuple<List<ConfiguredMediaInfo>, int>>(url) ??
+               throw new Exception("Failed to get folder contents");
     }
 
     public Task AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder = false)

@@ -1586,27 +1586,34 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return siblings.Select(s => new ConfiguredMediaDTO(s.GetDTO())).ToList();
     }
 
-    async Task<Tuple<List<ConfiguredMediaInfo>, int>> IClientDatabaseService.GetMediaFolderContents(long folderId,
-        int itemPage, int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection)
+    public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
+        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null)
     {
         // Fetch subfolders and collections
-        var subfolders = await dbContext.MediaFolders
-            .Where(f => f.Parents.Any(p => p.Id == folderId) && !f.IsDeleted)
-            .OrderBy(f => f.Name)
-            .ToListAsync();
+        var subfolderQuery = dbContext.MediaFolders
+            .Where(f => f.Parents.Any(p => p.Id == folderId) && !f.IsDeleted);
 
-        var collections = await dbContext.Collections
-            .Where(c => c.Folders.Any(f => f.Id == folderId) && !c.IsDeleted)
-            .OrderBy(c => c.Name)
-            .ToListAsync();
+        var collectionQuery = dbContext.Collections
+            .Where(c => c.Folders.Any(f => f.Id == folderId) && !c.IsDeleted);
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            searchText = searchText.ToLowerInvariant();
+            subfolderQuery = subfolderQuery.Where(f => f.NameLowerCase.Contains(searchText));
+            collectionQuery = collectionQuery.Where(c => c.NameLowerCase.Contains(searchText));
+        }
+
+        // Use lower name to make case-independent sorting
+        var subfolders = await subfolderQuery.OrderBy(f => f.NameLowerCase).ToListAsync();
+        var collections = await collectionQuery.OrderBy(c => c.NameLowerCase).ToListAsync();
 
         var allItems = new List<ConfiguredMediaInfo>();
 
         foreach (var folder in subfolders)
         {
-            allItems.Add(new ConfiguredMediaInfo(folder.Name, folder.Id, true, 0, MediaType.Png, 512, 512, false)
+            allItems.Add(new ConfiguredMediaInfo(folder.Name, folder.Id, 0, MediaType.Png, 512, 512)
             {
-                IsFolder = true
+                IsFolder = true,
             });
         }
 
@@ -1614,14 +1621,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         {
             // For collections, we might want to find a primary media file for preview
             // For now, just use dummy
-            allItems.Add(new ConfiguredMediaInfo(collection.Name, collection.Id, true, 0, MediaType.Png, 512, 512,
-                false)
+            // TODO: implement preview images for collections: pick either the first one or add a new property for selecting thumbnail manually which is used if set
+            allItems.Add(new ConfiguredMediaInfo(collection.Name, collection.Id, 0, MediaType.Png, 512, 512)
             {
-                IsCollection = true
+                IsCollection = true,
             });
         }
 
-        // TODO: handle paging properly for combined results
+        // TODO: handle paging properly for combined results (it seems correct? going further pages goes past the folders)
         int totalItems = allItems.Count;
         var pagedItems = allItems.Skip(itemPage * pageSize).Take(pageSize).ToList();
 
@@ -1647,12 +1654,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     Task IClientDatabaseService.SaveConfiguredMediaAsync(ConfiguredMediaDTO media)
     {
         return ((IClientDatabaseService)this).SaveMediaFileAsync(media);
-    }
-
-    async Task<ConfiguredMediaDTO?> IClientDatabaseService.GetPrimeConfiguredMediaFromFileAsync(long mediaFileId)
-    {
-        var media = await GetMediaByIdAsync(mediaFileId);
-        return media != null ? new ConfiguredMediaDTO(media.GetDTO()) : null;
     }
 
     // Server-side prerendering compatibility with IClientDatabaseService
