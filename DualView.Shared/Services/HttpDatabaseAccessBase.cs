@@ -96,6 +96,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                throw new Exception("Failed to get media");
     }
 
+    public async Task<List<MediaFileDTO>> GetCollectionContents(long collectionId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<MediaFileDTO>>($"api/v1/collection/{collectionId}/allContents") ??
+               new List<MediaFileDTO>();
+    }
+
     public async Task<MediaFileDTO?> GetMediaFileAsync(long mediaId)
     {
         return await HttpClient.GetFromJsonAsync<MediaFileDTO?>($"api/v1/media/{mediaId}");
@@ -221,6 +227,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         var response = await HttpClient.PostAsync(
             $"api/v1/collection/{collectionId}/removeMedia?mediaId={mediaId}",
             null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task ReorderCollection(long collectionId, List<long> newImageOrderIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/reorder", newImageOrderIds);
         response.EnsureSuccessStatusCode();
     }
 

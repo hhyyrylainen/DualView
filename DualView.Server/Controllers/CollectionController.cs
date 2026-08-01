@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models.DTO;
+using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using Backend.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -69,5 +70,42 @@ public class CollectionController : Controller
     public async Task<ActionResult<List<FolderPathDTO>>> GetFolderPaths([Required] long id)
     {
         return await ((IClientDatabaseService)databaseService).GetCollectionFolderPaths(id);
+    }
+
+    [HttpGet("{id:long}/contents")]
+    public async Task<ActionResult<Tuple<List<MediaFileDTO>, int>>> GetCollectionContents([Required] long id,
+        [Required] int page, int pageSize = 100, FolderSortColumn sortColumn = FolderSortColumn.DateCreated,
+        SortDirection sortDirection = SortDirection.Descending)
+    {
+        return await databaseService.GetCollectionContents(id, page, pageSize, sortColumn, sortDirection);
+    }
+
+    [HttpGet("{id:long}/allContents")]
+    public async Task<ActionResult<List<MediaFileDTO>>> GetAllCollectionContents([Required] long id)
+    {
+        return await ((IClientDatabaseService)databaseService).GetCollectionContents(id);
+    }
+
+    [HttpPost("{id:long}/reorder")]
+    public async Task<IActionResult> Reorder([Required] long id, [FromBody] List<long> newImageOrderIds)
+    {
+        await databaseService.ReorderCollection(id, newImageOrderIds);
+        return Ok();
+    }
+
+    [HttpPost("{id:long}/addMedia")]
+    public async Task<IActionResult> AddMediaToCollection([Required] long id,
+        [Required] long mediaId, [Required] int sequenceNumber)
+    {
+        await databaseService.AddMediaToCollection(mediaId, id, sequenceNumber);
+        return Ok();
+    }
+
+    [HttpPost("{id:long}/removeMedia")]
+    public async Task<IActionResult> RemoveMediaFromCollection([Required] long id,
+        [Required] long mediaId)
+    {
+        await databaseService.RemoveMediaFromCollection(mediaId, id);
+        return Ok();
     }
 }

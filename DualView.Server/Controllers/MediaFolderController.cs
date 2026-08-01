@@ -37,14 +37,6 @@ public class MediaFolderController : Controller
         return await databaseService.GetFolderCollections(folderId, page, pageSize);
     }
 
-    [HttpGet("collection/{collectionId:long}/contents")]
-    public async Task<ActionResult<Tuple<List<MediaFileDTO>, int>>> GetCollectionContents([Required] long collectionId,
-        [Required] int page, int pageSize = 100, FolderSortColumn sortColumn = FolderSortColumn.DateCreated,
-        SortDirection sortDirection = SortDirection.Descending)
-    {
-        return await databaseService.GetCollectionContents(collectionId, page, pageSize, sortColumn, sortDirection);
-    }
-
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] [Required] CreateFolderRequest request)
     {
@@ -158,21 +150,5 @@ public class MediaFolderController : Controller
     public async Task<ActionResult<string>> GetPath([Required] long id)
     {
         return await ((IClientDatabaseService)databaseService).GetMediaFolderPath(id);
-    }
-
-    [HttpPost("collection/{collectionId:long}/addMedia")]
-    public async Task<IActionResult> AddMediaToCollection([Required] long collectionId,
-        [Required] long mediaId, [Required] int sequenceNumber)
-    {
-        await databaseService.AddMediaToCollection(mediaId, collectionId, sequenceNumber);
-        return Ok();
-    }
-
-    [HttpPost("collection/{collectionId:long}/removeMedia")]
-    public async Task<IActionResult> RemoveMediaFromCollection([Required] long collectionId,
-        [Required] long mediaId)
-    {
-        await databaseService.RemoveMediaFromCollection(mediaId, collectionId);
-        return Ok();
     }
 }

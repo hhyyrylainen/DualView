@@ -246,6 +246,39 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
     }
 
+    public async Task ReorderCollection(long collectionId, List<long> newImageOrderIds)
+    {
+        var collection = await dbContext.Collections
+            .Include(c => c.Items)
+            .FirstOrDefaultAsync(c => c.Id == collectionId);
+
+        if (collection == null)
+            throw new ArgumentException("Collection not found");
+
+        var itemsByMediaId = collection.Items.ToDictionary(ci => ci.MediaFileId);
+        int nextSequence = 0;
+
+        // Assign sequence numbers to items in the new order
+        foreach (var mediaId in newImageOrderIds)
+        {
+            if (itemsByMediaId.Remove(mediaId, out var item))
+            {
+                item.SequenceNumber = nextSequence++;
+            }
+        }
+
+        // Assign sequence numbers to items NOT in the new order (move to end)
+        // Sort remaining by old sequence number to preserve relative order
+        foreach (var item in itemsByMediaId.Values.OrderBy(ci => ci.SequenceNumber))
+        {
+            item.SequenceNumber = nextSequence++;
+        }
+
+        collection.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync();
+        await updateNotifier.NotifyCollectionUpdated(collectionId);
+    }
+
     public async Task RemoveMediaFromCollection(long mediaId, long collectionId)
     {
         var item = await dbContext.Set<CollectionItem>().FirstOrDefaultAsync(ci =>
@@ -614,6 +647,15 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
 
         return new Tuple<List<MediaFileDTO>, int>(items, total);
+    }
+
+    public async Task<List<MediaFileDTO>> GetCollectionContents(long collectionId)
+    {
+        return await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId)
+            .OrderBy(ci => ci.SequenceNumber)
+            .Select(ci => ci.MediaFile.GetDTO())
+            .ToListAsync();
     }
 
     public async Task<List<Collection>> GetCollectionsInFolderAsync(long folderId)

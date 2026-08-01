@@ -28,6 +28,7 @@ public interface IDatabaseCommonService
 
     public Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber);
     public Task RemoveMediaFromCollection(long mediaId, long collectionId);
+    public Task ReorderCollection(long collectionId, List<long> newImageOrderIds);
 
     public Task<List<long>> GetMediaCollectionsAsync(long mediaId);
 
