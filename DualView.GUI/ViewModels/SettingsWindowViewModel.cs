@@ -67,24 +67,6 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     } = true;
 
-    public bool TabIsTasks
-    {
-        get;
-        set => SetProperty(ref field, value);
-    }
-
-    public bool TabIsInput
-    {
-        get;
-        set => SetProperty(ref field, value);
-    }
-
-    public bool TabIsOutput
-    {
-        get;
-        set => SetProperty(ref field, value);
-    }
-
     public bool TabIsMisc
     {
         get;
@@ -196,36 +178,6 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
     public void SelectGeneral()
     {
         TabIsGeneral = true;
-        TabIsTasks = false;
-        TabIsInput = false;
-        TabIsOutput = false;
-        TabIsMisc = false;
-    }
-
-    public void SelectTasks()
-    {
-        TabIsTasks = true;
-        TabIsGeneral = false;
-        TabIsInput = false;
-        TabIsOutput = false;
-        TabIsMisc = false;
-    }
-
-    public void SelectInput()
-    {
-        TabIsInput = true;
-        TabIsGeneral = false;
-        TabIsTasks = false;
-        TabIsOutput = false;
-        TabIsMisc = false;
-    }
-
-    public void SelectOutput()
-    {
-        TabIsOutput = true;
-        TabIsGeneral = false;
-        TabIsTasks = false;
-        TabIsInput = false;
         TabIsMisc = false;
     }
 
@@ -233,9 +185,6 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
     {
         TabIsMisc = true;
         TabIsGeneral = false;
-        TabIsTasks = false;
-        TabIsInput = false;
-        TabIsOutput = false;
     }
 
     public void OpenSidePanel()
@@ -316,7 +265,6 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(AudioBufferingMs));
         OnPropertyChanged(nameof(AudioBufferingMsText));
     }
-
 
     public void Dispose()
     {

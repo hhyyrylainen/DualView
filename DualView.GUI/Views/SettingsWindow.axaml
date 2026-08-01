@@ -37,21 +37,6 @@
                             <Label HorizontalAlignment="Center">General</Label>
                         </ToggleButton>
                         <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
-                                      IsChecked="{Binding TabIsTasks}"
-                                      Command="{Binding SelectTasks}">
-                            <Label HorizontalAlignment="Center">Tasks</Label>
-                        </ToggleButton>
-                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
-                                      IsChecked="{Binding TabIsInput}"
-                                      Command="{Binding SelectInput}">
-                            <Label HorizontalAlignment="Center">Input</Label>
-                        </ToggleButton>
-                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
-                                      IsChecked="{Binding TabIsOutput}"
-                                      Command="{Binding SelectOutput}">
-                            <Label HorizontalAlignment="Center">Output</Label>
-                        </ToggleButton>
-                        <ToggleButton HorizontalAlignment="Stretch" Margin="0 2"
                                       IsChecked="{Binding TabIsMisc}"
                                       Command="{Binding SelectMisc}">
                             <Label HorizontalAlignment="Center">Misc.</Label>
@@ -74,37 +59,24 @@
             <Grid ColumnDefinitions="*" RowDefinitions="Auto,*,Auto" Grid.Column="2">
                 <ScrollViewer IsVisible="{Binding TabIsGeneral}" Grid.Row="1">
                     <StackPanel Margin="0 0 4 0">
+                        <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto"
+                              RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                            <Label Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="3">Media storage folder:</Label>
+                            <TextBox Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="3"
+                                     ToolTip.Tip="A custom location where media (images etc.) are stored"
+                                     Text="{Binding LocalMediaStorageLocation}"
+                                     PlaceholderText="Custom media folder" />
 
+                            <Button Grid.Column="0" Grid.Row="3" Margin="5" Name="MediaInputPick">Pick a folder</Button>
+                            <Border  Grid.Column="0" Grid.Row="4" MinHeight="5"></Border>
+                            <TextBlock Grid.Column="0" Grid.Row="5" Grid.ColumnSpan="3" TextWrapping="Wrap">
+                                Note: the folder path will be used on the server, so if the server is on a different
+                                computer this file picker will not show the right folders to pick.
+                            </TextBlock>
+
+                        </Grid>
                         <Border MinHeight="5"></Border>
                     </StackPanel>
-                </ScrollViewer>
-                <ScrollViewer IsVisible="{Binding TabIsTasks}" Grid.Row="1">
-                    <StackPanel Margin="0 0 4 0">
-
-                    </StackPanel>
-                </ScrollViewer>
-                <ScrollViewer IsVisible="{Binding TabIsInput}" Grid.Row="1">
-                    <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto"
-                          RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-                        <TextBlock Text="Input Folder" Grid.ColumnSpan="3"
-                                   FontSize="20"
-                                   HorizontalAlignment="Center" />
-
-                        <Label Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="3">Media storage folder:</Label>
-                        <TextBox Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="3"
-                                 ToolTip.Tip="A custom location where media (images etc.) are stored (including prompt images and generated ones)"
-                                 Text="{Binding LocalMediaStorageLocation}"
-                                 PlaceholderText="Custom media folder" />
-
-                        <Button Grid.Column="0" Grid.Row="3" Margin="5" Name="MediaInputPick">Pick a folder</Button>
-                    </Grid>
-                </ScrollViewer>
-                <ScrollViewer IsVisible="{Binding TabIsOutput}" Grid.Row="1">
-                    <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto" RowDefinitions="Auto,Auto,Auto,Auto">
-                        <TextBlock Text="Output Folder" Grid.ColumnSpan="3"
-                                   FontSize="20"
-                                   HorizontalAlignment="Center" />
-                    </Grid>
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding TabIsMisc}" Grid.Row="1">
                     <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto"
@@ -123,7 +95,7 @@
                         <Label Grid.Column="0" Grid.Row="3" VerticalAlignment="Center">AIRunManager Access Key:</Label>
                         <TextBox Grid.Column="1" Grid.Row="3" Grid.ColumnSpan="2"
                                  Text="{Binding AIRunManagerAccessKey}"
-                                 PlaceholderText="Enter Civitai API key" PasswordChar="*"
+                                 PlaceholderText="Enter AIRunManager API key" PasswordChar="*"
                                  RevealPassword="{Binding ShowRunManagerKey}" />
 
                         <CheckBox Grid.Column="1" Grid.Row="4" IsChecked="{Binding ShowRunManagerKey}">
@@ -153,8 +125,6 @@
                     <Button Command="{Binding ReloadSettings}">Cancel</Button>
                 </StackPanel>
             </Grid>
-
-
         </Grid>
     </SplitView>
 </Window>
