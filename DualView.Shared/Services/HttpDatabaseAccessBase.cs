@@ -420,6 +420,16 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<List<string>> GetTagAliasesAsync(long tagId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<string>>($"api/v1/tag/{tagId}/alias") ?? new List<string>();
+    }
+
+    public async Task<List<TagDTO>> GetTagImpliesAsync(long tagId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<TagDTO>>($"api/v1/tag/{tagId}/imply") ?? new List<TagDTO>();
+    }
+
     public async Task<List<TagModifierDTO>> GetAllTagModifiersAsync()
     {
         return await HttpClient.GetFromJsonAsync<List<TagModifierDTO>>("api/v1/tagModifier") ??

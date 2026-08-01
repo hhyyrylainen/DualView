@@ -64,6 +64,18 @@ public class TagController : Controller
         return Ok();
     }
 
+    [HttpGet("{id:long}/alias")]
+    public async Task<ActionResult<List<string>>> GetAliases([Required] long id)
+    {
+        return await databaseService.GetTagAliasesAsync(id);
+    }
+
+    [HttpGet("{id:long}/imply")]
+    public async Task<ActionResult<List<TagDTO>>> GetImplies([Required] long id)
+    {
+        return await databaseService.GetTagImpliesAsync(id);
+    }
+
     [HttpPost("{id:long}/alias")]
     public async Task<IActionResult> CreateAlias([Required] long id, [FromBody] CreateTagAliasRequest request)
     {

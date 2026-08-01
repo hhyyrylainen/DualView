@@ -76,6 +76,9 @@ public interface IDatabaseCommonService
     public Task UpdateTagModifierAsync(long id, string? name, string? description);
     public Task DeleteTagModifierAsync(long id);
 
+    public Task<List<string>> GetTagAliasesAsync(long tagId);
+    public Task<List<TagDTO>> GetTagImpliesAsync(long tagId);
+
     public Task CreateTagAliasAsync(long tagId, string alias);
     public Task DeleteTagAliasAsync(long tagId, string alias);
 

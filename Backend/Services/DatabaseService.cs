@@ -991,6 +991,22 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyTagModifiersUpdated();
     }
 
+    public async Task<List<string>> GetTagAliasesAsync(long tagId)
+    {
+        return await dbContext.TagAliases
+            .Where(a => a.TagId == tagId)
+            .Select(a => a.Name)
+            .ToListAsync();
+    }
+
+    public async Task<List<TagDTO>> GetTagImpliesAsync(long tagId)
+    {
+        return await dbContext.TagImplies
+            .Where(i => i.PrimaryTagId == tagId)
+            .Select(i => i.ToApplyTag.GetDTO())
+            .ToListAsync();
+    }
+
     public async Task CreateTagAliasAsync(long tagId, string alias)
     {
         var tagAlias = new TagAlias(alias.TrimOrThrowIfEmpty().ToLowerInvariant(), tagId);
