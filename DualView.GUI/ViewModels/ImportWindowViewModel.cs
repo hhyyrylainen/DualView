@@ -130,7 +130,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
                     var vm = new MediaViewerViewModel(logger!, windowService!)
                     {
                         Name = import.PreferredName ?? "Unnamed",
-                        MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(import.PreferredName ?? "Unnamed", import.MediaFileId, true, import.MediaFileId, MediaType.Png, 512, 512, false), serviceProvider!),
+                        MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(import.PreferredName ?? "Unnamed", import.MediaFileId, import.MediaFileId, MediaType.Png, 512, 512), serviceProvider!),
                         ShowingThumbnail = true,
                         AllowSelection = true
                     };
@@ -312,7 +312,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
                 // TODO: this needs to set the collection
                 var mediaConfiguration = await backendAPI!.ImportMedia(Path.GetFileName(local.LocalPath),
-                    File.OpenRead(local.LocalPath), 1, ImportAlphaAsMask);
+                    File.OpenRead(local.LocalPath), null);
 
                 if (!string.IsNullOrWhiteSpace(secondary))
                 {

@@ -424,9 +424,6 @@ public class MediaEditorWindowViewModel : ViewModelBase, IDisposable, IRenderHoo
             if (mediaInfo == null)
                 throw new Exception("Media not found");
 
-            if (mediaInfo.Prime)
-                throw new Exception("Prime media cannot be edited");
-
             if (mediaInfo.IsDeleted)
                 windowService?.ShowNoticeWindow("Cannot edit a deleted media");
 

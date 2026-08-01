@@ -30,11 +30,12 @@ public class MediaEditSelectorWindowViewModel : ViewModelBase, IDisposable
         });
         NewFolders.Add(new NewFolderViewModel("Outputs/Images/Model/2026-02-22/"));
 
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Some_stuff_j2221", string.Empty), _ => { }, true));
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Another sibling", string.Empty), _ => { }, false));
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Third sibling", string.Empty), _ => { }, false));
-        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Sibling with a pretty long name", string.Empty), _ => { },
-            false));
+        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Some_stuff_j2221", string.Empty), _ => { }));
+        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Another sibling", string.Empty), _ => { }));
+        SiblingItems.Add(new SiblingItemViewModel(new ConfiguredMediaDTO("Third sibling", string.Empty), _ => { }));
+        SiblingItems.Add(
+            new SiblingItemViewModel(new ConfiguredMediaDTO("Sibling with a pretty long name", string.Empty),
+                _ => { }));
     }
 
     [ActivatorUtilitiesConstructor]
@@ -74,7 +75,6 @@ public class MediaEditSelectorWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     }
 
-    public bool IsPrime => ShownMedia?.Prime ?? false;
     public string Name => ShownMedia?.Name ?? "No media selected";
 
     public ConfiguredMediaDTO? ShownMedia
@@ -86,7 +86,6 @@ public class MediaEditSelectorWindowViewModel : ViewModelBase, IDisposable
                 return;
 
             SetProperty(ref field, value);
-            OnPropertyChanged(nameof(IsPrime));
             OnPropertyChanged(nameof(Name));
         }
     }
@@ -106,7 +105,8 @@ public class MediaEditSelectorWindowViewModel : ViewModelBase, IDisposable
 
     public void EditMain()
     {
-        if (ShownMedia == null || ShownMedia.Prime)
+        // TODO: redo this selector to be refactored away just entirely, DualView allows cropping the main image
+        if (ShownMedia == null)
         {
             windowService?.ShowNoticeWindow("Cannot edit the main media, create a new variant");
             return;
@@ -188,7 +188,7 @@ public class MediaEditSelectorWindowViewModel : ViewModelBase, IDisposable
 
                 foreach (var other in otherConfigs)
                 {
-                    SiblingItems.Add(new SiblingItemViewModel(other, OnSelectionMade, other.Prime));
+                    SiblingItems.Add(new SiblingItemViewModel(other, OnSelectionMade));
                 }
 
                 NewName = null;
@@ -264,16 +264,15 @@ public class MediaEditSelectorWindowViewModel : ViewModelBase, IDisposable
         private readonly ConfiguredMediaDTO item;
         private readonly Action<ConfiguredMediaDTO> selectAction;
 
-        public SiblingItemViewModel(ConfiguredMediaDTO item, Action<ConfiguredMediaDTO> selectAction, bool prime)
+        public SiblingItemViewModel(ConfiguredMediaDTO item, Action<ConfiguredMediaDTO> selectAction)
         {
             this.item = item;
             this.selectAction = selectAction;
-            Enabled = !prime;
         }
 
         public string Name => item.Name;
 
-        public bool Enabled { get; }
+        public bool Enabled => true;
 
         public void OnSelect()
         {

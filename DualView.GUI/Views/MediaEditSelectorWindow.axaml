@@ -19,7 +19,7 @@
         <TabControl Margin="3" IsVisible="{Binding !Loading}">
             <TabItem Header="Edit This">
                 <StackPanel Orientation="Vertical">
-                    <StackPanel Orientation="Vertical" IsVisible="{Binding !IsPrime}">
+                    <StackPanel Orientation="Vertical">
                         <TextBlock>Name:</TextBlock>
                         <TextBlock Text="{Binding Name}" />
                         <Border Height="15"></Border>
@@ -27,10 +27,6 @@
                             Edit This
                         </Button>
                     </StackPanel>
-                    <TextBlock IsVisible="{Binding IsPrime}" FontSize="24" HorizontalAlignment="Center"
-                               VerticalAlignment="Center" TextAlignment="Center"
-                               Text="Prime Config Can't Be Modified,&#10;Create a new One">
-                    </TextBlock>
                 </StackPanel>
             </TabItem>
             <TabItem Header="Create New Variant">
