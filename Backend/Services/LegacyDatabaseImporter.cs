@@ -164,6 +164,9 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                 continue;
 
             var name = SanitizeName(RequiredText(row, "name"));
+
+            // Note some folders might have duplicate names as long as they were in different parts, so this isn't an
+            // exact import!
             var folder = await dbContext.MediaFolders.IgnoreQueryFilters()
                 .FirstOrDefaultAsync(item => item.Name.ToLower() == name.ToLower(), cancellationToken);
             if (folder == null)
