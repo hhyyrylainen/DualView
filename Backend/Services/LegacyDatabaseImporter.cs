@@ -48,7 +48,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         await connection.OpenAsync(cancellationToken);
 
         var tags = await ImportTagsAsync(connection, cancellationToken);
-        var appliedTags = await ImportAppliedTagsAsync(connection, tags, cancellationToken);
+        var tagModifiers = await ImportTagModifiersAsync(connection, cancellationToken);
+        var appliedTags = await ImportAppliedTagsAsync(connection, tags, tagModifiers, cancellationToken);
         var folders = await ImportFoldersAsync(connection, cancellationToken);
         var collections = await ImportCollectionsAsync(connection, tags, folders, cancellationToken);
         await ImportMediaAsync(connection, appliedTags, collections,
@@ -196,29 +197,182 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         return folderIds;
     }
 
-    private async Task<Dictionary<long, long>> ImportAppliedTagsAsync(SqliteConnection connection,
-        Dictionary<long, long> tagIds, CancellationToken cancellationToken)
+    private async Task<Dictionary<long, long>> ImportTagModifiersAsync(SqliteConnection connection,
+        CancellationToken cancellationToken)
     {
-        var appliedTagIds = new Dictionary<long, long>();
-        await foreach (var row in ReadRowsAsync(connection, "SELECT id, tag FROM applied_tag ORDER BY id",
+        var modifierIds = new Dictionary<long, long>();
+        await foreach (var row in ReadRowsAsync(connection,
+                           "SELECT id, name, description, deleted FROM tag_modifiers ORDER BY id",
                            cancellationToken))
         {
-            if (!tagIds.TryGetValue(row.GetInt64("tag"), out var tagId))
+            if (row.GetBoolean("deleted"))
                 continue;
 
-            var applied = await dbContext.AppliedTags.FirstOrDefaultAsync(item => item.TagId == tagId &&
-                item.CombinedWithId == null, cancellationToken);
-            if (applied == null)
+            var name = RequiredText(row, "name").ToLowerInvariant();
+            var modifier = await dbContext.TagModifiers.IgnoreQueryFilters()
+                .FirstOrDefaultAsync(item => item.Name.ToLower() == name, cancellationToken);
+            if (modifier == null)
             {
-                applied = new AppliedTag(tagId);
-                dbContext.AppliedTags.Add(applied);
+                modifier = new TagModifier(name.ToLowerInvariant())
+                {
+                    Description = row.GetText("description"),
+                };
+                dbContext.TagModifiers.Add(modifier);
                 await dbContext.SaveChangesAsync(cancellationToken);
             }
 
-            appliedTagIds[row.GetInt64("id")] = applied.Id;
+            modifierIds[row.GetInt64("id")] = modifier.Id;
+        }
+
+        // Not actually used, so not ported to DualView 3
+        /*await foreach (var row in ReadRowsAsync(connection,
+                           "SELECT name, meant_modifier FROM tag_modifier_aliases",
+                           cancellationToken))
+        {
+            if (!modifierIds.TryGetValue(row.GetInt64("meant_modifier"), out var modifierId))
+                continue;
+
+            var alias = RequiredText(row, "name").ToLowerInvariant();
+            if (!await dbContext.TagModifierAliases.AnyAsync(item => item.Name.ToLower() == alias,
+                    cancellationToken))
+            {
+                dbContext.TagModifierAliases.Add(new TagModifierAlias(alias.ToLowerInvariant(), modifierId));
+            }
+        }*/
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return modifierIds;
+    }
+
+    private async Task<Dictionary<long, long>> ImportAppliedTagsAsync(SqliteConnection connection,
+        Dictionary<long, long> tagIds, Dictionary<long, long> modifierIds, CancellationToken cancellationToken)
+    {
+        var definitions = new Dictionary<long, LegacyAppliedTag>();
+        await foreach (var row in ReadRowsAsync(connection, "SELECT id, tag FROM applied_tag ORDER BY id",
+                           cancellationToken))
+        {
+            definitions[row.GetInt64("id")] = new LegacyAppliedTag(row.GetInt64("tag"));
+        }
+
+        await foreach (var row in ReadRowsAsync(connection,
+                           "SELECT to_tag, modifier FROM applied_tag_modifier ORDER BY to_tag, modifier",
+                           cancellationToken))
+        {
+            if (definitions.TryGetValue(row.GetInt64("to_tag"), out var definition))
+                definition.ModifierIds.Add(row.GetInt64("modifier"));
+        }
+
+        await foreach (var row in ReadRowsAsync(connection,
+                           "SELECT tag_left, tag_right, combined_with FROM applied_tag_combine ORDER BY tag_left",
+                           cancellationToken))
+        {
+            if (definitions.TryGetValue(row.GetInt64("tag_left"), out var definition))
+            {
+                definition.CombinedWithId = row.GetInt64("tag_right");
+                definition.CombineWord = RequiredText(row, "combined_with");
+            }
+        }
+
+        var appliedTagIds = new Dictionary<long, long>();
+        var currentlyImporting = new HashSet<long>();
+        foreach (var legacyAppliedTagId in definitions.Keys.Order())
+        {
+            await ImportAppliedTagAsync(legacyAppliedTagId, definitions, tagIds, modifierIds, appliedTagIds,
+                currentlyImporting, cancellationToken);
         }
 
         return appliedTagIds;
+    }
+
+    private async Task<long?> ImportAppliedTagAsync(long legacyAppliedTagId,
+        Dictionary<long, LegacyAppliedTag> definitions, Dictionary<long, long> tagIds,
+        Dictionary<long, long> modifierIds, Dictionary<long, long> appliedTagIds,
+        HashSet<long> currentlyImporting, CancellationToken cancellationToken)
+    {
+        if (appliedTagIds.TryGetValue(legacyAppliedTagId, out var importedId))
+            return importedId;
+
+        if (!definitions.TryGetValue(legacyAppliedTagId, out var definition))
+            throw new InvalidDataException($"Legacy applied tag {legacyAppliedTagId} does not exist");
+
+        if (!currentlyImporting.Add(legacyAppliedTagId))
+            throw new InvalidDataException($"Legacy applied tag combine contains a cycle at {legacyAppliedTagId}");
+
+        try
+        {
+            if (!tagIds.TryGetValue(definition.TagId, out var tagId))
+            {
+                logger.LogWarning("Skipping legacy applied tag {AppliedTagId}: tag {TagId} was not imported",
+                    legacyAppliedTagId, definition.TagId);
+                return null;
+            }
+
+            var importedModifierIds = new List<long>();
+            foreach (var legacyModifierId in definition.ModifierIds.Distinct())
+            {
+                if (!modifierIds.TryGetValue(legacyModifierId, out var modifierId))
+                {
+                    logger.LogWarning(
+                        "Skipping legacy applied tag {AppliedTagId}: modifier {ModifierId} was not imported",
+                        legacyAppliedTagId, legacyModifierId);
+                    return null;
+                }
+
+                importedModifierIds.Add(modifierId);
+            }
+
+            long? combinedWithId = null;
+            if (definition.CombinedWithId != null)
+            {
+                if (string.IsNullOrWhiteSpace(definition.CombineWord))
+                {
+                    throw new InvalidDataException(
+                        $"Legacy applied tag {legacyAppliedTagId} has a combined tag without a combine word");
+                }
+
+                combinedWithId = await ImportAppliedTagAsync(definition.CombinedWithId.Value, definitions, tagIds,
+                    modifierIds, appliedTagIds, currentlyImporting, cancellationToken);
+                if (combinedWithId == null)
+                {
+                    logger.LogWarning(
+                        "Skipping legacy applied tag {AppliedTagId}: its combined tag {CombinedTagId} was not imported",
+                        legacyAppliedTagId, definition.CombinedWithId.Value);
+                    return null;
+                }
+            }
+
+            var candidates = await dbContext.AppliedTags.Include(item => item.Modifiers)
+                .Where(item => item.TagId == tagId && item.CombinedWithId == combinedWithId &&
+                               item.CombineWord == definition.CombineWord)
+                .ToListAsync(cancellationToken);
+            var appliedTag = candidates.FirstOrDefault(item =>
+                item.Modifiers.Select(modifier => modifier.Id).Order().SequenceEqual(importedModifierIds.Order()));
+
+            if (appliedTag == null)
+            {
+                appliedTag = new AppliedTag(tagId)
+                {
+                    CombinedWithId = combinedWithId,
+                    CombineWord = definition.CombineWord,
+                };
+
+                var modifiers = await dbContext.TagModifiers
+                    .Where(item => importedModifierIds.Contains(item.Id))
+                    .ToListAsync(cancellationToken);
+                foreach (var modifier in modifiers)
+                    appliedTag.Modifiers.Add(modifier);
+
+                dbContext.AppliedTags.Add(appliedTag);
+                await dbContext.SaveChangesAsync(cancellationToken);
+            }
+
+            appliedTagIds[legacyAppliedTagId] = appliedTag.Id;
+            return appliedTag.Id;
+        }
+        finally
+        {
+            currentlyImporting.Remove(legacyAppliedTagId);
+        }
     }
 
     private async Task<Dictionary<long, long>> ImportCollectionsAsync(SqliteConnection connection,
@@ -530,6 +684,19 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
             yield return new SqliteRow(reader);
+    }
+
+    private sealed class LegacyAppliedTag
+    {
+        public long TagId { get; }
+        public List<long> ModifierIds { get; } = [];
+        public long? CombinedWithId { get; set; }
+        public string? CombineWord { get; set; }
+
+        public LegacyAppliedTag(long tagId)
+        {
+            TagId = tagId;
+        }
     }
 
     private sealed class SqliteRow
