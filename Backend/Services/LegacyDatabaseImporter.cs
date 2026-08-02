@@ -588,7 +588,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             }
         }
 
-        throw new InvalidDataException($"Legacy media '{fileName}' is missing, corrupt, or has a SHA3 mismatch");
+        throw new InvalidDataException($"Legacy media '{fileName}' is missing, corrupt, or has a SHA mismatch");
     }
 
     private static async Task<bool> IsValidMediaAsync(string path, string expectedHash,
