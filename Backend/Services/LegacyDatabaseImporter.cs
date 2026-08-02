@@ -468,9 +468,23 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                 var source = row.GetText("from_file");
                 if (!string.IsNullOrWhiteSpace(source))
                 {
-                    dbContext.MediaImportInfos.Add(new MediaImportInfo(media.Id, media.ImportedAt)
+                    // Rudimentary detection what kind of source it is
+                    string? sourceLocalPath = null;
+                    string? sourceUrl = null;
+
+                    if (source.StartsWith("http"))
                     {
-                        SourcePath = source,
+                        sourceUrl = source;
+                    }
+                    else
+                    {
+                        sourceLocalPath = source;
+                    }
+
+                    dbContext.MediaImportInfos.Add(new MediaImportInfo(media.Id)
+                    {
+                        SourcePath = sourceLocalPath,
+                        SourceUrl = sourceUrl,
                     });
                     await dbContext.SaveChangesAsync(cancellationToken);
                 }

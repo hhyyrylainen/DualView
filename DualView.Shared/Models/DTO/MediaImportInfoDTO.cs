@@ -2,17 +2,15 @@ namespace DualView.Shared.Models.DTO;
 
 public class MediaImportInfoDTO
 {
-    public MediaImportInfoDTO(long mediaFileId, DateTime importDate)
+    public MediaImportInfoDTO(long mediaFileId)
     {
         MediaFileId = mediaFileId;
-        ImportDate = importDate;
     }
 
     public long Id { get; set; }
     public long MediaFileId { get; set; }
     public string? SourceUrl { get; set; }
     public string? SourcePath { get; set; }
-    public DateTime ImportDate { get; set; }
     public string? Referrer { get; set; }
 
     public string? PreferredName { get; set; }

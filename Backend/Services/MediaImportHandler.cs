@@ -349,7 +349,7 @@ public class MediaImportHandler : IMediaImportHandler
 
         if (importInfo == null)
         {
-            importInfo = new MediaImportInfo(media.Id, DateTime.UtcNow)
+            importInfo = new MediaImportInfo(media.Id)
             {
                 SourcePath = sourcePath,
             };

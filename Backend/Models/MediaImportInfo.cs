@@ -7,10 +7,9 @@ namespace Backend.Models;
 
 public class MediaImportInfo : UpdateableModel, IDTOProvider<MediaImportInfoDTO>
 {
-    public MediaImportInfo(long mediaFileId, DateTime importDate)
+    public MediaImportInfo(long mediaFileId)
     {
         MediaFileId = mediaFileId;
-        ImportDate = importDate;
     }
 
     [Key]
@@ -24,8 +23,6 @@ public class MediaImportInfo : UpdateableModel, IDTOProvider<MediaImportInfoDTO>
 
     [MaxLength(1024)]
     public string? SourcePath { get; set; }
-
-    public DateTime ImportDate { get; set; }
 
     [MaxLength(1024)]
     public string? Referrer { get; set; }
@@ -41,7 +38,7 @@ public class MediaImportInfo : UpdateableModel, IDTOProvider<MediaImportInfoDTO>
 
     public MediaImportInfoDTO GetDTO()
     {
-        return new MediaImportInfoDTO(MediaFileId, ImportDate)
+        return new MediaImportInfoDTO(MediaFileId)
         {
             Id = Id,
             SourceUrl = SourceUrl,
