@@ -436,6 +436,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
     private async Task ImportMediaAsync(SqliteConnection connection, Dictionary<long, long> appliedTagIds,
         Dictionary<long, long> collectionIds, string legacyDirectory, CancellationToken cancellationToken)
     {
+        int imported = 0;
+
         var mediaIds = new Dictionary<long, long>();
         await foreach (var row in ReadRowsAsync(connection,
                            "SELECT id, relative_path, width, height, name, extension, add_date, last_view, " +
@@ -493,6 +495,9 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                     });
                     await dbContext.SaveChangesAsync(cancellationToken);
                 }
+
+                if (++imported % 100 == 0)
+                    logger.LogInformation("Imported media total: {Imported}", imported);
             }
 
             mediaIds[row.GetInt64("id")] = media.Id;
@@ -623,7 +628,9 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         if (hash != expectedHash)
             return false;
 
-        if (!MediaTypeExtensions.TypeFromExtension(Path.GetExtension(path)).IsImage())
+        var extension = NormalizeExtension(Path.GetExtension(path));
+
+        if (!MediaTypeExtensions.TypeFromExtension(extension).IsImage())
             return true;
 
         try
