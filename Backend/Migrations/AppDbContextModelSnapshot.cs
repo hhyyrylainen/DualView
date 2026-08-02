@@ -261,7 +261,7 @@ namespace Backend.Migrations
                     b.Property<float>("FramesPerSecond")
                         .HasColumnType("REAL");
 
-                    b.Property<string>("HashSha3")
+                    b.Property<string>("Hash")
                         .IsRequired()
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
@@ -311,7 +311,7 @@ namespace Backend.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("HashSha3")
+                    b.HasIndex("Hash")
                         .IsUnique();
 
                     b.HasIndex("ParentMediaId");
