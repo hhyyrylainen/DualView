@@ -33,7 +33,9 @@ public class ServerConfigurationService : IServerConfigurationService
             catch (Exception e)
             {
                 logger.LogError(e, "Failed to parse server config file at {Path}", expectedConfigFile);
-                tempConfig = new ConfigFileFormat();
+
+                // Do not start with bad config file as settings will be inconsistent
+                throw;
             }
         }
         else
