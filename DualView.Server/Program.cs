@@ -229,7 +229,9 @@ if (ResourceLimits.Memory >= reasonableMemoryLimit)
         logger.LogInformation("Starting legacy database import from: {Path}\nThis might take a while!",
             serverConfig.DatabaseFilePath);
         var importer = serviceScope.ServiceProvider.GetRequiredService<ILegacyDatabaseImporter>();
-        await importer.ImportAsync(serverConfig.LegacyDatabaseFilePath);
+        await importer.ImportAsync(serverConfig.LegacyDatabaseFilePath,
+            serverConfig.LegacyCollectionRootPath ??
+            Path.GetDirectoryName(Path.GetFullPath(serverConfig.LegacyDatabaseFilePath!))!);
         logger.LogInformation("Legacy import succeeded! Normal app startup will now happen.");
     }
 }

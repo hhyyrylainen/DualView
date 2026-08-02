@@ -11,6 +11,7 @@ public class ServerConfigurationService : IServerConfigurationService
     public string? ListenUrl { get; }
     public string? DatabaseFilePath { get; }
     public string? LegacyDatabaseFilePath { get; }
+    public string? LegacyCollectionRootPath { get; }
 
     public ServerConfigurationService(ILogger logger, IDataFolderService dataFolderService)
     {
@@ -49,6 +50,9 @@ public class ServerConfigurationService : IServerConfigurationService
 
         if (!string.IsNullOrEmpty(tempConfig.LegacyDatabaseFile))
             LegacyDatabaseFilePath = tempConfig.LegacyDatabaseFile;
+
+        if (!string.IsNullOrEmpty(tempConfig.LegacyCollectionRootPath))
+            LegacyCollectionRootPath = tempConfig.LegacyCollectionRootPath;
     }
 
     private class ConfigFileFormat
@@ -61,5 +65,10 @@ public class ServerConfigurationService : IServerConfigurationService
         ///   When set, the server imports this DualView++ database before accepting requests.
         /// </summary>
         public string? LegacyDatabaseFile { get; set; }
+
+        /// <summary>
+        ///   Also needed when importing a legacy DualView++ database.
+        /// </summary>
+        public string? LegacyCollectionRootPath { get; set; }
     }
 }
