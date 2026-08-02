@@ -120,6 +120,7 @@ builder.Services.AddRazorComponents().AddInteractiveWebAssemblyComponents();
 builder.Services.AddControllers();
 
 builder.Services.AddHttpClient();
+builder.Services.AddScoped<ILegacyDatabaseImporter, LegacyDatabaseImporter>();
 
 builder.Services.AddSignalR();
 
@@ -203,16 +204,6 @@ lifetime.ApplicationStopping.Register(() =>
     }
 });
 
-// Start core services
-{
-    var serviceScope = app.Services.CreateScope();
-
-    var databaseService = serviceScope.ServiceProvider.GetRequiredService<IDatabaseService>();
-
-    // Initialize the database
-    await databaseService.InitializeDatabaseAsync();
-}
-
 // Set ImageMagick limits
 ResourceLimits.LimitMemory(new Percentage(40));
 
@@ -222,6 +213,24 @@ ulong reasonableMemoryLimit = 1024L * 1024 * 1024 * 4;
 if (ResourceLimits.Memory >= reasonableMemoryLimit)
 {
     ResourceLimits.Memory = reasonableMemoryLimit;
+}
+
+// Start core services
+{
+    var serviceScope = app.Services.CreateScope();
+
+    var databaseService = serviceScope.ServiceProvider.GetRequiredService<IDatabaseService>();
+
+    // Initialize the database
+    await databaseService.InitializeDatabaseAsync();
+
+    if (!string.IsNullOrWhiteSpace(serverConfig.LegacyDatabaseFilePath))
+    {
+        logger.LogInformation("Starting legacy database import from: {Path}", serverConfig.DatabaseFilePath);
+        var importer = serviceScope.ServiceProvider.GetRequiredService<ILegacyDatabaseImporter>();
+        await importer.ImportAsync(serverConfig.LegacyDatabaseFilePath);
+        logger.LogInformation("Legacy import succeeded!");
+    }
 }
 
 var backgroundJobs = app.Services.GetRequiredService<IBackgroundJobs>();
