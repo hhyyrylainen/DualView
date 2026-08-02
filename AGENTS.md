@@ -23,6 +23,15 @@ public enum ExampleEnum
 }
 ```
 
+- Documenting elements should use XML, and 2 spaces per indentation level, for example:
+
+```cs
+/// <summary>
+///   This is a description of what this property does
+/// </summary>
+public int SomeProperty { get; set; }
+```
+
 - ASP.NET Controller paths should be in this format: `api/v1/ImageUpload/create` (rather than using "-" to separate words)
 - Controller classes should end with `Controller` but not put that in the API path.
 - In Avalonia .axaml files the two-way binding is the default. So do not use `Mode=TwoWay` as it is unnecessary. Only specify one way binding if needed for a use case.
