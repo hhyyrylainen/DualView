@@ -1,8 +1,8 @@
 using System.Globalization;
-using System.Security.Cryptography;
 using System.Text;
 using Backend.Database;
 using Backend.Models;
+using DualView.Shared.Models;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Utils;
 using ImageMagick;
@@ -21,6 +21,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
     private readonly ILogger<LegacyDatabaseImporter> logger;
     private readonly AppDbContext dbContext;
     private readonly IDataFolderService dataFolderService;
+    private DualViewSettings? settings;
 
     public LegacyDatabaseImporter(ILogger<LegacyDatabaseImporter> logger, AppDbContext dbContext,
         IDataFolderService dataFolderService)
@@ -35,6 +36,9 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
     {
         if (!File.Exists(databasePath))
             throw new FileNotFoundException("The configured legacy DualView database was not found", databasePath);
+
+        settings = await dbContext.AppSettings.FindAsync([1], cancellationToken) ??
+                   throw new Exception("Settings not found");
 
         logger.LogInformation("Importing legacy DualView database from {Path}", databasePath);
 
@@ -459,6 +463,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                     FrameCount = 1,
                     FramesPerSecond = -1,
                     ImportedAt = ParseDate(row.GetText("add_date")),
+                    LastViewed = ParseDate(row.GetText("last_view")),
                     IsFavorited = await IsFavoritedAsync(connection, row.GetInt64("id"), cancellationToken),
                 };
                 await CopyIntoCurrentStorageAsync(validatedPath, media, cancellationToken);
@@ -563,6 +568,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         if (await IsValidMediaAsync(path, expectedHash, cancellationToken))
             return path;
 
+        logger.LogInformation("Attempting recovery on file: {Path}", path);
+
         var source = row.GetText("from_file");
         var fileName = RequiredText(row, "name") + NormalizeExtension(RequiredText(row, "extension"));
         if (!Uri.TryCreate(source, UriKind.Absolute, out var sourceUri) ||
@@ -605,7 +612,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         throw new InvalidDataException($"Legacy media '{fileName}' is missing, corrupt, or has a SHA mismatch");
     }
 
-    private static async Task<bool> IsValidMediaAsync(string path, string expectedHash,
+    private async Task<bool> IsValidMediaAsync(string path, string expectedHash,
         CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
@@ -625,18 +632,25 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             await frames.ReadAsync(path, cancellationToken);
             return frames.Count > 0;
         }
-        catch
+        catch (Exception e)
         {
+            logger.LogWarning(e, "Failed to read image frames from {Path}", path);
             return false;
         }
     }
 
     private async Task CopyIntoCurrentStorageAsync(string source, MediaFile media, CancellationToken cancellationToken)
     {
-        var settings = await dbContext.AppSettings.FindAsync([1], cancellationToken);
-        var storage = settings?.LocalMediaStorageLocation;
+        if (settings == null)
+            throw new Exception("Settings not loaded");
+
+        var storage = settings.LocalMediaStorageLocation;
         if (string.IsNullOrWhiteSpace(storage))
+        {
+            logger.LogDebug("Using default storage location, which might not be wanted");
             storage = dataFolderService.GetDataFolderPath();
+        }
+
         var destination = Path.Combine(storage, media.PathRelativeToStorage());
         Directory.CreateDirectory(Path.GetDirectoryName(destination) ?? throw new InvalidOperationException());
         if (!Path.GetFullPath(source).Equals(Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
@@ -687,11 +701,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
     private static async Task<bool> IsFavoritedAsync(SqliteConnection connection, long imageId,
         CancellationToken cancellationToken)
     {
-        await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT favorited FROM ratings WHERE image = $image";
-        command.Parameters.AddWithValue("$image", imageId);
-        var value = await command.ExecuteScalarAsync(cancellationToken);
-        return value != null && Convert.ToInt32(value, CultureInfo.InvariantCulture) != 0;
+        // Favouriting was not implemented, so nothing is favourited
+        return false;
     }
 
     private static async IAsyncEnumerable<SqliteRow> ReadRowsAsync(SqliteConnection connection, string sql,
