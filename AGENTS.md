@@ -81,3 +81,9 @@ but proactively putting things in the right place (like `IDatabaseCommonService`
 When making calls from the client that aren't really about modifying database data, but triggering some other stuff, use the `IBackendAPI` interface instead to make general operations and access them on the clients.
 
 Database access should be implemented through Entity Framework, except for the case of very heavy duty access like tag parsing which can benefit from direct SQL reading to avoid extra overhead on the hot path.
+
+
+### DualViewWeb
+
+This folder contains a web extension allowing Firefox to send images
+directly to the backend to be put into the import system.
