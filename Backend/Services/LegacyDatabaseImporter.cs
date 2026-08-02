@@ -72,7 +72,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                 .FirstOrDefaultAsync(item => item.Name.ToLower() == name.ToLower(), cancellationToken);
             if (tag == null)
             {
-                tag = new Tag(name, (TagCategory)row.GetInt32("category"))
+                tag = new Tag(name.ToLowerInvariant(), (TagCategory)row.GetInt32("category"))
                 {
                     Description = row.GetText("description"),
                 };
@@ -99,7 +99,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
 
             var alias = RequiredText(row, "name");
             if (!await dbContext.TagAliases.AnyAsync(item => item.Name.ToLower() == alias.ToLower(), cancellationToken))
-                dbContext.TagAliases.Add(new TagAlias(alias, tagId));
+                dbContext.TagAliases.Add(new TagAlias(alias.ToLowerInvariant(), tagId));
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
