@@ -51,8 +51,8 @@ public class ServerConfigurationService : IServerConfigurationService
         if (!string.IsNullOrEmpty(tempConfig.LegacyDatabaseFile))
             LegacyDatabaseFilePath = tempConfig.LegacyDatabaseFile;
 
-        if (!string.IsNullOrEmpty(tempConfig.LegacyCollectionRootPath))
-            LegacyCollectionRootPath = tempConfig.LegacyCollectionRootPath;
+        if (!string.IsNullOrEmpty(tempConfig.LegacyCollectionRoot))
+            LegacyCollectionRootPath = tempConfig.LegacyCollectionRoot;
     }
 
     private class ConfigFileFormat
@@ -69,6 +69,6 @@ public class ServerConfigurationService : IServerConfigurationService
         /// <summary>
         ///   Also needed when importing a legacy DualView++ database.
         /// </summary>
-        public string? LegacyCollectionRootPath { get; set; }
+        public string? LegacyCollectionRoot { get; set; }
     }
 }
