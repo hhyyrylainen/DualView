@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using Backend.Database;
 using Backend.Models;
 using DualView.Shared.Models.Enums;
@@ -111,9 +112,19 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         await foreach (var row in ReadRowsAsync(connection, "SELECT primary_tag, to_apply FROM tag_implies",
                            cancellationToken))
         {
-            if (!tagIds.TryGetValue(row.GetInt64("primary_tag"), out var primary) ||
-                !tagIds.TryGetValue(row.GetInt64("to_apply"), out var applied))
+            long primary;
+            long applied;
+            try
             {
+                if (!tagIds.TryGetValue(row.GetInt64("primary_tag"), out primary) ||
+                    !tagIds.TryGetValue(row.GetInt64("to_apply"), out applied))
+                {
+                    continue;
+                }
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Invalid tag imply from old data, ignoring: {Data}", row);
                 continue;
             }
 
@@ -550,6 +561,34 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             return reader.IsDBNull(reader.GetOrdinal(column))
                 ? null
                 : reader.GetString(reader.GetOrdinal(column));
+        }
+
+        public override string ToString()
+        {
+            var builder = new StringBuilder("SqliteRow: ");
+
+            for (var i = 0; i < reader.FieldCount; i++)
+            {
+                if (i > 0)
+                    builder.Append(", ");
+
+                builder.Append(reader.GetName(i));
+                builder.Append('=');
+
+                if (reader.IsDBNull(i))
+                {
+                    builder.Append("NULL");
+                }
+                else
+                {
+                    var value = reader.GetValue(i);
+                    builder.Append(value is string text
+                        ? $"\"{text}\""
+                        : Convert.ToString(value, CultureInfo.InvariantCulture));
+                }
+            }
+
+            return builder.ToString();
         }
     }
 }
