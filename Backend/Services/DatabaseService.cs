@@ -525,7 +525,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<MediaFileDTO> CreateMediaFileAsync(MediaFileDTO mediaFile, long collectionId)
     {
-        var newMedia = new MediaFile(mediaFile.OriginalFileName, mediaFile.HashSha3)
+        var newMedia = new MediaFile(mediaFile.OriginalFileName, mediaFile.Hash)
         {
             MediaType = mediaFile.MediaType,
             Width = mediaFile.Width,
