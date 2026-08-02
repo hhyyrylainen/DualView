@@ -4,6 +4,7 @@ using System.Text;
 using Backend.Database;
 using Backend.Models;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Utils;
 using ImageMagick;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -437,9 +438,10 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             if (row.GetBoolean("deleted"))
                 continue;
 
-            var hash = RequiredText(row, "file_hash").ToLowerInvariant();
+            var hash = RequiredText(row, "file_hash");
+
             var media = await dbContext.MediaFiles.IgnoreQueryFilters()
-                .FirstOrDefaultAsync(item => item.HashSha3 == hash, cancellationToken);
+                .FirstOrDefaultAsync(item => item.Hash == hash, cancellationToken);
 
             if (media == null)
             {
@@ -593,7 +595,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             return false;
 
         await using var stream = File.OpenRead(path);
-        var hash = Convert.ToHexString(await SHA3_256.HashDataAsync(stream, cancellationToken)).ToLowerInvariant();
+        var hash = await MediaHash.CalculateMediaHashAsync(stream, cancellationToken);
         if (hash != expectedHash)
             return false;
 

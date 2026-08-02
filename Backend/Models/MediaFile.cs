@@ -10,14 +10,14 @@ namespace Backend.Models;
 /// <summary>
 ///   Concrete stored media file
 /// </summary>
-[Index(nameof(HashSha3), IsUnique = true)]
+[Index(nameof(Hash), IsUnique = true)]
 public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile, ISoftDelete
 {
-    public MediaFile(string originalFileName, string hashSha3)
+    public MediaFile(string originalFileName, string hash)
     {
         OriginalFileName = originalFileName;
         NameLowerCase = originalFileName.ToLowerInvariant();
-        HashSha3 = hashSha3;
+        Hash = hash;
     }
 
     [Key]
@@ -37,8 +37,11 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
     [MaxLength(200)]
     public string NameLowerCase { get; set; }
 
+    /// <summary>
+    ///   Base64-encoded sha hash of the file. Note must be calculated with MediaHash.CalculateMediaHash
+    /// </summary>
     [MaxLength(256)]
-    public string HashSha3 { get; set; }
+    public string Hash { get; set; }
 
     public DateTime ImportedAt { get; set; } = DateTime.UtcNow;
 
@@ -88,18 +91,18 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
 
     public string PathRelativeToStorage()
     {
-        return $"originalMedia/{HashSha3[..2]}/{HashSha3[2..4]}/{HashSha3[4..]}{Path.GetExtension(OriginalFileName)}";
+        return $"originalMedia/{Hash[..2]}/{Hash[2..4]}/{Hash[4..]}{Path.GetExtension(OriginalFileName)}";
     }
 
     public string CroppedPathRelativeToStorage()
     {
         var extension = Path.GetExtension(OriginalFileName);
-        return $"originalMedia/{HashSha3[..2]}/{HashSha3[2..4]}/{HashSha3[4..]}_cropped{extension}";
+        return $"originalMedia/{Hash[..2]}/{Hash[2..4]}/{Hash[4..]}_cropped{extension}";
     }
 
     public MediaFileDTO GetDTO()
     {
-        return new MediaFileDTO(OriginalFileName, HashSha3)
+        return new MediaFileDTO(OriginalFileName, Hash)
         {
             Id = Id,
             ImportedAt = ImportedAt,

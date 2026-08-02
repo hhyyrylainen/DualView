@@ -3,7 +3,7 @@ using DualView.Shared.Models.Enums;
 
 namespace DualView.Shared.Models.DTO;
 
-public class MediaFileDTO(string originalFileName, string hashSha3) : IMediaFile
+public class MediaFileDTO(string originalFileName, string hash) : IMediaFile
 {
     public long Id { get; set; }
 
@@ -13,7 +13,7 @@ public class MediaFileDTO(string originalFileName, string hashSha3) : IMediaFile
 
     [MaxLength(256)]
     [Required]
-    public string HashSha3 { get; set; } = hashSha3;
+    public string Hash { get; set; } = hash;
 
     public DateTime ImportedAt { get; set; }
 
@@ -49,7 +49,7 @@ public interface IMediaFile
 
     [MaxLength(256)]
     [Required]
-    public string HashSha3 { get; set; }
+    public string Hash { get; set; }
 
     public DateTime ImportedAt { get; set; }
 

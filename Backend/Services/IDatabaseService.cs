@@ -40,7 +40,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task DeleteCollectionAsync(Collection collection);
 
     // Media
-    public Task<MediaFile?> GetMediaByHashAsync(string sha3);
+    public Task<MediaFile?> GetMediaByHashAsync(string hash);
     public Task<MediaFile?> GetMediaByIdAsync(long id);
 
     public Task SaveMediaFileAsync(MediaFile mediaFile);

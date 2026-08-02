@@ -32,8 +32,8 @@ public class ConfiguredMediaInfo : IConfiguredMediaInfo
     }
 }
 
-public class ConfiguredMediaDTO(string name, string hashSha3)
-    : MediaFileDTO(name, hashSha3), IConfiguredMediaInfo, IUpdateableModel
+public class ConfiguredMediaDTO(string name, string hash)
+    : MediaFileDTO(name, hash), IConfiguredMediaInfo, IUpdateableModel
 {
     public string Name => OriginalFileName;
     public long MediaFileId => Id;
@@ -45,7 +45,7 @@ public class ConfiguredMediaDTO(string name, string hashSha3)
 
     public MediaFileDTO MediaFile => this;
 
-    public ConfiguredMediaDTO(MediaFileDTO media) : this(media.OriginalFileName, media.HashSha3)
+    public ConfiguredMediaDTO(MediaFileDTO media) : this(media.OriginalFileName, media.Hash)
     {
         Id = media.Id;
         ImportedAt = media.ImportedAt;

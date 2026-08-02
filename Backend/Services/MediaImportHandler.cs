@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using Backend.Utilities;
+using DualView.Shared.Utils;
 
 namespace Backend.Services;
 
@@ -76,16 +77,14 @@ public class MediaImportHandler : IMediaImportHandler
 
         logger.LogInformation("Beginning import checks for {FileName}", fileName);
 
-        // Start by calculating the sha3 hash of the file so that we can check for duplicates
-        stream.Position = 0;
-        var hashBytes = await SHA3_256.HashDataAsync(stream);
-        var sha3 = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        // Start by calculating the sha hash of the file so that we can check for duplicates
+        var hash = await MediaHash.CalculateMediaHashAsync(stream);
 
-        var existing = await databaseService.GetMediaByHashAsync(sha3);
+        var existing = await databaseService.GetMediaByHashAsync(hash);
 
         if (existing != null)
         {
-            logger.LogInformation("Hash is already imported: {Hash}", sha3);
+            logger.LogInformation("Hash is already imported: {Hash}", hash);
 
             // If it already exists, make sure it is added to the section as desired
             try
@@ -109,7 +108,7 @@ public class MediaImportHandler : IMediaImportHandler
         if (!type.IsImage())
         {
             // Video
-            var videoMedia = await CreateVideoMedia(stream, fileName, sha3, type);
+            var videoMedia = await CreateVideoMedia(stream, fileName, hash, type);
             videoMedia.IsTemporary = true;
 
             var result = await SaveFinalMedia(stream, sectionName, storage, videoMedia);
@@ -144,7 +143,7 @@ public class MediaImportHandler : IMediaImportHandler
                 frames[0].AnimationDelay = 1;
         }
 
-        var mediaItem = new MediaFile(fileName, sha3)
+        var mediaItem = new MediaFile(fileName, hash)
         {
             Width = (int)frames[0].Width,
             Height = (int)frames[0].Height,
@@ -181,16 +180,14 @@ public class MediaImportHandler : IMediaImportHandler
 
         logger.LogInformation("Beginning import checks for {FileName}", fileName);
 
-        // Start by calculating the sha3 hash of the file so that we can check for duplicates
-        stream.Position = 0;
-        var hashBytes = await SHA3_256.HashDataAsync(stream);
-        var sha3 = Convert.ToHexString(hashBytes).ToLowerInvariant();
+        // Start by calculating the hash of the file so that we can check for duplicates
+        var hash = await MediaHash.CalculateMediaHashAsync(stream);
 
-        var existing = await databaseService.GetMediaByHashAsync(sha3);
+        var existing = await databaseService.GetMediaByHashAsync(hash);
 
         if (existing != null)
         {
-            logger.LogInformation("Hash is already imported: {Hash}", sha3);
+            logger.LogInformation("Hash is already imported: {Hash}", hash);
 
             // If it already exists, we should update the parent media if it wasn't already set
             if (existing.ParentMediaId == null && parentMediaId != null)
@@ -220,7 +217,7 @@ public class MediaImportHandler : IMediaImportHandler
         {
             // Video
 
-            var videoMedia = await CreateVideoMedia(stream, fileName, sha3, type);
+            var videoMedia = await CreateVideoMedia(stream, fileName, hash, type);
             videoMedia.ParentMediaId = parentMediaId;
 
             var result = await SaveFinalMedia(stream, targetCollectionId, storage, videoMedia);
@@ -253,7 +250,7 @@ public class MediaImportHandler : IMediaImportHandler
                 frames[0].AnimationDelay = 1;
         }
 
-        var mediaItem = new MediaFile(fileName, sha3)
+        var mediaItem = new MediaFile(fileName, hash)
         {
             Width = (int)frames[0].Width,
             Height = (int)frames[0].Height,
@@ -283,7 +280,7 @@ public class MediaImportHandler : IMediaImportHandler
         return collection.Items.Select(i => i.SequenceNumber).DefaultIfEmpty(0).Max() + 1;
     }
 
-    private async Task<MediaFile> CreateVideoMedia(Stream stream, string fileName, string sha3, MediaType type)
+    private async Task<MediaFile> CreateVideoMedia(Stream stream, string fileName, string hash, MediaType type)
     {
         // We need to use ffprobe on the file to get its info
 
@@ -330,7 +327,7 @@ public class MediaImportHandler : IMediaImportHandler
         // TODO: rounding?
         var expectedFrames = (int)(fileInfo.Duration * video.FramesPerSecond);
 
-        var mediaItem = new MediaFile(fileName, sha3)
+        var mediaItem = new MediaFile(fileName, hash)
         {
             Width = video.Width,
             Height = video.Height,

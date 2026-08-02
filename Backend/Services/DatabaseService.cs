@@ -750,9 +750,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
     }
 
-    public async Task<MediaFile?> GetMediaByHashAsync(string sha3)
+    public async Task<MediaFile?> GetMediaByHashAsync(string hash)
     {
-        return await dbContext.MediaFiles.FirstOrDefaultAsync(m => m.HashSha3 == sha3);
+        return await dbContext.MediaFiles.FirstOrDefaultAsync(m => m.Hash == hash);
     }
 
     public async Task<MediaFile?> GetMediaByIdAsync(long id)

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Security.Cryptography;
 using Backend.Models;
+using DualView.Shared.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -107,13 +108,12 @@ public class MaintenanceService : IMaintenanceService
                     try
                     {
                         using var stream = File.OpenRead(path);
-                        var hashBytes = await SHA3_256.HashDataAsync(stream);
-                        var sha3 = Convert.ToHexString(hashBytes).ToLowerInvariant();
+                        var sha = await MediaHash.CalculateMediaHashAsync(stream);
 
-                        if (sha3 != media.HashSha3)
+                        if (sha != media.Hash)
                         {
                             var error =
-                                $"Hash mismatch for media {media.Id} ({media.OriginalFileName}). Expected: {media.HashSha3}, Actual: {sha3}";
+                                $"Hash mismatch for media {media.Id} ({media.OriginalFileName}). Expected: {media.Hash}, Actual: {sha}";
                             logger.LogError(error);
                             errors.Add(error);
                             m.SetError();
