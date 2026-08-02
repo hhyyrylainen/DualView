@@ -2,7 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
@@ -17,6 +19,7 @@ public class TagManagerWindowViewModel : ViewModelBase
     private readonly ILogger<TagManagerWindowViewModel>? logger;
     private readonly IClientDatabaseService? databaseService;
     private readonly IWindowService? windowService;
+    private CancellationTokenSource? searchCts;
 
     public TagManagerWindowViewModel()
     {
@@ -46,7 +49,7 @@ public class TagManagerWindowViewModel : ViewModelBase
         {
             if (SetProperty(ref field, value))
             {
-                _ = UpdateSearch();
+                TriggerSearch();
             }
         }
     } = "";
@@ -55,7 +58,16 @@ public class TagManagerWindowViewModel : ViewModelBase
     public string NewTagName
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                {
+                    SearchString = value.ToLowerInvariant();
+                }
+            }
+        }
     } = "";
 
     public string NewTagDescription
@@ -147,11 +159,14 @@ public class TagManagerWindowViewModel : ViewModelBase
         {
             var tags = await databaseService.SearchTagsWildcardAsync(SearchString);
 
-            FoundTags.Clear();
-            foreach (var tag in tags)
+            await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                FoundTags.Add(tag);
-            }
+                FoundTags.Clear();
+                foreach (var tag in tags)
+                {
+                    FoundTags.Add(tag);
+                }
+            });
         }
         catch (Exception e)
         {
@@ -250,6 +265,25 @@ public class TagManagerWindowViewModel : ViewModelBase
         NewTagIsPrivate = false;
         NewTagAliases = "";
         NewTagImplies = "";
+    }
+
+    private void TriggerSearch()
+    {
+        searchCts?.Cancel();
+        searchCts = new CancellationTokenSource();
+        var token = searchCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(300, token);
+                await UpdateSearch();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, token);
     }
 
     private async Task LoadEditedTag(TagDTO? tag)
