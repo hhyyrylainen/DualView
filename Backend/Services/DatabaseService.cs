@@ -1467,19 +1467,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await SaveAsync();
     }
 
-    public async Task<List<MediaImportInfo>> GetPendingImportsAsync()
-    {
-        return await dbContext.MediaImportInfos
-            .Where(i => i.Status == ImportStatus.Pending)
-            .OrderByDescending(i => i.ImportDate)
-            .ToListAsync();
-    }
-
-    async Task<List<MediaImportInfoDTO>> IClientDatabaseService.GetPendingImportsAsync()
-    {
-        return (await GetPendingImportsAsync()).ConvertToDTO<MediaImportInfo, MediaImportInfoDTO>();
-    }
-
     public async Task<List<DownloadGallery>> GetDownloadGalleriesAsync()
     {
         return await dbContext.DownloadGalleries.ToListAsync();

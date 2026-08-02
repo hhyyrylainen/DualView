@@ -118,12 +118,13 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var imports = await clientDatabaseService.GetPendingImportsAsync();
+            throw new NotImplementedException();
+            // var imports = await clientDatabaseService.GetPendingImportsAsync();
             
             Dispatcher.UIThread.Post(() =>
             {
                 MediaToImport.Clear();
-                foreach (var import in imports)
+                /*foreach (var import in imports)
                 {
                     // Need to fetch media info for preview
                     // For now, assume we have it or use dummy
@@ -135,7 +136,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
                         AllowSelection = true
                     };
                     MediaToImport.Add(vm);
-                }
+                }*/
             });
         }
         catch (Exception e)

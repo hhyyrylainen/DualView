@@ -1,19 +1,16 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
-using DualView.Shared.Models.Enums;
 using Backend.Utilities;
 
 namespace Backend.Models;
 
 public class MediaImportInfo : UpdateableModel, IDTOProvider<MediaImportInfoDTO>
 {
-    // TODO: if ImportStatus is only used by this class, it should be deleted
-    public MediaImportInfo(long mediaFileId, DateTime importDate, ImportStatus status)
+    public MediaImportInfo(long mediaFileId, DateTime importDate)
     {
         MediaFileId = mediaFileId;
         ImportDate = importDate;
-        Status = status;
     }
 
     [Key]
@@ -33,8 +30,6 @@ public class MediaImportInfo : UpdateableModel, IDTOProvider<MediaImportInfoDTO>
     [MaxLength(1024)]
     public string? Referrer { get; set; }
 
-    public ImportStatus Status { get; set; }
-
     [MaxLength(1024)]
     public string? PreferredName { get; set; }
 
@@ -46,7 +41,7 @@ public class MediaImportInfo : UpdateableModel, IDTOProvider<MediaImportInfoDTO>
 
     public MediaImportInfoDTO GetDTO()
     {
-        return new MediaImportInfoDTO(MediaFileId, ImportDate, Status)
+        return new MediaImportInfoDTO(MediaFileId, ImportDate)
         {
             Id = Id,
             SourceUrl = SourceUrl,

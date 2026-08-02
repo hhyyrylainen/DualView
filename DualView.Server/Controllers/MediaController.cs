@@ -137,12 +137,6 @@ public class MediaController : Controller
         return (await databaseService.GetDeletedMediaAsync(limit)).ConvertToDTO<MediaFile, MediaFileDTO>();
     }
 
-    [HttpGet("pendingImports")]
-    public async Task<ActionResult<List<MediaImportInfoDTO>>> GetPendingImports()
-    {
-        return (await databaseService.GetPendingImportsAsync()).ConvertToDTO<MediaImportInfo, MediaImportInfoDTO>();
-    }
-
     [HttpPost("{mediaId:long}/restore")]
     public async Task<ActionResult> RestoreMedia([Required] long mediaId)
     {

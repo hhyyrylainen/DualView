@@ -78,7 +78,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<MediaFolderDTO?> GetMediaFolderFromPathAsync(string path)
     {
         return await HttpClient.GetFromJsonAsync<MediaFolderDTO?>("api/v1/mediaFolder/atPath?path=" +
-                                                                         UrlEncoder.Default.Encode(path));
+                                                                  UrlEncoder.Default.Encode(path));
     }
 
     public async Task<Tuple<List<CollectionDTO>, int>> GetFolderCollections(long folderId, int page, int pageSize)
@@ -91,7 +91,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
         FolderSortColumn sortColumn, SortDirection sortDirection, string? search = null)
     {
-        var url = $"api/v1/collection/{collectionId}/contents?page={page}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}";
+        var url =
+            $"api/v1/collection/{collectionId}/contents?page={page}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}";
 
         if (!string.IsNullOrEmpty(search))
         {
@@ -127,13 +128,15 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId)
     {
-        return await HttpClient.GetFromJsonAsync<List<FolderPathDTO>>($"api/v1/collection/{collectionId}/folderPaths") ??
+        return await HttpClient.GetFromJsonAsync<List<FolderPathDTO>>(
+                   $"api/v1/collection/{collectionId}/folderPaths") ??
                new List<FolderPathDTO>();
     }
 
     public async Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId)
     {
-        return await HttpClient.GetFromJsonAsync<List<FolderPathDTO>>($"api/v1/mediaFolder/{folderId}/parentFolderPaths") ??
+        return await HttpClient.GetFromJsonAsync<List<FolderPathDTO>>(
+                   $"api/v1/mediaFolder/{folderId}/parentFolderPaths") ??
                new List<FolderPathDTO>();
     }
 
@@ -328,8 +331,9 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
         int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null)
     {
-        var url = $"api/v1/mediaFolder/{folderId}/contents?page={itemPage}&pageSize={pageSize}&sortColumn={sortColumn}&" +
-                  $"sortDirection={sortDirection}";
+        var url =
+            $"api/v1/mediaFolder/{folderId}/contents?page={itemPage}&pageSize={pageSize}&sortColumn={sortColumn}&" +
+            $"sortDirection={sortDirection}";
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
@@ -400,7 +404,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     // Tags
     public async Task<long> CreateTagAsync(string name, TagCategory category)
     {
-        var response = await HttpClient.PostAsJsonAsync("api/v1/tag", new CreateTagRequest { Name = name, Category = category });
+        var response =
+            await HttpClient.PostAsJsonAsync("api/v1/tag", new CreateTagRequest { Name = name, Category = category });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
@@ -409,7 +414,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         long? exampleMediaId)
     {
         var response = await HttpClient.PutAsJsonAsync($"api/v1/tag/{id}",
-            new UpdateTagRequest { Name = name, Description = description, Category = category, ExampleMediaId = exampleMediaId });
+            new UpdateTagRequest
+                { Name = name, Description = description, Category = category, ExampleMediaId = exampleMediaId });
         response.EnsureSuccessStatusCode();
     }
 
@@ -431,7 +437,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task<List<TagDTO>> SearchTagsWildcardAsync(string search)
     {
-        return await HttpClient.GetFromJsonAsync<List<TagDTO>>($"api/v1/tag/search?search={Uri.EscapeDataString(search)}") ??
+        return await HttpClient.GetFromJsonAsync<List<TagDTO>>(
+                   $"api/v1/tag/search?search={Uri.EscapeDataString(search)}") ??
                new List<TagDTO>();
     }
 
@@ -442,14 +449,16 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task<long> CreateTagModifierAsync(string name)
     {
-        var response = await HttpClient.PostAsJsonAsync("api/v1/tagModifier", new CreateModifierRequest { Name = name });
+        var response =
+            await HttpClient.PostAsJsonAsync("api/v1/tagModifier", new CreateModifierRequest { Name = name });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
 
     public async Task UpdateTagModifierAsync(long id, string? name, string? description)
     {
-        var response = await HttpClient.PutAsJsonAsync($"api/v1/tagModifier/{id}", new UpdateModifierRequest { Name = name, Description = description });
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/tagModifier/{id}",
+            new UpdateModifierRequest { Name = name, Description = description });
         response.EnsureSuccessStatusCode();
     }
 
@@ -482,19 +491,22 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task CreateTagAliasAsync(long tagId, string alias)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/alias", new CreateTagAliasRequest { Alias = alias });
+        var response =
+            await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/alias", new CreateTagAliasRequest { Alias = alias });
         response.EnsureSuccessStatusCode();
     }
 
     public async Task DeleteTagAliasAsync(long tagId, string alias)
     {
-        var response = await HttpClient.DeleteAsync($"api/v1/tag/{tagId}/alias?alias={UrlEncoder.Default.Encode(alias)}");
+        var response =
+            await HttpClient.DeleteAsync($"api/v1/tag/{tagId}/alias?alias={UrlEncoder.Default.Encode(alias)}");
         response.EnsureSuccessStatusCode();
     }
 
     public async Task CreateTagModifierAliasAsync(long modifierId, string alias)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/tagModifier/{modifierId}/alias", new CreateTagModifierAliasRequest { Alias = alias });
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tagModifier/{modifierId}/alias",
+            new CreateTagModifierAliasRequest { Alias = alias });
         response.EnsureSuccessStatusCode();
     }
 
@@ -508,7 +520,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
 
     public async Task AddTagImplicationAsync(long tagId, long impliedTagId)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/imply", new AddImplicationRequest { ImpliedTagId = impliedTagId });
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/imply",
+            new AddImplicationRequest { ImpliedTagId = impliedTagId });
         response.EnsureSuccessStatusCode();
     }
 
@@ -523,7 +536,11 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         long? combinedWithAppliedTagId, string? combineWord)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/media/{mediaId}/appliedTag",
-            new AddAppliedTagRequest { TagId = tagId, ModifierIds = modifierIds, CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord });
+            new AddAppliedTagRequest
+            {
+                TagId = tagId, ModifierIds = modifierIds, CombinedWithAppliedTagId = combinedWithAppliedTagId,
+                CombineWord = combineWord
+            });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
@@ -538,7 +555,11 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         long? combinedWithAppliedTagId, string? combineWord)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/appliedTag",
-            new AddAppliedTagRequest { TagId = tagId, ModifierIds = modifierIds, CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord });
+            new AddAppliedTagRequest
+            {
+                TagId = tagId, ModifierIds = modifierIds, CombinedWithAppliedTagId = combinedWithAppliedTagId,
+                CombineWord = combineWord
+            });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
@@ -562,12 +583,6 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     }
 
     // Import & Galleries
-    public async Task<List<MediaImportInfoDTO>> GetPendingImportsAsync()
-    {
-        return await HttpClient.GetFromJsonAsync<List<MediaImportInfoDTO>>("api/v1/media/pendingImports") ??
-               new List<MediaImportInfoDTO>();
-    }
-
     public async Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId)
     {
         return await HttpClient.GetFromJsonAsync<MediaImportInfoDTO?>($"api/v1/media/{mediaId}/importInfo");

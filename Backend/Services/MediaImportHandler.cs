@@ -352,7 +352,7 @@ public class MediaImportHandler : IMediaImportHandler
 
         if (importInfo == null)
         {
-            importInfo = new MediaImportInfo(media.Id, DateTime.UtcNow, ImportStatus.Completed)
+            importInfo = new MediaImportInfo(media.Id, DateTime.UtcNow)
             {
                 SourcePath = sourcePath,
             };
