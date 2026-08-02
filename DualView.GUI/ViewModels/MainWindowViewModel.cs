@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
@@ -399,11 +398,6 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public void OpenMediaManager()
-    {
-        windowService?.ShowSingletonWindow<MediaCollectionWindowViewModel>();
-    }
-
     public void OpenImportWindow()
     {
         windowService?.ShowSingletonWindow<ImportWindowViewModel>();
@@ -501,10 +495,6 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private void InitializeMenu()
     {
         AddDefaultMenuItems(Hamburger);
-        Hamburger.MenuItems.Add(new HamburgerMenuItem
-            { Title = "Media", Command = new RelayCommand(OpenMediaManager) });
-        Hamburger.MenuItems.Add(new HamburgerMenuItem
-            { Title = "Import Media", Command = new RelayCommand(OpenImportWindow) });
 
         // TODO: implement duplicate finding window (planned for later)
         /*Hamburger.MenuItems.Add(new HamburgerMenuItem
