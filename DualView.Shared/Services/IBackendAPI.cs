@@ -8,7 +8,8 @@ namespace DualView.Shared.Services;
 /// </summary>
 public interface IBackendAPI
 {
-    public Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName);
+    public Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName,
+        string? sourcePath = null);
 
     // Operation operations
     public Task<OperationStatusUpdate> GetOperationStatus(long operationId);

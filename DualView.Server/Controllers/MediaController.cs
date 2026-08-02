@@ -47,7 +47,7 @@ public class MediaController : Controller
 
     [HttpPost("import")]
     public async Task<ActionResult<MediaFileDTO>> ImportMedia([FromQuery] string? sectionName,
-        [Required] IFormFile file)
+        [FromQuery] string? sourcePath, [Required] IFormFile file)
     {
         if (file.Length == 0)
             return BadRequest("No file was uploaded.");
@@ -58,7 +58,7 @@ public class MediaController : Controller
         // Access the stream from the uploaded file
         await using var stream = file.OpenReadStream();
 
-        var media = await mediaImportHandler.ImportMedia(file.FileName, stream, sectionName);
+        var media = await mediaImportHandler.ImportMedia(file.FileName, stream, sectionName, sourcePath);
 
         return media.GetDTO();
     }

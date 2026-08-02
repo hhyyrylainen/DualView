@@ -1459,6 +1459,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.MediaImportInfos.FirstOrDefaultAsync(i => i.MediaFileId == mediaId);
     }
 
+    public async Task SaveMediaImportInfoAsync(MediaImportInfo importInfo)
+    {
+        if (dbContext.Entry(importInfo).State == EntityState.Detached)
+            await dbContext.MediaImportInfos.AddAsync(importInfo);
+
+        await SaveAsync();
+    }
+
     public async Task<List<MediaImportInfo>> GetPendingImportsAsync()
     {
         return await dbContext.MediaImportInfos

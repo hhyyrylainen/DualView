@@ -311,8 +311,10 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
                 logger?.LogInformation("Importing {ImagePath} to {Target}", local.LocalPath, target);
 
                 // TODO: this needs to set the collection
+                // TODO: this entire window needs to be redesigned for DualView 3
+                throw new NotImplementedException();
                 var mediaConfiguration = await backendAPI!.ImportMedia(Path.GetFileName(local.LocalPath),
-                    File.OpenRead(local.LocalPath), null);
+                    File.OpenRead(local.LocalPath), null, local.LocalPath);
 
                 if (!string.IsNullOrWhiteSpace(secondary))
                 {

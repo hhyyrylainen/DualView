@@ -13,10 +13,22 @@ public class HttpBackendAPI : IBackendAPI
         HttpClient = httpClient;
     }
 
-    public async Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName)
+    public async Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName,
+        string? sourcePath = null)
     {
+        var url = $"api/v1/media/import?sectionName={Uri.EscapeDataString(sectionName ?? "")}";
+
+        if (!string.IsNullOrEmpty(sourcePath))
+        {
+            url += $"&sourcePath={Uri.EscapeDataString(sourcePath)}";
+        }
+        else
+        {
+            throw new ArgumentException("sourcePath cannot be null or empty");
+        }
+
         var response = await HttpClient.PostAsync(
-            $"api/v1/media/import?sectionName={Uri.EscapeDataString(sectionName ?? "")}",
+            url,
             new MultipartFormDataContent
             {
                 { new StreamContent(data), "file", fileName }

@@ -120,6 +120,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     // Import & Galleries
     public Task<MediaImportInfo?> GetMediaImportInfoAsync(long mediaId);
+    public Task SaveMediaImportInfoAsync(MediaImportInfo importInfo);
     public Task<List<MediaImportInfo>> GetPendingImportsAsync();
     public Task<List<DownloadGallery>> GetDownloadGalleriesAsync();
     public Task<DownloadGallery?> GetDownloadGalleryAsync(long id);

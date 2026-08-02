@@ -121,7 +121,8 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
                 {
                     await using var stream = File.OpenRead(file.LocalPath);
                     // Use ImportMedia for now, but we might want a specific upload endpoint
-                    await backendAPI.ImportMedia(Path.GetFileName(file.LocalPath), stream, UploadSectionName);
+                    await backendAPI.ImportMedia(Path.GetFileName(file.LocalPath), stream, UploadSectionName,
+                        file.LocalPath);
                     file.Status = "Done";
                 }
                 catch (Exception e)

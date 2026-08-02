@@ -62,7 +62,8 @@ public class MediaImportHandler : IMediaImportHandler
         return media.CropLeft > 0 || media.CropTop > 0 || media.CropRight > 0 || media.CropBottom > 0;
     }
 
-    public async Task<MediaFile> ImportMedia(string fileName, Stream stream, string? sectionName)
+    public async Task<MediaFile> ImportMedia(string fileName, Stream stream, string? sectionName,
+        string? sourcePath = null)
     {
         if (!stream.CanSeek)
             throw new ArgumentException("Current implementation of importing must be able to seek");
@@ -100,6 +101,8 @@ public class MediaImportHandler : IMediaImportHandler
                 throw;
             }
 
+            await HandleSourcePath(existing, sourcePath);
+
             return existing;
         }
 
@@ -110,6 +113,8 @@ public class MediaImportHandler : IMediaImportHandler
             videoMedia.IsTemporary = true;
 
             var result = await SaveFinalMedia(stream, sectionName, storage, videoMedia);
+
+            await HandleSourcePath(result, sourcePath);
 
             return result;
         }
@@ -153,6 +158,8 @@ public class MediaImportHandler : IMediaImportHandler
         };
 
         var finalResult = await SaveFinalMedia(stream, sectionName, storage, mediaItem);
+
+        await HandleSourcePath(finalResult, sourcePath);
 
         return finalResult;
     }
@@ -334,6 +341,32 @@ public class MediaImportHandler : IMediaImportHandler
         };
 
         return mediaItem;
+    }
+
+    private async Task HandleSourcePath(MediaFile media, string? sourcePath)
+    {
+        if (string.IsNullOrEmpty(sourcePath))
+            return;
+
+        var importInfo = await databaseService.GetMediaImportInfoAsync(media.Id);
+
+        if (importInfo == null)
+        {
+            importInfo = new MediaImportInfo(media.Id, DateTime.UtcNow, ImportStatus.Completed)
+            {
+                SourcePath = sourcePath,
+            };
+        }
+        else if (string.IsNullOrEmpty(importInfo.SourcePath))
+        {
+            importInfo.SourcePath = sourcePath;
+        }
+        else
+        {
+            return;
+        }
+
+        await databaseService.SaveMediaImportInfoAsync(importInfo);
     }
 
     private async Task<MediaFile> SaveFinalMedia(Stream stream, string? sectionName, string storage,
