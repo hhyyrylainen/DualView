@@ -339,18 +339,11 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             if (currentCollectionId != null)
             {
                 var (contents, totalItems) = await databaseService.GetCollectionContents(currentCollectionId.Value,
-                    currentPage - 1, pageSize, FolderSortColumn.Name, SortDirection.Ascending);
+                    currentPage - 1, pageSize, FolderSortColumn.Name, SortDirection.Ascending, searchText);
 
                 totalItemsCount = totalItems;
 
-                IEnumerable<MediaFileDTO> filteredItems = contents;
-                if (!string.IsNullOrWhiteSpace(searchText))
-                {
-                    filteredItems = contents.Where(i =>
-                        (i.OriginalFileName ?? "").Contains(searchText, StringComparison.OrdinalIgnoreCase));
-                }
-
-                foreach (var item in filteredItems)
+                foreach (var item in contents)
                 {
                     newItems.Add(new MediaViewerViewModel(logger, windowService)
                     {

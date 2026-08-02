@@ -89,10 +89,16 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     }
 
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
-        FolderSortColumn sortColumn, SortDirection sortDirection)
+        FolderSortColumn sortColumn, SortDirection sortDirection, string? search = null)
     {
-        return await HttpClient.GetFromJsonAsync<Tuple<List<MediaFileDTO>, int>>(
-                   $"api/v1/collection/{collectionId}/contents?page={page}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}") ??
+        var url = $"api/v1/collection/{collectionId}/contents?page={page}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}";
+
+        if (!string.IsNullOrEmpty(search))
+        {
+            url += $"&search={UrlEncoder.Default.Encode(search)}";
+        }
+
+        return await HttpClient.GetFromJsonAsync<Tuple<List<MediaFileDTO>, int>>(url) ??
                throw new Exception("Failed to get media");
     }
 

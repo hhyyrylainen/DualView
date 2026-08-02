@@ -608,10 +608,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     }
 
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
-        FolderSortColumn sortColumn, SortDirection sortDirection)
+        FolderSortColumn sortColumn, SortDirection sortDirection, string? search = null)
     {
         var query = dbContext.Set<CollectionItem>()
             .Where(ci => ci.CollectionId == collectionId);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.ToLowerInvariant();
+            query = query.Where(ci => ci.MediaFile.NameLowerCase.Contains(searchLower));
+        }
 
         var total = await query.CountAsync();
 
