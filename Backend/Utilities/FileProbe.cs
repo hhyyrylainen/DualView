@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Backend.Models;
+using ImageMagick;
 
 namespace Backend.Utilities;
 
@@ -226,5 +227,19 @@ public static class FileProbe
         {
             return Streams.OfType<VideoStream>().ElementAt(index);
         }
+    }
+
+    public static string? GetExtensionForFormat(MagickFormat format)
+    {
+        return format switch
+        {
+            MagickFormat.Png => ".png",
+            MagickFormat.Gif => ".gif",
+            MagickFormat.Bmp => ".bmp",
+            MagickFormat.Jpeg => ".jpg",
+            MagickFormat.WebP => ".webp",
+            MagickFormat.Tiff => ".tiff",
+            _ => null,
+        };
     }
 }
