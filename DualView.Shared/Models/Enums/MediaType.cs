@@ -10,6 +10,7 @@ public enum MediaType
     Mp4,
     Mkv,
     Webm,
+    Bmp,
 }
 
 public static class MediaTypeExtensions
@@ -23,6 +24,7 @@ public static class MediaTypeExtensions
             case MediaType.Gif:
             case MediaType.Webp:
             case MediaType.WebpAnimated:
+            case MediaType.Bmp:
                 return true;
         }
 
@@ -82,6 +84,9 @@ public static class MediaTypeExtensions
         if (extension == ".webm")
             return MediaType.Webm;
 
+        if(extension == ".bmp")
+            return MediaType.Bmp;
+
         throw new ArgumentException("Unknown file extension: " + extension);
     }
 
@@ -104,6 +109,8 @@ public static class MediaTypeExtensions
                 return ".mkv";
             case MediaType.Webm:
                 return ".webm";
+            case MediaType.Bmp:
+                return ".bmp";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
@@ -128,6 +135,8 @@ public static class MediaTypeExtensions
                 return "video/x-matroska";
             case MediaType.Webm:
                 return "video/webm";
+            case MediaType.Bmp:
+                return "image/bmp";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
