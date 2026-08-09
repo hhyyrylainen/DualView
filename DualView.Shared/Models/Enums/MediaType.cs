@@ -11,6 +11,7 @@ public enum MediaType
     Mkv,
     Webm,
     Bmp,
+    Tif,
 }
 
 public static class MediaTypeExtensions
@@ -25,6 +26,7 @@ public static class MediaTypeExtensions
             case MediaType.Webp:
             case MediaType.WebpAnimated:
             case MediaType.Bmp:
+            case MediaType.Tif:
                 return true;
         }
 
@@ -66,7 +68,7 @@ public static class MediaTypeExtensions
         if (extension == ".png")
             return MediaType.Png;
 
-        if (extension == ".jpeg" || extension == ".jpg")
+        if (extension == ".jpeg" || extension == ".jpg" || extension == ".jfif" || extension == ".heic")
             return MediaType.Jpeg;
 
         if (extension == ".gif")
@@ -84,8 +86,11 @@ public static class MediaTypeExtensions
         if (extension == ".webm")
             return MediaType.Webm;
 
-        if(extension == ".bmp")
+        if (extension == ".bmp")
             return MediaType.Bmp;
+
+        if (extension == ".tif")
+            return MediaType.Tif;
 
         throw new ArgumentException("Unknown file extension: " + extension);
     }
@@ -111,6 +116,8 @@ public static class MediaTypeExtensions
                 return ".webm";
             case MediaType.Bmp:
                 return ".bmp";
+            case MediaType.Tif:
+                return ".tif";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
@@ -137,6 +144,8 @@ public static class MediaTypeExtensions
                 return "video/webm";
             case MediaType.Bmp:
                 return "image/bmp";
+            case MediaType.Tif:
+                return "image/tiff";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
