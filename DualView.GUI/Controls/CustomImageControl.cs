@@ -398,15 +398,17 @@ public class CustomImageControl : Control, IBrushPreviewTarget
 
         var overlay = ExtraOverlayImage;
         var sourceSize = source?.Size ?? background!.Size;
-        var destRect = GetImageDestinationRect();
+        var destRect = GetImageDestinationRect(sourceSize);
 
         if (background != null)
         {
-            context.DrawImage(background, new Rect(background.Size), destRect);
+            var backgroundDestRect = GetImageDestinationRect(background.Size);
+            context.DrawImage(background, new Rect(background.Size), backgroundDestRect);
         }
 
         if (source != null)
         {
+            destRect = GetImageDestinationRect(source.Size);
             context.DrawImage(source, new Rect(source.Size), destRect);
         }
 
@@ -444,7 +446,7 @@ public class CustomImageControl : Control, IBrushPreviewTarget
         var source = Source ?? throw new InvalidOperationException("Cannot map coordinates without a source image.");
 
         var sourceSize = source.Size;
-        var destRect = GetImageDestinationRect();
+        var destRect = GetImageDestinationRect(sourceSize);
 
         double imageX = (controlRelativeX - destRect.X) / destRect.Width * sourceSize.Width;
         double imageY = (controlRelativeY - destRect.Y) / destRect.Height * sourceSize.Height;
@@ -469,20 +471,12 @@ public class CustomImageControl : Control, IBrushPreviewTarget
         IsVisibleInViewport = inViewport && windowVisible;
     }
 
-    private Rect GetImageDestinationRect()
+    private Rect GetImageDestinationRect(Size imageSize)
     {
-        var source = Source;
-        var background = BackgroundSource;
-
-        if (source == null && background == null)
-            throw new InvalidOperationException(
-                "Cannot calculate destination rectangle without a source or background image.");
-
         var viewPort = new Rect(Bounds.Size);
-        var sourceSize = source?.Size ?? background!.Size;
 
-        double baseScale = Math.Min(viewPort.Width / sourceSize.Width, viewPort.Height / sourceSize.Height);
-        Size baseDestSize = sourceSize * baseScale;
+        double baseScale = Math.Min(viewPort.Width / imageSize.Width, viewPort.Height / imageSize.Height);
+        Size baseDestSize = imageSize * baseScale;
 
         double zoom = Math.Max(0.00001, RenderScale);
         Size zoomedDestSize = new(baseDestSize.Width * zoom, baseDestSize.Height * zoom);
