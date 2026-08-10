@@ -78,7 +78,9 @@ public class MediaContentController : Controller
             }
         }
 
-        return File(System.IO.File.OpenRead(path), media.MediaType.ToMimeType(),
+        // The generated thumbnail format is authoritative for the response MIME type.
+        var thumbnailMediaType = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(path));
+        return File(System.IO.File.OpenRead(path), thumbnailMediaType.ToMimeType(),
             "thumb_" + media.OriginalFileName);
     }
 
@@ -112,7 +114,9 @@ public class MediaContentController : Controller
             }
         }
 
-        return File(System.IO.File.OpenRead(path), media.MediaType.ToMimeType(),
+        // The generated thumbnail format is authoritative for the response MIME type.
+        var thumbnailMediaType = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(path));
+        return File(System.IO.File.OpenRead(path), thumbnailMediaType.ToMimeType(),
             "thumb_" + media.OriginalFileName);
     }
 

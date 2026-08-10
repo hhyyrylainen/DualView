@@ -162,7 +162,18 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
             {
                 await using var data = await imageRequest.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
-                if (MediaInfo.MediaType.IsAnimated())
+                // Note the MediaInfo is synthetic when showing a collection; for that reason, we check the server
+                // MIME type.
+                var responseMediaType = imageRequest.Content.Headers.ContentType?.MediaType;
+
+                var serverMediaType = MediaInfo.MediaType;
+
+                if (!string.IsNullOrWhiteSpace(responseMediaType))
+                    serverMediaType = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(responseMediaType));
+
+                // TODO: detecting animated webp?
+
+                if (MediaInfo.MediaType.IsAnimated() || serverMediaType.IsAnimated())
                 {
                     var collection = new MagickImageCollection();
                     await collection.ReadAsync(data).ConfigureAwait(false);
