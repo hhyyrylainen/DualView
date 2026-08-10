@@ -35,6 +35,12 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
     private readonly bool tryFixOldCollection = false;
 
     /// <summary>
+    ///   If set to true, skips importing files that are broken. This is useful to get a mostly working import if there
+    ///   are many bad files.
+    /// </summary>
+    private readonly bool skipImportBrokenFiles = false;
+
+    /// <summary>
     ///   These files are corrupted but allowed to be imported with the changed hash. NOTE: clear this array before
     ///   committing!
     /// </summary>
@@ -1050,49 +1056,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         int skipped = 0;
         int processed = 0;
 
-        await foreach (var row in ReadRowsAsync(connection, "SELECT image, tag FROM image_tag", cancellationToken))
-        {
-            if (!mediaIds.TryGetValue(row.GetInt64("image"), out var mediaId) ||
-                !appliedTagIds.TryGetValue(row.GetInt64("tag"), out var appliedTagId))
-            {
-                // Presumably, these are mostly failed media imports, so they are skipped
-                ++skipped;
-                continue;
-            }
-
-            var media = await dbContext.MediaFiles.Include(item => item.AppliedTags).FirstAsync(
-                item => item.Id == mediaId, cancellationToken);
-            var applied = await dbContext.AppliedTags.FindAsync([appliedTagId], cancellationToken);
-            if (applied != null && media.AppliedTags.All(item => item.Id != applied.Id))
-                media.AppliedTags.Add(applied);
-
-            if (applied == null)
-            {
-                logger.LogWarning("Cannot find applied tag to add to media with id {MediaId}, tag {TagId}", mediaId,
-                    appliedTagId);
-            }
-
-            ++processed;
-
-            // Save intermittently to not leave everything until the end
-            if (processed % 10000 == 0)
-            {
-                await dbContext.SaveChangesAsync(cancellationToken);
-                logger.LogInformation("Processed {Count} image tags", processed);
-            }
-        }
-
-        if (skipped > 0)
-            logger.LogWarning("Skipped {Count} image tags (probably unimported images)", skipped);
-
-        logger.LogInformation("Imported {Count} image tags", processed);
-
-        // Save after each block as we do have plenty of changes applied, and it would be better to find errors
-        // before continuing
-        await dbContext.SaveChangesAsync(cancellationToken);
-        skipped = 0;
-        processed = 0;
-
+        // There's least number of these in the DB, so we import them first as this can use normal EF without being
+        // way too slow
         await foreach (var row in ReadRowsAsync(connection, "SELECT collection, tag FROM collection_tag",
                            cancellationToken))
         {
@@ -1107,7 +1072,10 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                 .FirstAsync(item => item.Id == collectionId, cancellationToken);
             var applied = await dbContext.AppliedTags.FindAsync([appliedTagId], cancellationToken);
             if (applied != null && collection.AppliedTags.All(item => item.Id != applied.Id))
+            {
                 collection.AppliedTags.Add(applied);
+                ++processed;
+            }
 
             if (applied == null)
             {
@@ -1115,9 +1083,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                     collectionId, appliedTagId);
             }
 
-            ++processed;
-
-            if (processed % 1000 == 0)
+            if (processed % 5000 == 0)
             {
                 await dbContext.SaveChangesAsync(cancellationToken);
                 logger.LogInformation("Processed {Count} collection tags", processed);
@@ -1129,9 +1095,79 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
 
         logger.LogInformation("Imported {Count} collection tags", processed);
 
+        // Save after each block as we do have plenty of changes applied, and it would be better to find errors
+        // before continuing
         await dbContext.SaveChangesAsync(cancellationToken);
         skipped = 0;
         processed = 0;
+
+        // Then these two next ones are complicated because there's so much data we have to be more efficient.
+        // This is a dictionary of *new* image ID to a list of *new* applied tag IDs.
+        var imageTagGroups = new Dictionary<long, List<long>>();
+
+        await foreach (var row in ReadRowsAsync(connection, "SELECT image, tag FROM image_tag", cancellationToken))
+        {
+            if (!mediaIds.TryGetValue(row.GetInt64("image"), out var mediaId) ||
+                !appliedTagIds.TryGetValue(row.GetInt64("tag"), out var appliedTagId))
+            {
+                // Presumably, these are mostly failed media imports, so they are skipped
+                ++skipped;
+                continue;
+            }
+
+            if (!imageTagGroups.TryGetValue(mediaId, out var currentImageTags))
+            {
+                currentImageTags = new List<long>();
+                imageTagGroups.Add(mediaId, currentImageTags);
+            }
+
+            currentImageTags.Add(appliedTagId);
+        }
+
+        if (skipped > 0)
+            logger.LogWarning("Skipped {Count} image tags (probably unimported images)", skipped);
+
+        int index = 0;
+        int total = imageTagGroups.Count;
+        int added = 0;
+
+        foreach (var imageTagGroup in imageTagGroups)
+        {
+            // Write each image tag group in a single transaction
+            await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+            {
+                foreach (var tagId in imageTagGroup.Value)
+                {
+                    added += await dbContext.Database.ExecuteSqlAsync(
+                        $"INSERT OR IGNORE INTO MediaFileAppliedTags (MediaFilesId, AppliedTagsId) VALUES ({imageTagGroup.Key}, {tagId})",
+                        cancellationToken: cancellationToken);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            processed += imageTagGroup.Value.Count;
+            ++index;
+
+            if (index % 10000 == 0)
+            {
+                logger.LogInformation("Processed {Count} out of {Total} image tag groups (new tags: {Added})", index, total, added);
+            }
+        }
+
+        logger.LogInformation("Processed {Count} image tags and added {Added} new tags", processed, added);
+        imageTagGroups.Clear();
+
+        // We want to let go of this data
+        // ReSharper disable once RedundantAssignment
+        imageTagGroups = null;
+
+        skipped = 0;
+        processed = 0;
+        added = 0;
+
+        // This is a dictionary of *new* collection ID, and a list of new image IDs and their show order.
+        var imageCollectionGroups = new Dictionary<long, List<(long Image, long ShowOrder)>>();
 
         await foreach (var row in ReadRowsAsync(connection,
                            "SELECT collection, image, show_order FROM collection_image",
@@ -1145,31 +1181,47 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                 continue;
             }
 
-            var exists = await dbContext.Set<CollectionItem>().AnyAsync(item => item.CollectionId == collectionId &&
-                item.MediaFileId == mediaId, cancellationToken);
-            if (!exists)
+            if (!imageCollectionGroups.TryGetValue(collectionId, out var imageCollectionGroup))
             {
-                dbContext.Set<CollectionItem>().Add(new CollectionItem
-                {
-                    CollectionId = collectionId,
-                    MediaFileId = mediaId,
-                    SequenceNumber = row.GetInt32("show_order"),
-                });
+                imageCollectionGroup = new List<(long Image, long ShowOrder)>();
+                imageCollectionGroups.Add(collectionId, imageCollectionGroup);
             }
 
-            ++processed;
-
-            if (processed % 10000 == 0)
-            {
-                await dbContext.SaveChangesAsync(cancellationToken);
-                logger.LogInformation("Processed {Count} collection image records", processed);
-            }
+            imageCollectionGroup.Add((mediaId, row.GetInt32("show_order")));
         }
 
         if (skipped > 0)
             logger.LogWarning("Skipped {Count} collection image assignments (probably unimported images)", skipped);
 
-        logger.LogInformation("Imported {Count} collection image assignments", processed);
+        total = imageCollectionGroups.Count;
+        index = 0;
+
+        foreach (var collectionGroup in imageCollectionGroups)
+        {
+            // Write each collection image list in a single transaction
+            await using (var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken))
+            {
+                foreach (var (mediaId, showOrder) in collectionGroup.Value)
+                {
+                    added += await dbContext.Database.ExecuteSqlAsync(
+                        $"INSERT OR IGNORE INTO CollectionItem (CollectionId, MediaFileId, SequenceNumber) VALUES ({collectionGroup.Key}, {mediaId}, {showOrder})",
+                        cancellationToken: cancellationToken);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+            }
+
+            processed += collectionGroup.Value.Count;
+            ++index;
+
+            if (index % 300 == 0)
+            {
+                logger.LogInformation("Processed {Count} out of {Total} collection image contents", index, total);
+            }
+        }
+
+        logger.LogInformation("Processed {Count} collection items and added {Added} new items", processed, added);
+        imageCollectionGroups.Clear();
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
