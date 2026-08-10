@@ -32,7 +32,7 @@ public class ServerEditPreview : ServerMediaSource
         return new ServerEditPreview(MediaInfo, VideoPlayerServiceProvider);
     }
 
-    protected override Task<HttpResponseMessage> SendRequest(string url)
+    protected override Task<HttpResponseMessage> SendRequest(string url, bool smallRequest)
     {
         // We need to send it as the real type, otherwise not all properties are written
         var data = JsonSerializer.Serialize(MediaInfo, MediaInfo.GetType(), JsonSerializerOptions.Web);

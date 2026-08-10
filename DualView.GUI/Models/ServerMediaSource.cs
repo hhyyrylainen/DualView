@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Net.Http;
+using System.Threading;
 using System.Threading.Tasks;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
@@ -18,6 +19,11 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
     {
         Timeout = TimeSpan.FromSeconds(120),
     };
+
+    /// <summary>
+    ///   Limit concurrency of image decoding to make the overall process not stall for a really long time
+    /// </summary>
+    protected static readonly SemaphoreSlim ImageDecodingLock = new(4, 4);
 
     protected readonly IConfiguredMediaInfo MediaInfo;
 
@@ -83,34 +89,42 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
 
             PrepareForNewMedia();
 
-            var imageRequest = await SendRequest(GetFullDownloadUrl());
+            var imageRequest = await SendRequest(GetFullDownloadUrl(), false);
             imageRequest.EnsureSuccessStatusCode();
 
             if (MediaInfo.MediaType.IsImage())
             {
                 await using var data = await imageRequest.Content.ReadAsStreamAsync().ConfigureAwait(false);
 
-                if (MediaInfo.MediaType.IsAnimated())
+                await ImageDecodingLock.WaitAsync();
+                try
                 {
-                    var collection = new MagickImageCollection();
-                    await collection.ReadAsync(data).ConfigureAwait(false);
-
-                    // TODO: should this be done in a task in case this takes a while?
-                    foreach (var frame in collection)
+                    if (MediaInfo.MediaType.IsAnimated())
                     {
-                        frame.AutoOrient();
+                        var collection = new MagickImageCollection();
+                        await collection.ReadAsync(data).ConfigureAwait(false);
+
+                        // TODO: should this be done in a task in case this takes a while?
+                        foreach (var frame in collection)
+                        {
+                            frame.AutoOrient();
+                        }
+
+                        LoadImage(null, collection);
                     }
+                    else
+                    {
+                        var image = new MagickImage();
+                        await image.ReadAsync(data).ConfigureAwait(false);
 
-                    LoadImage(null, collection);
+                        image.AutoOrient();
+
+                        LoadImage(image, null);
+                    }
                 }
-                else
+                finally
                 {
-                    var image = new MagickImage();
-                    await image.ReadAsync(data).ConfigureAwait(false);
-
-                    image.AutoOrient();
-
-                    LoadImage(image, null);
+                    ImageDecodingLock.Release();
                 }
             }
             else
@@ -122,8 +136,16 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
                 await imageRequest.Content.CopyToAsync(memoryStream);
                 memoryStream.Position = 0;
 
-                // This will dispose of the memory when not needed any more
-                await StartVideo(memoryStream);
+                await ImageDecodingLock.WaitAsync();
+                try
+                {
+                    // This will dispose of the memory when not needed any more
+                    await StartVideo(memoryStream);
+                }
+                finally
+                {
+                    ImageDecodingLock.Release();
+                }
             }
 
             LoadStatus = IVisualMediaSource.LoadType.FullSize;
@@ -145,7 +167,7 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
 
             PrepareForNewMedia();
 
-            var imageRequest = await SendRequest(GetThumbnailDownloadUrl());
+            var imageRequest = await SendRequest(GetThumbnailDownloadUrl(), true);
 
             if (imageRequest.StatusCode == HttpStatusCode.NotFound && MediaInfo.IsCollection)
             {
@@ -169,24 +191,31 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
                 var serverMediaType = MediaInfo.MediaType;
 
                 if (!string.IsNullOrWhiteSpace(responseMediaType))
-                    serverMediaType = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(responseMediaType));
+                    serverMediaType = MediaTypeExtensions.TypeFromMime(responseMediaType);
 
-                // TODO: detecting animated webp?
-
-                if (MediaInfo.MediaType.IsAnimated() || serverMediaType.IsAnimated())
+                await ImageDecodingLock.WaitAsync();
+                try
                 {
-                    var collection = new MagickImageCollection();
-                    await collection.ReadAsync(data).ConfigureAwait(false);
+                    // TODO: detecting animated webp?
+                    if (MediaInfo.MediaType.IsAnimated() || serverMediaType.IsAnimated())
+                    {
+                        var collection = new MagickImageCollection();
+                        await collection.ReadAsync(data).ConfigureAwait(false);
 
-                    // The server auto-orients thumbnails, so we don't need to apply that here
+                        // The server auto-orients thumbnails, so we don't need to apply that here
 
-                    LoadImage(null, collection);
+                        LoadImage(null, collection);
+                    }
+                    else
+                    {
+                        var image = new MagickImage();
+                        await image.ReadAsync(data).ConfigureAwait(false);
+                        LoadImage(image, null);
+                    }
                 }
-                else
+                finally
                 {
-                    var image = new MagickImage();
-                    await image.ReadAsync(data).ConfigureAwait(false);
-                    LoadImage(image, null);
+                    ImageDecodingLock.Release();
                 }
             }
             else
@@ -200,7 +229,15 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
                 await imageRequest.Content.CopyToAsync(memoryStream);
                 memoryStream.Position = 0;
 
-                await StartVideo(memoryStream, true);
+                await ImageDecodingLock.WaitAsync();
+                try
+                {
+                    await StartVideo(memoryStream, true);
+                }
+                finally
+                {
+                    ImageDecodingLock.Release();
+                }
             }
 
             LoadStatus = IVisualMediaSource.LoadType.Thumbnail;
@@ -238,8 +275,15 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
         return new ServerMediaSource(MediaInfo, VideoPlayerServiceProvider);
     }
 
-    protected virtual Task<HttpResponseMessage> SendRequest(string url)
+    protected virtual Task<HttpResponseMessage> SendRequest(string url, bool smallRequest)
     {
+        if (smallRequest)
+        {
+            // Buffer small data all upfront for better decoding
+            return HttpClient.GetAsync(url, HttpCompletionOption.ResponseContentRead);
+        }
+
+        // Big things will still be read synchronously
         return HttpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
     }
 
