@@ -23,7 +23,7 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
     [Key]
     public long Id { get; set; }
 
-    [MaxLength(200)]
+    [MaxLength(256)]
     public string OriginalFileName
     {
         get;
@@ -34,7 +34,7 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
         }
     }
 
-    [MaxLength(200)]
+    [MaxLength(256)]
     public string NameLowerCase { get; set; }
 
     /// <summary>
@@ -83,10 +83,9 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
     public ICollection<CollectionItem> InCollections { get; set; } = new List<CollectionItem>();
 
     public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
-    
+
     public ICollection<UploadSectionItem> InUploadSections { get; set; } = new List<UploadSectionItem>();
 
-    // TODO: make this mandatory as all files should have info where they came from even if it has to have blank fields
     public MediaImportInfo? ImportInfo { get; set; }
 
     public string PathRelativeToStorage()
