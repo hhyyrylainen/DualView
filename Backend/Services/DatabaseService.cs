@@ -661,6 +661,24 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == id);
     }
 
+    public async Task<MediaFile?> GetCollectionPreviewMediaAsync(long collectionId)
+    {
+        var collection = await dbContext.Collections.FirstOrDefaultAsync(c => c.Id == collectionId);
+        if (collection == null)
+            return null;
+
+        if (collection.PreviewMediaId is { } previewMediaId)
+        {
+            return await dbContext.MediaFiles.FirstOrDefaultAsync(m => m.Id == previewMediaId);
+        }
+
+        return await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId)
+            .OrderBy(item => item.SequenceNumber)
+            .Select(item => item.MediaFile)
+            .FirstOrDefaultAsync();
+    }
+
     public async Task SaveCollectionAsync(Collection collection)
     {
         await SaveAsync();

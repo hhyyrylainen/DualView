@@ -82,6 +82,40 @@ public class MediaContentController : Controller
             "thumb_" + media.OriginalFileName);
     }
 
+    // Note this is a path for another controller as we have a bunch of thumbnail logic here.
+    // So this route is services from here.
+    [HttpGet("~/api/v1/Collection/{collectionId:long}/thumbnail")]
+    public async Task<ActionResult> GetCollectionThumbnail([Required] long collectionId)
+    {
+        var media = await databaseService.GetCollectionPreviewMediaAsync(collectionId);
+
+        if (media == null)
+            return NotFound();
+
+        string path;
+
+        if (!await ThumbnailProcessingLock.WaitAsync(TimeSpan.FromSeconds(60), HttpContext.RequestAborted))
+        {
+            logger.LogWarning(
+                "Thumbnail generation is being overloaded, will proceed trying to use more CPU after wait timed out");
+            path = await GetThumbnailPathInternal(media);
+        }
+        else
+        {
+            try
+            {
+                path = await GetThumbnailPathInternal(media);
+            }
+            finally
+            {
+                ThumbnailProcessingLock.Release();
+            }
+        }
+
+        return File(System.IO.File.OpenRead(path), media.MediaType.ToMimeType(),
+            "thumb_" + media.OriginalFileName);
+    }
+
     [NonAction]
     private async Task<string> GetThumbnailPathInternal(MediaFile media)
     {

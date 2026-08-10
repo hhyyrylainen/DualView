@@ -34,6 +34,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     // Collections
     public Task<Collection?> GetCollectionAsync(long id);
+    public Task<MediaFile?> GetCollectionPreviewMediaAsync(long collectionId);
     public Task<List<MediaFile>> GetCollectionContents(long collectionId);
     public Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId);
     public Task SaveCollectionAsync(Collection collection);
