@@ -119,6 +119,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         var collections = await ImportCollectionsAsync(connection, tags, folders, cancellationToken);
         await ImportMediaAsync(connection, appliedTags, collections,
             legacyRootCollectionPath, cancellationToken);
+        await VerifyImportedDatabaseStructureAsync(cancellationToken);
+        await VerifyImportedAnimatedImageMetadataAsync(cancellationToken);
 
         logger.LogInformation("Legacy DualView database import completed");
     }
@@ -1151,7 +1153,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
 
             if (index % 10000 == 0)
             {
-                logger.LogInformation("Processed {Count} out of {Total} image tag groups (new tags: {Added})", index, total, added);
+                logger.LogInformation("Processed {Count} out of {Total} image tag groups (new tags: {Added})", index,
+                    total, added);
             }
         }
 
@@ -1516,6 +1519,97 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             await using var output = File.Create(destination);
             await input.CopyToAsync(output, cancellationToken);
         }
+    }
+
+    private async Task VerifyImportedDatabaseStructureAsync(CancellationToken cancellationToken)
+    {
+        var mediaWithoutCollections = await dbContext.MediaFiles
+            .Where(media => !media.InCollections.Any())
+            .Select(media => new { media.Id, media.OriginalFileName })
+            .ToListAsync(cancellationToken);
+
+        var collectionsWithoutFolders = await dbContext.Collections
+            .Where(collection => !collection.Folders.Any())
+            .Select(collection => new { collection.Id, collection.Name })
+            .ToListAsync(cancellationToken);
+
+        if (mediaWithoutCollections.Count == 0 && collectionsWithoutFolders.Count == 0)
+        {
+            logger.LogInformation("Imported database structure verification succeeded");
+            return;
+        }
+
+        var problems = new List<string>();
+        if (mediaWithoutCollections.Count > 0)
+        {
+            problems.Add($"{mediaWithoutCollections.Count} media files without a collection " +
+                         $"({string.Join(", ", mediaWithoutCollections.Take(10).Select(media =>
+                             $"{media.Id}:{media.OriginalFileName}"))})");
+        }
+
+        if (collectionsWithoutFolders.Count > 0)
+        {
+            problems.Add($"{collectionsWithoutFolders.Count} collections without a folder " +
+                         $"({string.Join(", ", collectionsWithoutFolders.Take(10).Select(collection =>
+                             $"{collection.Id}:{collection.Name}"))})");
+        }
+
+        throw new InvalidDataException("Imported database structure verification failed: " +
+                                       string.Join("; ", problems));
+    }
+
+    private async Task VerifyImportedAnimatedImageMetadataAsync(CancellationToken cancellationToken)
+    {
+        if (settings == null)
+            throw new InvalidOperationException("Settings not loaded");
+
+        var storage = settings.LocalMediaStorageLocation;
+        if (string.IsNullOrWhiteSpace(storage))
+            storage = dataFolderService.GetDataFolderPath();
+
+        var mediaFiles = await dbContext.MediaFiles
+            .Where(media => media.MediaType == MediaType.Gif ||
+                            media.MediaType == MediaType.Webp ||
+                            media.MediaType == MediaType.WebpAnimated)
+            .ToListAsync(cancellationToken);
+
+        var changed = false;
+        foreach (var media in mediaFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var path = Path.Combine(storage, media.PathRelativeToStorage());
+            using var frames = new MagickImageCollection();
+            await frames.ReadAsync(path, cancellationToken);
+
+            var frameCount = frames.Count;
+            if (frameCount <= 0)
+                throw new InvalidDataException($"ImageMagick found no frames in '{path}'");
+
+            var mediaType = media.MediaType;
+            if (media.MediaType == MediaType.Webp)
+            {
+                mediaType = frameCount > 1 ? MediaType.WebpAnimated : MediaType.Webp;
+            }
+            else if (media.MediaType == MediaType.WebpAnimated)
+            {
+                mediaType = frameCount > 1 ? MediaType.WebpAnimated : MediaType.Webp;
+            }
+
+            if (media.FrameCount != frameCount || media.MediaType != mediaType)
+            {
+                logger.LogInformation("Correcting image metadata for {MediaId}: {FrameCount} frames, type {MediaType}",
+                    media.Id, frameCount, mediaType);
+                media.FrameCount = frameCount;
+                media.MediaType = mediaType;
+                changed = true;
+            }
+        }
+
+        if (changed)
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("Verified animated image metadata for {Count} files", mediaFiles.Count);
     }
 
     private static string ResolveLegacyPath(string value, string legacyDirectory)
