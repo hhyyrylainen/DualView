@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using Backend.Database;
 using Backend.Models;
+using Backend.Utilities;
 using DualView.Shared.Models;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Utils;
@@ -18,10 +19,46 @@ namespace Backend.Services;
 /// </summary>
 public class LegacyDatabaseImporter : ILegacyDatabaseImporter
 {
+    /// <summary>
+    ///   This is how many images are imported in a single batch. This makes the import process much faster as DB
+    ///   flushes don't happen for each imported image.
+    /// </summary>
+    private const int BulkImportImages = 100;
+
     private readonly ILogger<LegacyDatabaseImporter> logger;
     private readonly AppDbContext dbContext;
     private readonly IDataFolderService dataFolderService;
+
+    /// <summary>
+    ///   When true, tries to fix some common corruptions by editing the legacy database.
+    /// </summary>
+    private readonly bool tryFixOldCollection = false;
+
+    /// <summary>
+    ///   These files are corrupted but allowed to be imported with the changed hash. NOTE: clear this array before
+    ///   committing!
+    /// </summary>
+    private readonly string[] allowedHashChangeFiles =
+    [
+    ];
+
+    /// <summary>
+    ///   Similar to <see cref="allowedHashChangeFiles"/> but allows entire folders to be ignored.
+    /// </summary>
+    private readonly string[] allowedHashChangeFolderPrefixes =
+    [
+    ];
+
+    /// <summary>
+    ///   These files will be ignored during import. Can be used to ignore media that has no replacements available.
+    ///   NOTE: clear this list before committing!
+    /// </summary>
+    private readonly HashSet<string> skipMediaImportHashes = new([
+    ]);
+
     private DualViewSettings? settings;
+
+    private int importedTotalImages;
 
     public LegacyDatabaseImporter(ILogger<LegacyDatabaseImporter> logger, AppDbContext dbContext,
         IDataFolderService dataFolderService)
@@ -41,6 +78,23 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                    throw new Exception("Settings not found");
 
         logger.LogInformation("Importing legacy DualView database from {Path}", databasePath);
+
+        if (tryFixOldCollection)
+        {
+            var connectionStringWritable = new SqliteConnectionStringBuilder
+            {
+                DataSource = Path.GetFullPath(databasePath),
+                Mode = SqliteOpenMode.ReadWrite,
+                ForeignKeys = true,
+            }.ToString();
+
+            await using var connectionWritable = new SqliteConnection(connectionStringWritable);
+            await connectionWritable.OpenAsync(cancellationToken);
+
+            await FixMediaIncorrectEncodings(connectionWritable, legacyRootCollectionPath, cancellationToken);
+            await FixMediaMissingExtensions(connectionWritable, legacyRootCollectionPath, cancellationToken);
+            await FixMediaBadExtensions(connectionWritable, legacyRootCollectionPath, cancellationToken);
+        }
 
         var connectionString = new SqliteConnectionStringBuilder
         {
@@ -433,10 +487,253 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         return collectionIds;
     }
 
+    private async Task FixMediaIncorrectEncodings(SqliteConnection connection, string legacyDirectory,
+        CancellationToken cancellationToken)
+    {
+        var toProcess = new List<(long Id, string RelativePath, string Path, string Hash)>();
+
+        await foreach (var row in ReadRowsAsync(connection,
+                           "SELECT id, relative_path, width, height, name, extension, add_date, last_view, " +
+                           "is_private, from_file, file_hash, deleted FROM pictures " +
+                           "WHERE relative_path LIKE '%.png.jpg.jpg' ORDER BY id",
+                           cancellationToken))
+        {
+            if (row.GetBoolean("deleted"))
+                continue;
+
+            var hash = RequiredText(row, "file_hash");
+            var relativePath = RequiredText(row, "relative_path");
+            var sourcePath = ResolveLegacyPath(relativePath, legacyDirectory);
+
+            if (!File.Exists(sourcePath))
+            {
+                logger.LogWarning("Cannot fix non-existent path: {Path}", sourcePath);
+                continue;
+            }
+
+            if (await IsValidMediaAsync(sourcePath, hash, cancellationToken))
+                continue;
+
+            toProcess.Add((row.GetInt64("id"), relativePath, sourcePath, hash));
+        }
+
+        foreach (var (id, relativePath, sourcePath, hash) in toProcess)
+        {
+            logger.LogInformation("Attempting repair on potentially wrong format file: {Path}", sourcePath);
+
+            var targetPath = sourcePath.Replace(".png.jpg.jpg", ".png");
+            var newRelativePath = relativePath.Replace(".png.jpg.jpg", ".png");
+            File.Copy(sourcePath, targetPath);
+
+            // If this can now load as PNG, update the DB to acknowledge the actual format of the file
+            if (await IsValidMediaAsync(targetPath, hash, cancellationToken))
+            {
+                logger.LogInformation("File at path was actually a PNG: {Path}", sourcePath);
+
+                await using var command = connection.CreateCommand();
+                command.CommandText =
+                    "UPDATE pictures SET relative_path = @newRelativePath, extension = '.png' WHERE id = @id";
+                command.Parameters.AddWithValue("newRelativePath", newRelativePath);
+                command.Parameters.AddWithValue("id", id);
+                var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+
+                if (affected != 1)
+                {
+                    File.Delete(targetPath);
+                    throw new InvalidOperationException(
+                        $"Expected to update exactly one row, but updated {affected} rows");
+                }
+
+                File.Delete(sourcePath);
+                logger.LogInformation("File at path was actually a PNG, and should now be fixed: {Path}", sourcePath);
+            }
+            else
+            {
+                logger.LogWarning("Could not fix file: {Path}", sourcePath);
+                File.Delete(targetPath);
+            }
+        }
+    }
+
+    private async Task FixMediaMissingExtensions(SqliteConnection connection, string legacyDirectory,
+        CancellationToken cancellationToken)
+    {
+        var toProcess = new List<(long Id, string RelativePath, string Path, string Name0)>();
+
+        await foreach (var row in ReadRowsAsync(connection,
+                           "SELECT id, relative_path, width, height, name, extension, add_date, last_view, " +
+                           "is_private, from_file, file_hash, deleted FROM pictures " +
+                           "WHERE extension ='' ORDER BY id",
+                           cancellationToken))
+        {
+            if (row.GetBoolean("deleted"))
+                continue;
+
+            var relativePath = RequiredText(row, "relative_path");
+            var extension = row.GetText("extension");
+            var name = RequiredText(row, "name");
+
+            if (!string.IsNullOrEmpty(extension) || Path.GetExtension(relativePath) != "")
+                throw new Exception($"Extension is not empty: {extension}");
+
+            var sourcePath = ResolveLegacyPath(relativePath, legacyDirectory);
+
+            if (!File.Exists(sourcePath))
+            {
+                logger.LogWarning("Cannot fix non-existent path: {Path}", sourcePath);
+                continue;
+            }
+
+            toProcess.Add((row.GetInt64("id"), relativePath, sourcePath, name));
+        }
+
+        foreach (var (id, relativePath, sourcePath, name) in toProcess)
+        {
+            logger.LogInformation("Attempting repair on missing extension: {Path}", sourcePath);
+
+            string? targetExtension;
+            MagickFormat format;
+            try
+            {
+                var imageInfo = new MagickImageInfo(sourcePath);
+                targetExtension = FileProbe.GetExtensionForFormat(imageInfo.Format);
+                format = imageInfo.Format;
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Cannot determine the format of file at: {Path}", sourcePath);
+                continue;
+            }
+
+            if (targetExtension == null)
+                throw new Exception("Could not determine extension for file: " + sourcePath);
+
+            var finalPath = sourcePath + targetExtension;
+
+            if (File.Exists(finalPath))
+            {
+                // Sadly, this occurs sometimes, so we can't fix those
+                logger.LogError("File already exists at path (can't rename a file without extension to it): {Path}",
+                    finalPath);
+                continue;
+            }
+
+            var newRelativePath = relativePath + targetExtension;
+
+            logger.LogInformation("File at path was actually a {Format} file: {Path}", format, sourcePath);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "UPDATE pictures SET relative_path = @newRelativePath, extension = @newExtension, name = @newName " +
+                "WHERE id = @id";
+            command.Parameters.AddWithValue("newRelativePath", newRelativePath);
+            command.Parameters.AddWithValue("newExtension", targetExtension);
+            command.Parameters.AddWithValue("newName", name + targetExtension);
+            command.Parameters.AddWithValue("id", id);
+            var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+
+            if (affected != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Expected to update exactly one row, but updated {affected} rows");
+            }
+
+            File.Move(sourcePath, finalPath);
+            logger.LogInformation("File without extension was fixed and is now at path: {Path}", finalPath);
+        }
+    }
+
+    private async Task FixMediaBadExtensions(SqliteConnection connection, string legacyDirectory,
+        CancellationToken cancellationToken)
+    {
+        var toProcess = new List<(long Id, string RelativePath, string Path, string Name0)>();
+
+        await foreach (var row in ReadRowsAsync(connection,
+                           "SELECT id, relative_path, width, height, name, extension, add_date, last_view, " +
+                           "is_private, from_file, file_hash, deleted FROM pictures " +
+                           "WHERE extension = '.jpg:large' OR extension = '.jpg:d' ORDER BY id",
+                           cancellationToken))
+        {
+            if (row.GetBoolean("deleted"))
+                continue;
+
+            var relativePath = RequiredText(row, "relative_path");
+            var name = RequiredText(row, "name");
+            var sourcePath = ResolveLegacyPath(relativePath, legacyDirectory);
+
+            if (!File.Exists(sourcePath))
+            {
+                logger.LogWarning("Cannot fix non-existent path: {Path}", sourcePath);
+                continue;
+            }
+
+            toProcess.Add((row.GetInt64("id"), relativePath, sourcePath, name));
+        }
+
+        foreach (var (id, relativePath, sourcePath, name) in toProcess)
+        {
+            logger.LogInformation("Attempting repair on missing extension: {Path}", sourcePath);
+
+            string? targetExtension;
+            MagickFormat format;
+            try
+            {
+                var imageInfo = new MagickImageInfo(sourcePath);
+                targetExtension = FileProbe.GetExtensionForFormat(imageInfo.Format);
+                format = imageInfo.Format;
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Cannot determine the format of file at: {Path}", sourcePath);
+                continue;
+            }
+
+            if (targetExtension == null)
+                throw new Exception("Could not determine extension for file: " + sourcePath);
+
+            var finalPath = Path.ChangeExtension(sourcePath, targetExtension);
+
+            if (File.Exists(finalPath))
+            {
+                // Sadly, this occurs sometimes, so we can't fix those
+                logger.LogError("File already exists at path (can't rename a file with bad extension to it): {Path}",
+                    finalPath);
+                continue;
+            }
+
+            var newRelativePath = Path.ChangeExtension(relativePath, targetExtension);
+
+            logger.LogInformation("File at path was actually a {Format} file: {Path}", format, sourcePath);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "UPDATE pictures SET relative_path = @newRelativePath, extension = @newExtension, name = @newName " +
+                "WHERE id = @id";
+            command.Parameters.AddWithValue("newRelativePath", newRelativePath);
+            command.Parameters.AddWithValue("newExtension", targetExtension);
+            command.Parameters.AddWithValue("newName", Path.ChangeExtension(name, targetExtension));
+            command.Parameters.AddWithValue("id", id);
+            var affected = await command.ExecuteNonQueryAsync(cancellationToken);
+
+            if (affected != 1)
+            {
+                throw new InvalidOperationException(
+                    $"Expected to update exactly one row, but updated {affected} rows");
+            }
+
+            File.Move(sourcePath, finalPath);
+            logger.LogInformation("File with bad extension was fixed and is now at path: {Path}", finalPath);
+        }
+    }
+
     private async Task ImportMediaAsync(SqliteConnection connection, Dictionary<long, long> appliedTagIds,
         Dictionary<long, long> collectionIds, string legacyDirectory, CancellationToken cancellationToken)
     {
-        int imported = 0;
+        int ignored = 0;
+
+        // Because otherwise we'd be just constantly committing to the new database, we use a buffer of images to
+        // import and save at once
+        var mediaBuffer = new List<(long OldId, MediaFile NewMedia, MediaImportInfo? ImportInfo, string OldPath)>();
 
         var mediaIds = new Dictionary<long, long>();
         await foreach (var row in ReadRowsAsync(connection,
@@ -444,10 +741,20 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                            "is_private, from_file, file_hash, deleted FROM pictures ORDER BY id",
                            cancellationToken))
         {
+            if (cancellationToken.IsCancellationRequested)
+                break;
+
             if (row.GetBoolean("deleted"))
                 continue;
 
             var hash = RequiredText(row, "file_hash");
+
+            // Ignore known bad media files
+            if (skipMediaImportHashes.Contains(hash))
+            {
+                logger.LogInformation("Ignoring media file hash that is known bad: {Hash}", hash);
+                continue;
+            }
 
             var media = await dbContext.MediaFiles.IgnoreQueryFilters()
                 .FirstOrDefaultAsync(item => item.Hash == hash, cancellationToken);
@@ -455,22 +762,251 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             if (media == null)
             {
                 var sourcePath = ResolveLegacyPath(RequiredText(row, "relative_path"), legacyDirectory);
-                var validatedPath = await ValidateOrRepairAsync(connection, sourcePath, row, hash, cancellationToken);
-                var extension = NormalizeExtension(RequiredText(row, "extension"));
-                media = new MediaFile(RequiredText(row, "name") + extension, hash)
+                string? customExtension = null;
+                string validatedPath;
+                try
                 {
-                    MediaType = MediaTypeExtensions.TypeFromExtension(extension),
-                    Width = row.GetInt32("width"),
-                    Height = row.GetInt32("height"),
-                    FrameCount = 1,
-                    FramesPerSecond = -1,
-                    ImportedAt = ParseDate(row.GetText("add_date")),
-                    LastViewed = ParseDate(row.GetText("last_view")),
-                    IsFavorited = await IsFavoritedAsync(connection, row.GetInt64("id"), cancellationToken),
-                };
-                await CopyIntoCurrentStorageAsync(validatedPath, media, cancellationToken);
-                dbContext.MediaFiles.Add(media);
-                await dbContext.SaveChangesAsync(cancellationToken);
+                    validatedPath = await ValidateOrRepairAsync(connection, sourcePath, row, hash, cancellationToken);
+                }
+                catch (IgnoreImportException e)
+                {
+                    logger.LogError(e, "Ignoring import of {SourcePath}", sourcePath);
+                    ++ignored;
+                    continue;
+                }
+                catch (ChangeHashException e)
+                {
+                    logger.LogInformation("Allowing hash of media at path to change: {SourcePath}", sourcePath);
+                    logger.LogInformation("Hash is changing from {Hash1} to {Hash2}", hash, e.Hash);
+                    hash = e.Hash;
+                    validatedPath = e.Path;
+
+                    // Still, make sure the new file pointed to by the updated hash is valid
+                    await IsValidMediaAsync(e.Path, hash, cancellationToken);
+
+                    // Check if the new hash is imported
+                    media = await dbContext.MediaFiles.IgnoreQueryFilters()
+                        .FirstOrDefaultAsync(item => item.Hash == hash, cancellationToken);
+                }
+                catch (RetryAsDifferentMediaTypeException e)
+                {
+                    customExtension = Path.GetExtension(e.NewPath);
+                    validatedPath = e.NewPath;
+                    logger.LogInformation("Path is incorrect media type, overriding its extension to {Extension}",
+                        customExtension);
+                }
+                catch (Exception e)
+                {
+                    if (skipImportBrokenFiles)
+                    {
+                        logger.LogError(e, "Skipping importing broken file! It will be missing from the database.");
+                        ++ignored;
+                        continue;
+                    }
+
+                    throw;
+                }
+
+                if (media == null)
+                {
+                    try
+                    {
+                        // Buffer this media import so that we can batch things into the DB
+                        (media, var importInfo) =
+                            await CreateMediaObject(connection, row, hash, validatedPath, customExtension,
+                                cancellationToken);
+
+                        mediaBuffer.Add((row.GetInt64("id"), media, importInfo, validatedPath));
+                    }
+                    catch (Exception e)
+                    {
+                        if (skipImportBrokenFiles)
+                        {
+                            logger.LogError(e,
+                                "Skipping importing file with invalid data! It will be missing from the database.");
+                            ++ignored;
+                            continue;
+                        }
+
+                        throw;
+                    }
+                }
+                else
+                {
+                    // This happens if recalculated hash has changed (and is now an already imported media)
+                    logger.LogInformation("Media with hash {Hash} already exists at path {Path}", hash, validatedPath);
+                    mediaIds[row.GetInt64("id")] = media.Id;
+                }
+            }
+            else
+            {
+                if (media.Id <= 0)
+                    throw new InvalidOperationException("Accidentally using non-initialized media");
+
+                // Already exists so we can directly set the ID without needing to save to the database
+                mediaIds[row.GetInt64("id")] = media.Id;
+            }
+
+            if (mediaBuffer.Count >= BulkImportImages)
+                await ProcessImportBuffer(mediaBuffer, mediaIds, cancellationToken);
+
+            if (mediaIds.Count % 50000 == 0)
+                logger.LogInformation("Total loaded image objects: {Count}", mediaIds.Count);
+        }
+
+        // If we didn't end at exactly batch size, process the remaining
+        if (mediaBuffer.Count > 0)
+            await ProcessImportBuffer(mediaBuffer, mediaIds, cancellationToken);
+
+        await ImportMediaRelationshipsAsync(connection, mediaIds, appliedTagIds, collectionIds, cancellationToken);
+
+        if (ignored > 0)
+        {
+            logger.LogError("Some images were ignored due to import errors, failing");
+            throw new Exception($"Some media failed to import (errors: {ignored})");
+        }
+    }
+
+    private async Task ProcessImportBuffer(
+        List<(long OldId, MediaFile NewMedia, MediaImportInfo? ImportInfo, string OldPath)> mediaBuffer,
+        Dictionary<long, long> mediaIds, CancellationToken cancellationToken)
+    {
+        if (mediaBuffer.Count < 1)
+            logger.LogWarning("Media buffer is empty");
+
+        int doneImports = 0;
+        var pendingImportInfo = new List<(MediaFile Media, MediaImportInfo ImportInfo)>();
+        bool log = false;
+        Exception? failure = null;
+
+        foreach (var (_, newMedia, importInfo, oldPath) in mediaBuffer)
+        {
+            try
+            {
+                // This copies the file data to the new location
+                await ImportMediaFile(cancellationToken, newMedia, oldPath);
+                ++doneImports;
+            }
+            catch (OperationCanceledException)
+            {
+                logger.LogInformation("Canceled during image batch import, exiting loop but still trying to save DB");
+                break;
+            }
+            catch (Exception e)
+            {
+                if (doneImports <= 0)
+                    throw;
+
+                logger.LogWarning("Failed one part of an image bundle, handling saving before throwing");
+                failure = e;
+                break;
+            }
+
+            if (importedTotalImages % 100 == 0)
+                log = true;
+
+            if (importInfo != null)
+            {
+                pendingImportInfo.Add((newMedia, importInfo));
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+                break;
+        }
+
+        // We do not want to cancel after writing images.
+        // We save here to be able to access the IDs of the media files.
+        await dbContext.SaveChangesAsync(CancellationToken.None);
+
+        bool hadImportInfo = false;
+
+        foreach (var (newMedia, importInfo) in pendingImportInfo)
+        {
+            if (newMedia.Id <= 0 || importInfo.MediaFileId != -1)
+                throw new InvalidOperationException("New media was not saved, or import info was already used");
+
+            importInfo.MediaFileId = newMedia.Id;
+            dbContext.MediaImportInfos.Add(importInfo);
+            hadImportInfo = true;
+        }
+
+        if (hadImportInfo)
+        {
+            // Need to then save again to get the import infos into the DB
+            await dbContext.SaveChangesAsync(CancellationToken.None);
+        }
+
+        if (failure != null)
+            throw failure;
+
+        if (log)
+            logger.LogInformation("Imported media total: {Imported}", importedTotalImages);
+
+        // Capture the IDs of things if not cancelled
+        if (!cancellationToken.IsCancellationRequested)
+        {
+            foreach (var (oldId, newMedia, _, _) in mediaBuffer)
+            {
+                if (newMedia.Id <= 0)
+                    throw new InvalidOperationException("New media was not saved");
+                mediaIds[oldId] = newMedia.Id;
+            }
+        }
+
+        mediaBuffer.Clear();
+    }
+
+    private async Task<(MediaFile Media, MediaImportInfo? ImportInfo)> CreateMediaObject(SqliteConnection connection,
+        SqliteRow row, string hash, string validatedPath, string? customExtension, CancellationToken cancellationToken)
+    {
+        MediaFile media;
+
+        string extension;
+        if (string.IsNullOrWhiteSpace(customExtension))
+        {
+            extension = NormalizeExtension(RequiredText(row, "extension"));
+        }
+        else
+        {
+            extension = customExtension;
+            if (!extension.StartsWith('.'))
+                throw new Exception("Custom extension must start with a dot");
+
+            logger.LogInformation(
+                "Replacing database extension {Db} with {Custom} on import due to file type mismatch on image load",
+                RequiredText(row, "extension"), customExtension);
+        }
+
+        MediaType type;
+        try
+        {
+            type = MediaTypeExtensions.TypeFromExtension(extension);
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Couldn't determine media type from extension, trying to figure it out");
+
+            await using var stream = File.OpenRead(validatedPath);
+            var imageInfo = new MagickImageInfo(stream);
+            extension = FileProbe.GetExtensionForFormat(imageInfo.Format) ??
+                        throw new Exception("Unknown Magick format");
+            type = MediaTypeExtensions.TypeFromExtension(extension);
+        }
+
+        // Name already contains the extension, so we need to swap it to not get duplicates!
+        media = new MediaFile(
+            Path.ChangeExtension(RequiredText(row, "name") ?? throw new Exception("Extension change fail"), extension),
+            hash)
+        {
+            MediaType = type,
+            Width = row.GetInt32("width"),
+            Height = row.GetInt32("height"),
+            FrameCount = 1,
+            FramesPerSecond = -1,
+            ImportedAt = ParseDate(row.GetText("add_date")),
+            LastViewed = ParseDate(row.GetText("last_view")),
+            IsFavorited = await IsFavoritedAsync(connection, row.GetInt64("id"), cancellationToken),
+        };
 
                 var source = row.GetText("from_file");
                 if (!string.IsNullOrWhiteSpace(source))
@@ -479,51 +1015,81 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                     string? sourceLocalPath = null;
                     string? sourceUrl = null;
 
-                    if (source.StartsWith("http"))
-                    {
-                        sourceUrl = source;
-                    }
-                    else
-                    {
-                        sourceLocalPath = source;
-                    }
-
-                    dbContext.MediaImportInfos.Add(new MediaImportInfo(media.Id)
-                    {
-                        SourcePath = sourceLocalPath,
-                        SourceUrl = sourceUrl,
-                    });
-                    await dbContext.SaveChangesAsync(cancellationToken);
-                }
-
-                if (++imported % 100 == 0)
-                    logger.LogInformation("Imported media total: {Imported}", imported);
+            if (source.StartsWith("http"))
+            {
+                sourceUrl = source;
+            }
+            else
+            {
+                sourceLocalPath = source;
             }
 
-            mediaIds[row.GetInt64("id")] = media.Id;
+            // This is a temporary one until the media is saved in the DB and then this is updated with the ID
+            importInfo = new MediaImportInfo(-1)
+            {
+                SourcePath = sourceLocalPath,
+                SourceUrl = sourceUrl,
+            };
         }
 
-        await ImportMediaRelationshipsAsync(connection, mediaIds, appliedTagIds, collectionIds, cancellationToken);
+        return (media, importInfo);
+    }
+
+    private async Task ImportMediaFile(CancellationToken cancellationToken, MediaFile media, string validatedPath)
+    {
+        await CopyIntoCurrentStorageAsync(validatedPath, media, cancellationToken);
+        dbContext.MediaFiles.Add(media);
+        ++importedTotalImages;
     }
 
     private async Task ImportMediaRelationshipsAsync(SqliteConnection connection, Dictionary<long, long> mediaIds,
         Dictionary<long, long> appliedTagIds, Dictionary<long, long> collectionIds, CancellationToken cancellationToken)
     {
+        int skipped = 0;
+        int processed = 0;
+
         await foreach (var row in ReadRowsAsync(connection, "SELECT image, tag FROM image_tag", cancellationToken))
         {
             if (!mediaIds.TryGetValue(row.GetInt64("image"), out var mediaId) ||
                 !appliedTagIds.TryGetValue(row.GetInt64("tag"), out var appliedTagId))
             {
+                // Presumably, these are mostly failed media imports, so they are skipped
+                ++skipped;
                 continue;
             }
 
             var media = await dbContext.MediaFiles.Include(item => item.AppliedTags).FirstAsync(
-                item => item.Id == mediaId,
-                cancellationToken);
+                item => item.Id == mediaId, cancellationToken);
             var applied = await dbContext.AppliedTags.FindAsync([appliedTagId], cancellationToken);
             if (applied != null && media.AppliedTags.All(item => item.Id != applied.Id))
                 media.AppliedTags.Add(applied);
+
+            if (applied == null)
+            {
+                logger.LogWarning("Cannot find applied tag to add to media with id {MediaId}, tag {TagId}", mediaId,
+                    appliedTagId);
+            }
+
+            ++processed;
+
+            // Save intermittently to not leave everything until the end
+            if (processed % 10000 == 0)
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Processed {Count} image tags", processed);
+            }
         }
+
+        if (skipped > 0)
+            logger.LogWarning("Skipped {Count} image tags (probably unimported images)", skipped);
+
+        logger.LogInformation("Imported {Count} image tags", processed);
+
+        // Save after each block as we do have plenty of changes applied, and it would be better to find errors
+        // before continuing
+        await dbContext.SaveChangesAsync(cancellationToken);
+        skipped = 0;
+        processed = 0;
 
         await foreach (var row in ReadRowsAsync(connection, "SELECT collection, tag FROM collection_tag",
                            cancellationToken))
@@ -531,6 +1097,7 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             if (!collectionIds.TryGetValue(row.GetInt64("collection"), out var collectionId) ||
                 !appliedTagIds.TryGetValue(row.GetInt64("tag"), out var appliedTagId))
             {
+                ++skipped;
                 continue;
             }
 
@@ -539,7 +1106,30 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             var applied = await dbContext.AppliedTags.FindAsync([appliedTagId], cancellationToken);
             if (applied != null && collection.AppliedTags.All(item => item.Id != applied.Id))
                 collection.AppliedTags.Add(applied);
+
+            if (applied == null)
+            {
+                logger.LogWarning("Cannot find applied tag to add to collection with id {CollectionId}, tag {TagId}",
+                    collectionId, appliedTagId);
+            }
+
+            ++processed;
+
+            if (processed % 1000 == 0)
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Processed {Count} collection tags", processed);
+            }
         }
+
+        if (skipped > 0)
+            logger.LogWarning("Skipped {Count} collection tags (probably unimported collections)", skipped);
+
+        logger.LogInformation("Imported {Count} collection tags", processed);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        skipped = 0;
+        processed = 0;
 
         await foreach (var row in ReadRowsAsync(connection,
                            "SELECT collection, image, show_order FROM collection_image",
@@ -548,6 +1138,8 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             if (!collectionIds.TryGetValue(row.GetInt64("collection"), out var collectionId) ||
                 !mediaIds.TryGetValue(row.GetInt64("image"), out var mediaId))
             {
+                // These should again be unimported resources we can skip
+                ++skipped;
                 continue;
             }
 
@@ -562,7 +1154,20 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
                     SequenceNumber = row.GetInt32("show_order"),
                 });
             }
+
+            ++processed;
+
+            if (processed % 10000 == 0)
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
+                logger.LogInformation("Processed {Count} collection image records", processed);
+            }
         }
+
+        if (skipped > 0)
+            logger.LogWarning("Skipped {Count} collection image assignments (probably unimported images)", skipped);
+
+        logger.LogInformation("Imported {Count} collection image assignments", processed);
 
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -570,8 +1175,31 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
     private async Task<string> ValidateOrRepairAsync(SqliteConnection connection, string path, SqliteRow row,
         string expectedHash, CancellationToken cancellationToken)
     {
-        if (await IsValidMediaAsync(path, expectedHash, cancellationToken))
-            return path;
+        Exception? failedException = null;
+
+        try
+        {
+            if (await IsValidMediaAsync(path, expectedHash, cancellationToken))
+                return path;
+        }
+        // Pass through exceptions
+        catch (ChangeHashException)
+        {
+            throw;
+        }
+        catch (IgnoreImportException)
+        {
+            throw;
+        }
+        catch (RetryAsDifferentMediaTypeException)
+        {
+            throw;
+        }
+        catch (Exception e)
+        {
+            logger.LogWarning(e, "Validation failed with an error, trying potential repair");
+            failedException = e;
+        }
 
         logger.LogInformation("Attempting recovery on file: {Path}", path);
 
@@ -593,43 +1221,127 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         if (Uri.TryCreate(source, UriKind.Absolute, out var uri) &&
             (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
+            // Ignore some sites that cannot be redownloaded
+            if (source.Contains("example.com"))
+                throw new IgnoreImportException("Cannot redownload from: " + source);
+
+            // Disallows getting data again
+            if (source.Contains("instagram."))
+                throw new IgnoreImportException("Cannot redownload from: " + source);
+
+            // Site gone
+            if (source.Contains("getlazy.net"))
+                throw new IgnoreImportException("Cannot redownload from: " + source);
+
+            // This also seems gone
+            if (source.Contains("pbs.twimg.com"))
+                throw new IgnoreImportException("Cannot redownload from: " + source);
+
+            // Discord applies 24-hour URL aliveness, so pretty useless to redownload
+            if (source.Contains("discordapp.com") || source.Contains("media.discordapp.net"))
+                throw new IgnoreImportException("Cannot redownload from: " + source);
+
+            // These seem to always fail
+            if (source.Contains("out.reddit.com") && source.Contains("imgur.com"))
+                throw new IgnoreImportException("Cannot redownload from: " + source);
+
+            // This seems to always give an HTML page even if it exists
+            if (source.Contains("i.redd.it"))
+                throw new IgnoreImportException("Cannot automatically redownload from: " + source);
             var target = Path.Combine(Path.GetTempPath(),
-                "dualview-import-" + Guid.NewGuid() + NormalizeExtension(RequiredText(row, "extension")));
+                "dualview-import-" + Guid.NewGuid());
+            bool wasValid = false;
+
             try
             {
                 using var httpClient = new HttpClient();
                 httpClient.DefaultRequestHeaders.Add("User-Agent",
                     "Mozilla/5.0 (X11; Linux x86_64; rv:153.0) Gecko/20100101 Firefox/153.0");
-                await using (var input = await httpClient.GetStreamAsync(uri, cancellationToken))
-                await using (var output = File.Create(target))
+                logger.LogInformation("Trying to redownload from: {Url}", uri);
+                {
+                    await using var input = await httpClient.GetStreamAsync(uri, cancellationToken);
+                    await using var output = File.Create(target);
                     await input.CopyToAsync(output, cancellationToken);
+                }
 
-                if (await IsValidMediaAsync(target, expectedHash, cancellationToken))
+                if (string.IsNullOrWhiteSpace(extension) || extension == ".")
+                {
+                    try
+                    {
+                        var imageInfo = new MagickImageInfo(target);
+                        extension = FileProbe.GetExtensionForFormat(imageInfo.Format);
+                    }
+                    catch (Exception e)
+                    {
+                        throw new Exception("Downloaded file is not a valid image", e);
+                    }
+
+                    var old = target;
+                    target = Path.ChangeExtension(target, extension);
+                    File.Move(old, target);
+
+                    // TODO: this needs to somehow signal to the importer what path to use to work
+                }
+
+                if (!File.Exists(target))
+                    logger.LogError("Downloaded file does not exist");
+
+                logger.LogInformation("Redownload succeeded, size: {Size}", new FileInfo(target).Length);
+
+                // TODO: allowing extension to change here?
+                // TODO: find out why this is always failing as not found
+                if (await IsValidMediaAsync(target, expectedHash, cancellationToken, true))
+                {
+                    wasValid = true;
                     return target;
+                }
+            }
+            catch (ChangeHashException)
+            {
+                // This should only be thrown when it was valid, so allow passing through
+                logger.LogInformation("Downloaded file has different hash");
+                wasValid = true;
+                return target;
             }
             finally
             {
-                if (File.Exists(target) && !await IsValidMediaAsync(target, expectedHash, cancellationToken))
+                if (File.Exists(target) && !wasValid)
                     File.Delete(target);
             }
         }
 
-        throw new InvalidDataException($"Legacy media '{fileName}' is missing, corrupt, or has a SHA mismatch");
+        logger.LogError("Unable to validate legacy path: {Path}", path);
+
+        throw new InvalidDataException($"Legacy media '{fileName}' is missing, corrupt, or has an SHA mismatch",
+            failedException);
     }
 
     private async Task<bool> IsValidMediaAsync(string path, string expectedHash,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, bool allowHashChange = false)
     {
         if (!File.Exists(path))
+        {
+            logger.LogWarning("File does not exist at path to check it is valid for import: {Path}", path);
             return false;
+        }
 
         await using var stream = File.OpenRead(path);
         var hash = await MediaHash.CalculateMediaHashAsync(stream, cancellationToken);
         if (hash != expectedHash)
+        {
+            // If hash is allowed to change, then signal that
+            if (allowedHashChangeFiles.Contains(path) ||
+                allowedHashChangeFolderPrefixes.Any(path.StartsWith) || allowHashChange)
+            {
+                throw new ChangeHashException(path, hash);
+            }
+
             return false;
+        }
 
         var extension = NormalizeExtension(Path.GetExtension(path));
 
+        // We assume video files are valid for import
         if (!MediaTypeExtensions.TypeFromExtension(extension).IsImage())
             return true;
 
@@ -642,8 +1354,91 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         catch (Exception e)
         {
             logger.LogWarning(e, "Failed to read image frames from {Path}", path);
+
+            if (e.Message.Contains("starts with 0x89 0x50"))
+            {
+                await RetryAsDifferentMediaTypeAsync(path, ".png", "PNG", expectedHash, cancellationToken);
+            }
+            else if (e.Message.Contains("starts with 0x47 0x49"))
+            {
+                await RetryAsDifferentMediaTypeAsync(path, ".gif", "GIF", expectedHash, cancellationToken);
+            }
+            else if (e.Message.Contains("starts with 0x42 0x4d"))
+            {
+                await RetryAsDifferentMediaTypeAsync(path, ".bmp", "BMP", expectedHash, cancellationToken);
+            }
+            /*else if (e.Message.Contains("starts with 0x3c 0x21"))
+            {
+               // This is likely an HTML file, not an image
+            }*/
+
+            // await RetryAsDifferentMediaTypeAsync(path, ".webp", "WebP", expectedHash, cancellationToken);
+
+            else if (e.Message.Contains("ImproperImageHeader `' @ error/png.c/ReadPNGImage/3956"))
+            {
+                // A .png file but isn't a png. Likely a jpeg
+                await RetryAsDifferentMediaTypeAsync(path, ".jpg", "JPEG", expectedHash, cancellationToken);
+            }
+            else if (e.Message.Contains("ImproperImageHeader `' @ error/gif.c/ReadGIFImage/1028"))
+            {
+                // A file pretending to be a GIF, but might be a jpg
+                await RetryAsDifferentMediaTypeAsync(path, ".jpg", "JPEG", expectedHash, cancellationToken);
+            }
+            else if (e.Message.Contains("CorruptImage `' @ error/webp.c/ReadWEBPImage/569"))
+            {
+                await RetryAsDifferentMediaTypeAsync(path, ".jpg", "JPEG", expectedHash, cancellationToken);
+            }
+            else if (e.Message.Contains(
+                         "starts with 0x52 0x49"))
+            {
+                await RetryAsDifferentMediaTypeAsync(path, ".webp", "WebP", expectedHash, cancellationToken);
+            }
+            else if (e.Message.Contains("ReadHEICImage/1036"))
+            {
+                // Try for fun reading this as JPEG
+                await RetryAsDifferentMediaTypeAsync(path, ".jpg", "JPEG", expectedHash, cancellationToken);
+            }
+
             return false;
         }
+    }
+
+    private async Task RetryAsDifferentMediaTypeAsync(string path, string extension, string mediaTypeName,
+        string expectedHash, CancellationToken cancellationToken)
+    {
+        var newPath = Path.ChangeExtension(path, extension) ?? throw new Exception("New path is empty");
+
+        logger.LogInformation("Retrying path as a {MediaType} file: {Path}", mediaTypeName, newPath);
+
+        // Just for the extremely rare case of existing target, check its hash matches to not overwrite anything
+        // important
+        if (File.Exists(newPath))
+        {
+            await using var stream = File.OpenRead(path);
+            var existingHash = await MediaHash.CalculateMediaHashAsync(stream, cancellationToken);
+            if (existingHash != expectedHash)
+            {
+                logger.LogWarning("Existing file at {Path} has different hash, skipping", newPath);
+                return;
+            }
+        }
+
+        File.Copy(path, newPath, true);
+        logger.LogInformation("Created duplicate file to test at: {Path}", newPath);
+
+        if (await IsValidMediaAsync(newPath, expectedHash, cancellationToken))
+        {
+            // Not the cleanest to use exceptions for flow control, but this script file wasn't designed with a lot
+            // of retry conditions. So we use exceptions for the rare file where the data is kind of incorrect,
+            // but we can recover.
+            logger.LogInformation("It is valid as {MediaType}, signalling up...", mediaTypeName);
+            throw new RetryAsDifferentMediaTypeException(newPath);
+        }
+
+        logger.LogInformation("Deleting duplicate file as it is not valid as a {MediaType}: {Path}", mediaTypeName,
+            newPath);
+
+        File.Delete(newPath);
     }
 
     private async Task CopyIntoCurrentStorageAsync(string source, MediaFile media, CancellationToken cancellationToken)
@@ -690,6 +1485,13 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
     private static string NormalizeExtension(string value)
     {
         var extension = value.Trim();
+
+        // For some reason there are some numeric suffixes
+        if (value.EndsWith("jpg_1") || value.EndsWith("jpg_2") || value.EndsWith("jpg_3") || value.EndsWith("jpg_4"))
+        {
+            extension = ".jpg";
+        }
+
         return extension.StartsWith('.') ? extension.ToLowerInvariant() : "." + extension.ToLowerInvariant();
     }
 
@@ -794,5 +1596,38 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
 
             return builder.ToString();
         }
+    }
+}
+
+internal class RetryAsDifferentMediaTypeException : Exception
+{
+    public RetryAsDifferentMediaTypeException(string newPath)
+    {
+        NewPath = newPath;
+    }
+
+    public string NewPath { get; }
+}
+
+internal class ChangeHashException : Exception
+{
+    public ChangeHashException(string path, string hash)
+    {
+        Path = path;
+        Hash = hash;
+    }
+
+    public string Path { get; }
+    public string Hash { get; }
+}
+
+internal class IgnoreImportException : Exception
+{
+    public IgnoreImportException(string message) : base(message)
+    {
+    }
+
+    public IgnoreImportException(string message, Exception e) : base(message, e)
+    {
     }
 }
