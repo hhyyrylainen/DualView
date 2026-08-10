@@ -159,4 +159,33 @@ public static class MediaTypeExtensions
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
     }
+
+    public static MediaType TypeFromMime(string mime)
+    {
+        switch (mime)
+        {
+            case "image/png":
+                return MediaType.Png;
+            case "image/jpeg":
+                return MediaType.Jpeg;
+            case "image/gif":
+                return MediaType.Gif;
+            case "image/webp":
+                return MediaType.Webp;
+            case "video/mp4":
+                return MediaType.Mp4;
+            case "video/x-matroska":
+                return MediaType.Mkv;
+            case "video/webm":
+                return MediaType.Webm;
+            case "image/bmp":
+                return MediaType.Bmp;
+            case "image/tiff":
+                return MediaType.Tif;
+            case "image/avif":
+                return MediaType.Avif;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(mime), mime, null);
+        }
+    }
 }
