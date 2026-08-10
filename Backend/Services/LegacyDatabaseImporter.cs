@@ -119,7 +119,11 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         var collections = await ImportCollectionsAsync(connection, tags, folders, cancellationToken);
         await ImportMediaAsync(connection, appliedTags, collections,
             legacyRootCollectionPath, cancellationToken);
+
+        await RepairOrphanedMediaCollectionsAsync(connection, cancellationToken);
         await VerifyImportedDatabaseStructureAsync(cancellationToken);
+
+        // This takes a while to read all images, so this can be disabled if needed
         await VerifyImportedAnimatedImageMetadataAsync(cancellationToken);
 
         logger.LogInformation("Legacy DualView database import completed");
@@ -1521,25 +1525,178 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
         }
     }
 
+    private async Task RepairOrphanedMediaCollectionsAsync(SqliteConnection connection,
+        CancellationToken cancellationToken)
+    {
+        var orphanedMedia = await dbContext.MediaFiles
+            .Where(media => !media.InCollections.Any())
+            .ToListAsync(cancellationToken);
+
+        if (orphanedMedia.Count == 0)
+        {
+            logger.LogInformation("No orphaned media files require collection repair");
+            return;
+        }
+
+        var nextSequenceNumbers = new Dictionary<long, int>();
+        var repairedCount = 0;
+        foreach (var media in orphanedMedia)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "SELECT relative_path FROM pictures WHERE file_hash = $hash AND (deleted = 0 OR deleted IS NULL) LIMIT 1";
+            command.Parameters.AddWithValue("$hash", media.Hash);
+            var relativePath = await command.ExecuteScalarAsync(cancellationToken) as string;
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                logger.LogWarning(
+                    "Could not find the old database record for orphaned media {MediaId} with hash {Hash}",
+                    media.Id, media.Hash);
+
+                // Then do a fuzzier match using partial name and image size
+                await using var command2 = connection.CreateCommand();
+                command.CommandText =
+                    "SELECT relative_path FROM pictures WHERE name LIKE $name AND width = $width AND height = $height AND (deleted = 0 OR deleted IS NULL) LIMIT 1";
+                command.Parameters.AddWithValue("$name", "%" + GetUntilFirstDot(media.OriginalFileName) + "%");
+                command.Parameters.AddWithValue("$width", media.Width);
+                command.Parameters.AddWithValue("$height", media.Height);
+                relativePath = await command.ExecuteScalarAsync(cancellationToken) as string;
+
+                if (string.IsNullOrWhiteSpace(relativePath))
+                {
+                    logger.LogWarning(
+                        "Even partial fuzzy search failed to find anything for media {MediaId} with hash {Hash}",
+                        media.Id, media.Hash);
+                    continue;
+                }
+
+                logger.LogInformation("Fuzzy match on partial name and size matched on {Name}, {Width}x{Height}",
+                    GetUntilFirstDot(media.OriginalFileName), media.Width, media.Height);
+            }
+
+            var collectionName = GetLegacyCollectionName(relativePath);
+            if (string.IsNullOrWhiteSpace(collectionName))
+            {
+                logger.LogWarning("Could not determine a collection name from the old path {Path} for media {MediaId}",
+                    relativePath, media.Id);
+                continue;
+            }
+
+            collectionName = SanitizeName(collectionName);
+            var collection = await dbContext.Collections
+                .FirstOrDefaultAsync(item => item.NameLowerCase == collectionName.ToLowerInvariant(),
+                    cancellationToken);
+            if (collection == null)
+            {
+                logger.LogWarning("Could not find collection {CollectionName} for orphaned media {MediaId}",
+                    collectionName, media.Id);
+                continue;
+            }
+
+            var collectionItems = dbContext.Set<CollectionItem>()
+                .Where(item => item.CollectionId == collection.Id);
+            if (!nextSequenceNumbers.TryGetValue(collection.Id, out var sequenceNumber))
+            {
+                sequenceNumber = await collectionItems
+                    .Select(item => (int?)item.SequenceNumber)
+                    .MaxAsync(cancellationToken) ?? -1;
+                ++sequenceNumber;
+            }
+
+            dbContext.Set<CollectionItem>().Add(new CollectionItem
+            {
+                CollectionId = collection.Id,
+                MediaFileId = media.Id,
+                SequenceNumber = sequenceNumber,
+            });
+            nextSequenceNumbers[collection.Id] = sequenceNumber + 1;
+            ++repairedCount;
+
+            logger.LogInformation("Added orphaned media {MediaId} to collection {CollectionId} ({CollectionName})",
+                media.Id, collection.Id, collection.Name);
+        }
+
+        if (repairedCount > 0)
+            await dbContext.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation("Repaired {RepairedCount} of {OrphanedCount} orphaned media files", repairedCount,
+            orphanedMedia.Count);
+    }
+
     private async Task VerifyImportedDatabaseStructureAsync(CancellationToken cancellationToken)
     {
-        var mediaWithoutCollections = await dbContext.MediaFiles
-            .Where(media => !media.InCollections.Any())
-            .Select(media => new { media.Id, media.OriginalFileName })
+        var folders = await dbContext.MediaFolders
+            .Include(folder => folder.Parents)
             .ToListAsync(cancellationToken);
+
+        var childrenByParent = new Dictionary<long, List<long>>();
+        foreach (var folder in folders)
+        {
+            foreach (var parent in folder.Parents)
+            {
+                if (!childrenByParent.TryGetValue(parent.Id, out var children))
+                {
+                    children = [];
+                    childrenByParent[parent.Id] = children;
+                }
+
+                children.Add(folder.Id);
+            }
+        }
+
+        var reachableFolderIds = new HashSet<long>();
+        var foldersToVisit = new Queue<long>();
+        if (folders.Any(folder => folder.Id == MediaFolder.RootFolderId))
+        {
+            reachableFolderIds.Add(MediaFolder.RootFolderId);
+            foldersToVisit.Enqueue(MediaFolder.RootFolderId);
+        }
+
+        while (foldersToVisit.Count > 0)
+        {
+            var parentId = foldersToVisit.Dequeue();
+            if (!childrenByParent.TryGetValue(parentId, out var children))
+                continue;
+
+            foreach (var childId in children)
+            {
+                if (reachableFolderIds.Add(childId))
+                    foldersToVisit.Enqueue(childId);
+            }
+        }
+
+        var foldersWithoutRootPath = folders
+            .Where(folder => !reachableFolderIds.Contains(folder.Id))
+            .Select(folder => new { folder.Id, folder.Name })
+            .ToList();
 
         var collectionsWithoutFolders = await dbContext.Collections
             .Where(collection => !collection.Folders.Any())
             .Select(collection => new { collection.Id, collection.Name })
             .ToListAsync(cancellationToken);
 
-        if (mediaWithoutCollections.Count == 0 && collectionsWithoutFolders.Count == 0)
+        var mediaWithoutCollections = await dbContext.MediaFiles
+            .Where(media => !media.InCollections.Any())
+            .Select(media => new { media.Id, media.OriginalFileName })
+            .ToListAsync(cancellationToken);
+
+        if (foldersWithoutRootPath.Count == 0 && collectionsWithoutFolders.Count == 0 &&
+            mediaWithoutCollections.Count == 0)
         {
             logger.LogInformation("Imported database structure verification succeeded");
             return;
         }
 
         var problems = new List<string>();
+        if (foldersWithoutRootPath.Count > 0)
+        {
+            problems.Add($"{foldersWithoutRootPath.Count} folders not reachable from the root folder " +
+                         $"({string.Join(", ", foldersWithoutRootPath.Take(10).Select(folder =>
+                             $"{folder.Id}:{folder.Name}"))})");
+        }
+
         if (mediaWithoutCollections.Count > 0)
         {
             problems.Add($"{mediaWithoutCollections.Count} media files without a collection " +
@@ -1556,6 +1713,27 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
 
         throw new InvalidDataException("Imported database structure verification failed: " +
                                        string.Join("; ", problems));
+    }
+
+    private static string? GetLegacyCollectionName(string relativePath)
+    {
+        var normalizedPath = relativePath.Replace('\\', '/');
+        var fileSeparator = normalizedPath.LastIndexOf('/');
+        if (fileSeparator <= 0)
+            return null;
+
+        var directoryPath = normalizedPath[..fileSeparator].TrimEnd('/');
+        if (directoryPath.Length == 0)
+            return null;
+
+        var collectionSeparator = directoryPath.LastIndexOf('/');
+        return directoryPath[(collectionSeparator + 1)..];
+    }
+
+    private static string GetUntilFirstDot(string str)
+    {
+        var dotIndex = str.IndexOf('.');
+        return dotIndex < 0 ? str : str[..dotIndex];
     }
 
     private async Task VerifyImportedAnimatedImageMetadataAsync(CancellationToken cancellationToken)
@@ -1580,7 +1758,15 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
 
             var path = Path.Combine(storage, media.PathRelativeToStorage());
             using var frames = new MagickImageCollection();
-            await frames.ReadAsync(path, cancellationToken);
+            try
+            {
+                await frames.ReadAsync(path, cancellationToken);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to read image '{Path}'", path);
+                continue;
+            }
 
             var frameCount = frames.Count;
             if (frameCount <= 0)
