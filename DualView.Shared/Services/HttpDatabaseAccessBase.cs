@@ -503,21 +503,6 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task CreateTagModifierAliasAsync(long modifierId, string alias)
-    {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/tagModifier/{modifierId}/alias",
-            new CreateTagModifierAliasRequest { Alias = alias });
-        response.EnsureSuccessStatusCode();
-    }
-
-    public async Task DeleteTagModifierAliasAsync(long modifierId, string alias)
-    {
-        var response =
-            await HttpClient.DeleteAsync(
-                $"api/v1/tagModifier/{modifierId}/alias?alias={UrlEncoder.Default.Encode(alias)}");
-        response.EnsureSuccessStatusCode();
-    }
-
     public async Task AddTagImplicationAsync(long tagId, long impliedTagId)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{tagId}/imply",

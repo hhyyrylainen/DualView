@@ -80,9 +80,6 @@ public interface IDatabaseCommonService
     public Task CreateTagAliasAsync(long tagId, string alias);
     public Task DeleteTagAliasAsync(long tagId, string alias);
 
-    public Task CreateTagModifierAliasAsync(long modifierId, string alias);
-    public Task DeleteTagModifierAliasAsync(long modifierId, string alias);
-
     public Task AddTagImplicationAsync(long tagId, long impliedTagId);
     public Task RemoveTagImplicationAsync(long tagId, long impliedTagId);
 

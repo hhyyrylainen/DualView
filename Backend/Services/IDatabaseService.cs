@@ -107,7 +107,6 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<AppliedTag?> GetAppliedTagAsync(long id);
 
     public Task<Tag?> GetTagByNameOrAliasAsync(string name);
-    public Task<TagModifier?> GetTagModifierByNameOrAliasAsync(string name);
     public Task<TagBreakRule?> GetTagBreakRuleByStrAsync(string str);
     public Task<string?> GetTagSuperAliasAsync(string alias);
 

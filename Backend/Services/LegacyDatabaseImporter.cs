@@ -298,22 +298,6 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             modifierIds[row.GetInt64("id")] = modifier.Id;
         }
 
-        // Not actually used, so not ported to DualView 3
-        /*await foreach (var row in ReadRowsAsync(connection,
-                           "SELECT name, meant_modifier FROM tag_modifier_aliases",
-                           cancellationToken))
-        {
-            if (!modifierIds.TryGetValue(row.GetInt64("meant_modifier"), out var modifierId))
-                continue;
-
-            var alias = RequiredText(row, "name").ToLowerInvariant();
-            if (!await dbContext.TagModifierAliases.AnyAsync(item => item.Name.ToLower() == alias,
-                    cancellationToken))
-            {
-                dbContext.TagModifierAliases.Add(new TagModifierAlias(alias.ToLowerInvariant(), modifierId));
-            }
-        }*/
-
         await dbContext.SaveChangesAsync(cancellationToken);
         return modifierIds;
     }

@@ -1105,27 +1105,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
     }
 
-    public async Task CreateTagModifierAliasAsync(long modifierId, string alias)
-    {
-        var modifierAlias = new TagModifierAlias(alias.TrimOrThrowIfEmpty().ToLowerInvariant(), modifierId);
-        await dbContext.TagModifierAliases.AddAsync(modifierAlias);
-        await SaveAsync();
-        await updateNotifier.NotifyTagModifiersUpdated();
-    }
-
-    public async Task DeleteTagModifierAliasAsync(long modifierId, string alias)
-    {
-        var modifierAlias =
-            await dbContext.TagModifierAliases.FirstOrDefaultAsync(a =>
-                a.ModifierId == modifierId && a.Name == alias.ToLowerInvariant());
-        if (modifierAlias != null)
-        {
-            dbContext.TagModifierAliases.Remove(modifierAlias);
-            await SaveAsync();
-            await updateNotifier.NotifyTagModifiersUpdated();
-        }
-    }
-
     public async Task AddTagImplicationAsync(long tagId, long impliedTagId)
     {
         if (tagId == impliedTagId)
@@ -1350,18 +1329,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         var alias = await dbContext.TagAliases.Include(a => a.Tag).FirstOrDefaultAsync(a => a.Name == name);
         return alias?.Tag;
-    }
-
-    public async Task<TagModifier?> GetTagModifierByNameOrAliasAsync(string name)
-    {
-        name = name.ToLowerInvariant();
-        var modifier = await GetTagModifierByNameAsync(name);
-        if (modifier != null)
-            return modifier;
-
-        var alias = await dbContext.TagModifierAliases.Include(a => a.Modifier)
-            .FirstOrDefaultAsync(a => a.Name == name);
-        return alias?.Modifier;
     }
 
     public async Task<TagBreakRule?> GetTagBreakRuleByStrAsync(string str)

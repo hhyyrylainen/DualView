@@ -24,7 +24,6 @@ public class AppDbContext : DbContext
     public DbSet<Tag> Tags { get; set; }
     public DbSet<TagAlias> TagAliases { get; set; }
     public DbSet<TagModifier> TagModifiers { get; set; }
-    public DbSet<TagModifierAlias> TagModifierAliases { get; set; }
     public DbSet<TagImply> TagImplies { get; set; }
     public DbSet<AppliedTag> AppliedTags { get; set; }
     public DbSet<TagBreakRule> TagBreakRules { get; set; }
@@ -246,11 +245,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<TagAlias>(builder =>
         {
             builder.HasQueryFilter(ta => !ta.Tag.IsDeleted);
-        });
-
-        modelBuilder.Entity<TagModifierAlias>(builder =>
-        {
-            builder.HasQueryFilter(tma => !tma.Modifier.IsDeleted);
         });
     }
 }

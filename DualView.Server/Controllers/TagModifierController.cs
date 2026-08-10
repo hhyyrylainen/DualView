@@ -51,18 +51,4 @@ public class TagModifierController : Controller
         await databaseService.DeleteTagModifierAsync(id);
         return Ok();
     }
-
-    [HttpPost("{id:long}/alias")]
-    public async Task<IActionResult> CreateAlias([Required] long id, [FromBody] CreateTagModifierAliasRequest request)
-    {
-        await databaseService.CreateTagModifierAliasAsync(id, request.Alias);
-        return Ok();
-    }
-
-    [HttpDelete("{id:long}/alias")]
-    public async Task<IActionResult> DeleteAlias([Required] long id, [Required] [FromQuery] string alias)
-    {
-        await databaseService.DeleteTagModifierAliasAsync(id, alias);
-        return Ok();
-    }
 }

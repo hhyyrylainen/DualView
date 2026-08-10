@@ -13,9 +13,3 @@ public class UpdateModifierRequest
     public string? Name { get; set; }
     public string? Description { get; set; }
 }
-
-public class CreateTagModifierAliasRequest
-{
-    [Required]
-    public string Alias { get; set; } = "";
-}

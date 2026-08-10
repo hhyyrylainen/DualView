@@ -26,8 +26,6 @@ public class TagModifier : UpdateableModel, ISoftDelete, IDTOProvider<TagModifie
 
     public bool IsDeleted { get; set; }
 
-    public ICollection<TagModifierAlias> Aliases { get; set; } = new List<TagModifierAlias>();
-
     public TagModifierDTO GetDTO()
     {
         return new TagModifierDTO(Name)
