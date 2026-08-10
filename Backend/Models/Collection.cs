@@ -18,6 +18,9 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
     {
         Name = name;
         NameLowerCase = name.ToLowerInvariant();
+
+        if (name.Contains('/'))
+            throw new ArgumentException("Collection name cannot contain '/'");
     }
 
     [Key]
