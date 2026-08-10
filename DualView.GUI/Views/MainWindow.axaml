@@ -27,7 +27,7 @@
             <Button Grid.Column="1" Content="UP" Command="{Binding NavigateUp}" Margin="0 0 5 0" />
             <TextBox Grid.Column="2" Text="{Binding CurrentPath}" VerticalAlignment="Center">
                 <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding Refresh}" />
+                    <KeyBinding Gesture="Enter" Command="{Binding NavigateToEnteredPath}" />
                 </TextBox.KeyBindings>
             </TextBox>
         </Grid>
@@ -53,6 +53,7 @@
         <!-- Important to not follow focus as otherwise it just jumps all over the place when items are interacted with and new ones added -->
         <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
+                      Offset="{Binding MainScrollOffset, Mode=TwoWay}"
                       BringIntoViewOnFocusChange="False">
             <ItemsControl ItemsSource="{Binding MainItems}" Padding="1 5 10 10">
                 <ItemsControl.ItemsPanel>

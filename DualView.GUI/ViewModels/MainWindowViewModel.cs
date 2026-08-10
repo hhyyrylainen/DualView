@@ -31,11 +31,15 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IServiceProvider? serviceProvider;
     private readonly MainWindowMediaActions? mediaActions;
 
+    private readonly Stack<(string Path, Vector ScrollOffset)> navigationHistory = new();
+
     private string currentPath = "/";
     private long? currentFolderId;
     private long? currentCollectionId;
     private string searchText = string.Empty;
-    private string? previousPath;
+
+    private Vector? pendingScrollOffsetRestore;
+
     private int currentPage = 1;
     private int totalPages = 1;
     private int pageSize = 100;
@@ -98,6 +102,12 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     {
         get => currentPath;
         set => SetProperty(ref currentPath, value);
+    }
+
+    public Vector MainScrollOffset
+    {
+        get;
+        set => SetProperty(ref field, value);
     }
 
     public string SearchText
@@ -212,24 +222,34 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         await RefreshItems();
     }
 
+    public async Task NavigateToEnteredPath()
+    {
+        navigationHistory.Clear();
+        pendingScrollOffsetRestore = null;
+        currentCollectionId = null;
+        CurrentCollectionName = null;
+        MainScrollOffset = new Vector(0, 0);
+        await RefreshItems();
+    }
+
     public void NavigateUp()
     {
-        if (currentCollectionId != null)
+        if (navigationHistory.Count > 0)
         {
             currentCollectionId = null;
             CurrentCollectionName = null;
 
-            if (!string.IsNullOrEmpty(previousPath))
-            {
-                CurrentPath = previousPath;
-                previousPath = null;
-            }
+            var previousLocation = navigationHistory.Pop();
+            CurrentPath = previousLocation.Path;
+            pendingScrollOffsetRestore = previousLocation.ScrollOffset;
 
             currentPage = 1;
             OnPropertyChanged(nameof(CurrentPage));
             _ = RefreshItems();
             return;
         }
+
+        pendingScrollOffsetRestore = null;
 
         if (string.IsNullOrEmpty(currentPath) || currentPath == "/")
             return;
@@ -257,16 +277,19 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var path = await databaseService.GetMediaFolderPath(id);
+            navigationHistory.Push((CurrentPath, MainScrollOffset));
+            pendingScrollOffsetRestore = null;
             currentFolderId = id;
             currentCollectionId = null;
             CurrentCollectionName = null;
             CurrentPath = path;
+            MainScrollOffset = new Vector(0, 0);
 
             // Directly set value to not cause another refresh
             currentPage = 1;
             OnPropertyChanged(nameof(CurrentPage));
 
-            // As we done just one guaranteed refresh here
+            // As we're done just one guaranteed refresh here
             _ = RefreshItems();
         }
         catch (Exception e)
@@ -278,9 +301,11 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void OpenCollection(long id, string name)
     {
-        previousPath = currentPath;
+        navigationHistory.Push((CurrentPath, MainScrollOffset));
+        pendingScrollOffsetRestore = null;
         currentCollectionId = id;
         CurrentCollectionName = name;
+        MainScrollOffset = new Vector(0, 0);
         currentPage = 1;
         OnPropertyChanged(nameof(CurrentPage));
         _ = RefreshItems();
@@ -389,6 +414,22 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 foreach (var item in newItems)
                 {
                     MainItems.Add(item);
+                }
+
+                if (pendingScrollOffsetRestore is { } scrollOffset)
+                {
+                    pendingScrollOffsetRestore = null;
+
+                    _ = Task.Run(async () =>
+                    {
+                        // The item controls need to be measured before the offset can be
+                        // restored; otherwise ScrollViewer clamps it to the new empty extent.
+                        // There was a different bug, so this delay might not be needed,
+                        // but it is low enough to be human-imperceptible.
+                        await Task.Delay(50);
+
+                        Dispatcher.UIThread.Post(() => MainScrollOffset = scrollOffset, DispatcherPriority.Background);
+                    });
                 }
             });
         }
