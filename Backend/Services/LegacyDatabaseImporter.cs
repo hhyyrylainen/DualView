@@ -1008,12 +1008,14 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             IsFavorited = await IsFavoritedAsync(connection, row.GetInt64("id"), cancellationToken),
         };
 
-                var source = row.GetText("from_file");
-                if (!string.IsNullOrWhiteSpace(source))
-                {
-                    // Rudimentary detection what kind of source it is
-                    string? sourceLocalPath = null;
-                    string? sourceUrl = null;
+        var source = row.GetText("from_file");
+        MediaImportInfo? importInfo = null;
+
+        if (!string.IsNullOrWhiteSpace(source))
+        {
+            // Rudimentary detection what kind of source it is
+            string? sourceLocalPath = null;
+            string? sourceUrl = null;
 
             if (source.StartsWith("http"))
             {
