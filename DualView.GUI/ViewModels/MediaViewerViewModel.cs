@@ -482,36 +482,58 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
-        disposed = true;
+        Task? loadTask;
+        IVisualMediaSource? media;
 
         lock (taskLock)
         {
+            if (disposed)
+                return;
+
+            disposed = true;
             animationTokenSource?.Cancel();
             animationTokenSource?.Dispose();
             animationTokenSource = null;
+
+            loadTask = imageLoadTask;
+            imageLoadTask = null;
+            media = MediaToShow;
         }
 
-        if (imageLoadTask != null)
+        // The load task may still be using the media source. Waiting here blocks the UI thread, while disposing the
+        // source immediately would race with the load. Finish clean-up asynchronously once the task has stopped.
+        _ = DisposeAfterLoadTaskAsync(loadTask, media);
+    }
+
+    private async Task DisposeAfterLoadTaskAsync(Task? loadTask, IVisualMediaSource? media)
+    {
+        if (loadTask != null)
         {
-            if (!imageLoadTask.Wait(TimeSpan.FromSeconds(5)))
+            try
             {
-                logger?.LogWarning("Image load task did not finish in time. This will LAG THE UI!");
+                await loadTask.ConfigureAwait(false);
             }
-            else
+            catch (Exception e)
             {
-                imageLoadTask?.Dispose();
+                logger?.LogInformation(e, "Image load task stopped while disposing media viewer");
             }
         }
 
-        lock (taskLock)
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            MediaOpenResources = null;
-            MediaToShow?.Dispose();
-            MediaToShow = null;
-            CurrentFrameBitmap?.Dispose();
-            OnSelectionChanged = null;
-            OnDisplayedFrameChanged = null;
-        }
+            lock (taskLock)
+            {
+                MediaOpenResources = null;
+                media?.Dispose();
+                if (ReferenceEquals(MediaToShow, media))
+                    MediaToShow = null;
+
+                CurrentFrameBitmap?.Dispose();
+                CurrentFrameBitmap = null;
+                OnSelectionChanged = null;
+                OnDisplayedFrameChanged = null;
+            }
+        });
     }
 
     private void StartLoadingTask()
