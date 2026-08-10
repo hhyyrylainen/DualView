@@ -6,7 +6,7 @@
         xmlns:controls="using:DualView.GUI.Controls"
         mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="DualView.GUI.Views.MainWindow"
-        Width="600" Height="800"
+        Width="720" Height="800"
         MinWidth="300" MinHeight="200"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/logo.ico"
