@@ -1250,8 +1250,9 @@ public class LegacyDatabaseImporter : ILegacyDatabaseImporter
             // This seems to always give an HTML page even if it exists
             if (source.Contains("i.redd.it"))
                 throw new IgnoreImportException("Cannot automatically redownload from: " + source);
-            var target = Path.Combine(Path.GetTempPath(),
-                "dualview-import-" + Guid.NewGuid());
+
+            var extension = NormalizeExtension(RequiredText(row, "extension"));
+            var target = Path.Combine(Path.GetTempPath(), "dualview-import-" + Guid.NewGuid());
             bool wasValid = false;
 
             try
