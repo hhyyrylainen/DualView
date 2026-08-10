@@ -31,7 +31,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly IServiceProvider? serviceProvider;
     private readonly MainWindowMediaActions? mediaActions;
 
-    private readonly Stack<(string Path, Vector ScrollOffset)> navigationHistory = new();
+    private readonly Stack<(string Path, Vector ScrollOffset, string SearchText)> navigationHistory = new();
 
     private string currentPath = "/";
     private long? currentFolderId;
@@ -243,6 +243,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
             var previousLocation = navigationHistory.Pop();
             CurrentPath = previousLocation.Path;
+            SearchText = previousLocation.SearchText;
             pendingScrollOffsetRestore = previousLocation.ScrollOffset;
 
             currentPage = 1;
@@ -251,10 +252,21 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
+        var hadSearchText = !string.IsNullOrEmpty(SearchText);
+        SearchText = string.Empty;
         pendingScrollOffsetRestore = null;
+        MainScrollOffset = new Vector(0, 0);
 
         if (string.IsNullOrEmpty(currentPath) || currentPath == "/")
+        {
+            if (!hadSearchText)
+                return;
+
+            currentPage = 1;
+            OnPropertyChanged(nameof(CurrentPage));
+            _ = RefreshItems();
             return;
+        }
 
         var lastSlash = currentPath.LastIndexOf('/');
         if (lastSlash <= 0)
@@ -279,7 +291,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var path = await databaseService.GetMediaFolderPath(id);
-            navigationHistory.Push((CurrentPath, MainScrollOffset));
+            navigationHistory.Push((CurrentPath, MainScrollOffset, SearchText));
             pendingScrollOffsetRestore = null;
             currentFolderId = id;
             currentCollectionId = null;
@@ -303,7 +315,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void OpenCollection(long id, string name)
     {
-        navigationHistory.Push((CurrentPath, MainScrollOffset));
+        navigationHistory.Push((CurrentPath, MainScrollOffset, SearchText));
         pendingScrollOffsetRestore = null;
         currentCollectionId = id;
         CurrentCollectionName = name;
