@@ -144,6 +144,8 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 OnPropertyChanged(nameof(CanNavigateBackwards));
                 OnPropertyChanged(nameof(CanNavigateForwards));
+                pendingScrollOffsetRestore = null;
+                MainScrollOffset = new Vector(0, 0);
                 _ = RefreshItems();
             }
         }
