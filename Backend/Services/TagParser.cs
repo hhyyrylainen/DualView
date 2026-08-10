@@ -108,7 +108,7 @@ public class TagParser : ITagParser
 
             if (!partIsValid && modifierAllowed)
             {
-                var mod = await databaseService.GetTagModifierByNameOrAliasAsync(nextPart);
+                var mod = await databaseService.GetTagModifierByNameAsync(nextPart);
                 if (mod != null)
                 {
                     modifierAllowed = false;
@@ -240,7 +240,7 @@ public class TagParser : ITagParser
 
                 for (int j = 0; j < i; ++j)
                 {
-                    var modifier = await databaseService.GetTagModifierByNameOrAliasAsync(words[j]);
+                    var modifier = await databaseService.GetTagModifierByNameAsync(words[j]);
                     if (modifier == null)
                     {
                         allModifiersValid = false;
@@ -269,7 +269,7 @@ public class TagParser : ITagParser
 
                 for (int j = i + 1; j < words.Length; ++j)
                 {
-                    var modifier = await databaseService.GetTagModifierByNameOrAliasAsync(words[j]);
+                    var modifier = await databaseService.GetTagModifierByNameAsync(words[j]);
                     if (modifier == null)
                     {
                         allModifiersValid = false;
