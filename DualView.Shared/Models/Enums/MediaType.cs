@@ -12,6 +12,7 @@ public enum MediaType
     Webm,
     Bmp,
     Tif,
+    Avif,
 }
 
 public static class MediaTypeExtensions
@@ -27,6 +28,7 @@ public static class MediaTypeExtensions
             case MediaType.WebpAnimated:
             case MediaType.Bmp:
             case MediaType.Tif:
+            case MediaType.Avif:
                 return true;
         }
 
@@ -92,6 +94,9 @@ public static class MediaTypeExtensions
         if (extension == ".tif")
             return MediaType.Tif;
 
+        if (extension == ".avif")
+            return MediaType.Avif;
+
         throw new ArgumentException("Unknown file extension: " + extension);
     }
 
@@ -118,6 +123,8 @@ public static class MediaTypeExtensions
                 return ".bmp";
             case MediaType.Tif:
                 return ".tif";
+            case MediaType.Avif:
+                return ".avif";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
@@ -146,6 +153,8 @@ public static class MediaTypeExtensions
                 return "image/bmp";
             case MediaType.Tif:
                 return "image/tiff";
+            case MediaType.Avif:
+                return "image/avif";
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, null);
         }
