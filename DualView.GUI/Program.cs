@@ -231,7 +231,6 @@ sealed class Program
         services.AddTransient<OperationStatusWindowViewModel>();
         services.AddTransient<MediaEditorWindowViewModel>();
         services.AddTransient<MediaEditSelectorWindowViewModel>();
-        services.AddTransient<MediaPickerWindowViewModel>();
         services.AddTransient<FolderPickerViewModel>();
         services.AddTransient<EditMediaFoldersWindowViewModel>();
         services.AddTransient<TagManagerWindowViewModel>();

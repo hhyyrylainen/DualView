@@ -58,13 +58,6 @@ public interface IWindowService
     public Task<bool?> ShowConfirmationWindow(string title, string question, bool allowCancel = false);
 
     /// <summary>
-    ///   Shows a window for selecting a folder.
-    /// </summary>
-    /// <param name="type">Type of folders to show</param>
-    /// <returns>The selected folder ID or null if canceled</returns>
-    public Task<long?> ShowFolderSelectionWindow(FolderSelectorWindowViewModel.FolderType type);
-
-    /// <summary>
     ///   Shows the given media source in a dedicated window
     /// </summary>
     /// <param name="mediaSource">Media to view</param>
@@ -97,14 +90,6 @@ public interface IWindowService
     ///   Shows the media selection window.
     /// </summary>
     /// <returns>The selected media or null if cancelled</returns>
-    public Task<ConfiguredMediaDTO?> ShowMediaSelectionWindow();
-
-    /// <summary>
-    ///   Shows the media selection window in multi-select mode.
-    /// </summary>
-    /// <returns>The selected media items or null if cancelled</returns>
-    public Task<List<ConfiguredMediaDTO>?> ShowMediaMultiSelectionWindow();
-
     public void ShowTextInputWindow(string title, string explanation, string? initialValue,
         Func<TextInputWindowViewModel, Task<bool>> onAccept, string? placeholder = null);
 }

@@ -223,40 +223,6 @@ public sealed class WindowService : IWindowService
         return await future.Task;
     }
 
-    public async Task<long?> ShowFolderSelectionWindow(FolderSelectorWindowViewModel.FolderType type)
-    {
-        var serviceScope = services.CreateScope();
-        var provider = serviceScope.ServiceProvider;
-        var confirmationViewModel =
-            new FolderSelectorWindowViewModel(provider.GetRequiredService<ILogger<FolderSelectorWindowViewModel>>(),
-                provider.GetRequiredService<IWindowService>(),
-                provider.GetRequiredService<IClientDatabaseService>(),
-                provider.GetRequiredService<IBackendStatusService>(), type);
-
-        var future = new TaskCompletionSource<long?>();
-
-        confirmationViewModel.OnFolderSelected += (result, selectedType) =>
-        {
-            if (selectedType != type)
-            {
-                future.TrySetResult(null);
-                return;
-            }
-
-            future.TrySetResult(result);
-        };
-
-        // If this was called on another thread, we need to show the window on the UI thread
-        await Dispatcher.UIThread.InvokeAsync(() => PerformInstanceWindowCreation(confirmationViewModel, serviceScope,
-            () =>
-            {
-                // Set a null result if no result yet to avoid never having a result if closed
-                future.TrySetResult(null);
-            }));
-
-        return await future.Task;
-    }
-
     public void ShowMediaViewer(IVisualMediaSource mediaSource)
     {
         var serviceScope = services.CreateScope();
@@ -331,54 +297,6 @@ public sealed class WindowService : IWindowService
         var vm = ActivatorUtilities.CreateInstance<EditMediaFoldersWindowViewModel>(scope.ServiceProvider);
         vm.Initialize(mediaConfigurationId);
         Dispatcher.UIThread.Post(() => PerformInstanceWindowCreation(vm, scope));
-    }
-
-    public async Task<ConfiguredMediaDTO?> ShowMediaSelectionWindow()
-    {
-        var serviceScope = services.CreateScope();
-        var vm = serviceScope.ServiceProvider.GetRequiredService<MediaPickerWindowViewModel>();
-        var tcs = new TaskCompletionSource<ConfiguredMediaDTO?>();
-
-        Dispatcher.UIThread.Post(() =>
-            PerformInstanceWindowCreation(vm, serviceScope, () =>
-            {
-                if (vm.Result != null)
-                {
-                    tcs.TrySetResult(vm.Result);
-                }
-                else
-                {
-                    tcs.TrySetResult(null);
-                }
-            }));
-
-        return await tcs.Task;
-    }
-
-    public async Task<List<ConfiguredMediaDTO>?> ShowMediaMultiSelectionWindow()
-    {
-        var serviceScope = services.CreateScope();
-        var vm = serviceScope.ServiceProvider.GetRequiredService<MediaPickerWindowViewModel>();
-
-        // Enable multi-select mode on the picker
-        vm.MultiSelect = true;
-
-        var tcs = new TaskCompletionSource<List<ConfiguredMediaDTO>?>();
-
-        Dispatcher.UIThread.Post(() =>
-            PerformInstanceWindowCreation(vm, serviceScope, () =>
-            {
-                if (vm.ResultMultiple != null)
-                {
-                    tcs.TrySetResult(vm.ResultMultiple);
-                }
-                else
-                {
-                    tcs.TrySetResult(null);
-                }
-            }));
-
-        return await tcs.Task;
     }
 
     public void ShowTextInputWindow(string title, string explanation, string? initialValue,
