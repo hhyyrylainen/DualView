@@ -20,6 +20,7 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
 
     public EditMediaFoldersWindowViewModel()
     {
+        FolderPicker = new FolderPickerViewModel();
     }
 
     [ActivatorUtilitiesConstructor]
@@ -30,6 +31,8 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
         this.windowService = windowService;
         this.clientDatabaseService = clientDatabaseService;
     }
+
+    public FolderPickerViewModel FolderPicker { get; }
 
     public ObservableCollection<FolderItem> ExistingFolders { get; } = new();
 
@@ -109,6 +112,12 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
             windowService?.ShowErrorWindow("Failed to apply folder changes", e);
             return false;
         }
+    }
+
+    private void OnFolderPickerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(FolderPickerViewModel.SelectedPath))
+            NewFolderPath = FolderPicker.SelectedPath;
     }
 
     public class FolderItem : ObservableObject

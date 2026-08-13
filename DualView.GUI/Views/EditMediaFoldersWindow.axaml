@@ -3,8 +3,9 @@
         xmlns:vm="using:DualView.GUI.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:controls="using:DualView.GUI.Controls"
         mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
-        Width="520" Height="420"
+        Width="560" Height="620"
         MinHeight="200" MinWidth="300"
         x:Class="DualView.GUI.Views.EditMediaFoldersWindow"
         x:DataType="vm:EditMediaFoldersWindowViewModel"
@@ -35,9 +36,8 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <Border Height="10" />
-            <TextBlock>Or add to a new folder path:</TextBlock>
-            <TextBox Text="{Binding NewFolderPath}" PlaceholderText="/path/to/new/folder" />
+            <TextBlock Text="Choose a folder to add:" FontWeight="Bold" />
+            <controls:FolderPicker DataContext="{Binding FolderPicker}" Height="380" />
         </StackPanel>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">

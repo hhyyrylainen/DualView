@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:DualView.GUI.ViewModels"
+             xmlns:controls="using:DualView.GUI.Controls"
+             mc:Ignorable="d" d:DesignWidth="420" d:DesignHeight="520"
+             x:Class="DualView.GUI.Controls.FolderPicker"
+             x:DataType="vm:FolderPickerViewModel">
+
+    <Design.DataContext>
+        <vm:FolderPickerViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="5">
+        <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="0,0,0,5">
+            <Button Grid.Column="0" Content="UP" Command="{Binding NavigateUp}" Margin="0,0,4,0" />
+            <Button Grid.Column="1" Content="Copy" Command="{Binding CopyPath}" Margin="0,0,4,0" />
+            <Button Grid.Column="2" Content="Paste" Command="{Binding PastePath}" Margin="0,0,4,0" />
+            <TextBox Grid.Column="3" Text="{Binding CurrentPath}" VerticalContentAlignment="Center">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding NavigateToEnteredPath}" />
+                </TextBox.KeyBindings>
+            </TextBox>
+            <Button Grid.Column="4" Content="Go" Command="{Binding NavigateToEnteredPath}" Margin="4,0,4,0" />
+            <Button Grid.Column="5" Content="New Folder" Command="{Binding CreateNewFolder}" />
+        </Grid>
+
+        <TextBlock Grid.Row="1" Text="{Binding CurrentPath}" FontWeight="Bold" Margin="0,0,0,5" />
+
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto" BringIntoViewOnFocusChange="False">
+            <ItemsControl ItemsSource="{Binding Folders}" Padding="1,5,5,5">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:MediaViewer Width="104" Height="156" Margin="4" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
