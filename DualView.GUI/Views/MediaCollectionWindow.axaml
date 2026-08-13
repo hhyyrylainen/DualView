@@ -52,7 +52,8 @@
                     IsEnabled="{Binding CanNavigateForwards}" />
         </Grid>
 
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                      Offset="{Binding CollectionScrollOffset, Mode=TwoWay}">
             <ItemsControl ItemsSource="{Binding CollectionItems}" Padding="0 5 10 10">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

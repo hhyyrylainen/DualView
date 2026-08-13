@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using DualView.GUI.Models;
@@ -20,11 +22,17 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     private readonly IClientDatabaseService? databaseService;
     private readonly IWindowService? windowService;
     private readonly IServiceProvider? serviceProvider;
+
+    private readonly Dictionary<int, Vector> pageScrollOffsets = new();
+
     private long? collectionId;
     private int currentPage = 1;
     private int totalPages = 1;
     private int pageSize = 500;
     private string searchText = string.Empty;
+
+    private Vector? pendingScrollOffsetRestore;
+    private int scrollOffsetRestoreVersion;
 
     public MediaCollectionWindowViewModel()
     {
@@ -78,8 +86,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref searchText, value))
             {
-                currentPage = 1;
-                OnPropertyChanged(nameof(CurrentPage));
+                ResetScrollPositionCache(true);
                 _ = RefreshItems();
             }
         }
@@ -92,8 +99,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref pageSize, value))
             {
-                currentPage = 1;
-                OnPropertyChanged(nameof(CurrentPage));
+                ResetScrollPositionCache(true);
                 _ = RefreshItems();
             }
         }
@@ -105,7 +111,10 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         set
         {
             if (SetProperty(ref field, value))
+            {
+                ResetScrollPositionCache(false);
                 _ = RefreshItems();
+            }
         }
     } = CollectionSortColumn.CollectionOrder;
 
@@ -115,7 +124,10 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         set
         {
             if (SetProperty(ref field, value))
+            {
+                ResetScrollPositionCache(false);
                 _ = RefreshItems();
+            }
         }
     } = SortDirection.Ascending;
 
@@ -136,10 +148,35 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         get => currentPage;
         set
         {
-            if (SetProperty(ref currentPage, Math.Clamp(value, 1, totalPages)))
+            var nextPage = Math.Clamp(value, 1, totalPages);
+            if (nextPage == currentPage)
+            {
+                OnPropertyChanged(nameof(CanNavigateBackwards));
+                OnPropertyChanged(nameof(CanNavigateForwards));
+                return;
+            }
+
+            pendingScrollOffsetRestore = pageScrollOffsets.TryGetValue(nextPage, out var scrollOffset)
+                ? scrollOffset
+                : null;
+            ++scrollOffsetRestoreVersion;
+            if (SetProperty(ref currentPage, nextPage))
+            {
+                CollectionScrollOffset = new Vector(0, 0);
                 _ = RefreshItems();
+            }
             OnPropertyChanged(nameof(CanNavigateBackwards));
             OnPropertyChanged(nameof(CanNavigateForwards));
+        }
+    }
+
+    public Vector CollectionScrollOffset
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+                pageScrollOffsets[currentPage] = value;
         }
     }
 
@@ -164,6 +201,12 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public async Task Initialize(long id, string? fallbackName = null)
     {
         collectionId = id;
+        pageScrollOffsets.Clear();
+        pendingScrollOffsetRestore = null;
+        ++scrollOffsetRestoreVersion;
+        currentPage = 1;
+        OnPropertyChanged(nameof(CurrentPage));
+        CollectionScrollOffset = new Vector(0, 0);
         if (databaseService == null)
             return;
 
@@ -238,6 +281,22 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
                     viewer.OnSelectionChanged += OnItemSelectionChanged;
                     CollectionItems.Add(viewer);
                 }
+
+                if (pendingScrollOffsetRestore is { } scrollOffset)
+                {
+                    pendingScrollOffsetRestore = null;
+                    var restoreVersion = scrollOffsetRestoreVersion;
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(50);
+                        Dispatcher.UIThread.Post(() =>
+                        {
+                            if (restoreVersion == scrollOffsetRestoreVersion)
+                                CollectionScrollOffset = scrollOffset;
+                        },
+                            DispatcherPriority.Background);
+                    });
+                }
             });
         }
         catch (Exception ex)
@@ -261,6 +320,20 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     }
 
     private void OnItemSelectionChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(SelectedCount));
+
+    private void ResetScrollPositionCache(bool resetPage)
+    {
+        pageScrollOffsets.Clear();
+        pendingScrollOffsetRestore = null;
+        ++scrollOffsetRestoreVersion;
+        if (resetPage)
+        {
+            currentPage = 1;
+            OnPropertyChanged(nameof(CurrentPage));
+        }
+
+        CollectionScrollOffset = new Vector(0, 0);
+    }
 
     private void InitializeMenu()
     {
