@@ -41,7 +41,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <controls:MediaViewer Width="104" Height="156" Margin="4" />
+                        <controls:MediaViewer Width="80" Height="132" Margin="4" />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
