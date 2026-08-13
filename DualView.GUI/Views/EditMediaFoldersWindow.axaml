@@ -10,7 +10,7 @@
         x:Class="DualView.GUI.Views.EditMediaFoldersWindow"
         x:DataType="vm:EditMediaFoldersWindowViewModel"
         Icon="/Assets/logo.ico"
-        Title="Edit Media Folders">
+        Title="Manage Folders">
 
     <Design.DataContext>
         <vm:EditMediaFoldersWindowViewModel />
@@ -18,7 +18,7 @@
 
     <Grid RowDefinitions="*,Auto" Margin="8">
         <StackPanel Orientation="Vertical" Spacing="6">
-            <TextBlock Text="Current folders for this media:" FontWeight="Bold" />
+            <TextBlock Text="{Binding ExistingFoldersHeading}" FontWeight="Bold" />
             <ItemsControl ItemsSource="{Binding ExistingFolders}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
@@ -36,8 +36,9 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
 
-            <TextBlock Text="Choose a folder to add:" FontWeight="Bold" />
+            <TextBlock Text="{Binding AddFolderHeading}" FontWeight="Bold" />
             <controls:FolderPicker DataContext="{Binding FolderPicker}" Height="380" />
+            <CheckBox Content="Add to root" IsChecked="{Binding AddToRoot}" />
         </StackPanel>
 
         <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">

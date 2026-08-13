@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using DualView.GUI.Services;
+using DualView.Shared.Models.DTO;
 using DualView.Shared.Services;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,6 +19,8 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
     private readonly IClientDatabaseService? clientDatabaseService;
 
     private long mediaConfigId;
+    private long? collectionId;
+    private long? folderId;
 
     public EditMediaFoldersWindowViewModel()
     {
@@ -46,9 +50,46 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
         set => SetProperty(ref field, value);
     } = string.Empty;
 
+    public bool AddToRoot
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
+    public string ManagedItemType
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "media";
+
+    public string ManagedItemName
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = "media";
+
+    public string ExistingFoldersHeading => $"Current folders for this {ManagedItemType}:";
+    public string AddFolderHeading => $"Choose a folder to add this {ManagedItemType} to:";
+
     public void Initialize(long configuredMediaId)
     {
         mediaConfigId = configuredMediaId;
+        collectionId = null;
+        folderId = null;
+        ManagedItemType = "media";
+        ManagedItemName = "media";
+        NotifyManagedItemTextChanged();
+        _ = Task.Run(LoadFolders);
+    }
+
+    public void Initialize(IConfiguredMediaInfo item)
+    {
+        mediaConfigId = 0;
+        collectionId = item.IsCollection ? item.Id : null;
+        folderId = item.IsFolder ? item.Id : null;
+        ManagedItemType = item.IsCollection ? "collection" : "folder";
+        ManagedItemName = item.Name;
+        NotifyManagedItemTextChanged();
         _ = Task.Run(LoadFolders);
     }
 
@@ -60,26 +101,24 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
         try
         {
             ExistingFolders.Clear();
-            var info = await clientDatabaseService.GetConfiguredMediaFoldersAsync(mediaConfigId);
-            if (!string.IsNullOrWhiteSpace(info.PrimaryFolder))
+            if (collectionId.HasValue)
             {
-                ExistingFolders.Add(new FolderItem
-                {
-                    Name = info.PrimaryFolder,
-                    Selected = true,
-                });
+                var paths = await clientDatabaseService.GetCollectionFolderPaths(collectionId.Value);
+                AddExistingFolders(paths.Select(path => path.Path));
             }
-
-            if (info.SecondaryFolders != null)
+            else if (folderId.HasValue)
             {
-                foreach (var folder in info.SecondaryFolders)
-                {
-                    ExistingFolders.Add(new FolderItem
-                    {
-                        Name = folder,
-                        Selected = true,
-                    });
-                }
+                var paths = await clientDatabaseService.GetFolderParentFolderPaths(folderId.Value);
+                AddExistingFolders(paths.Select(path => path.Path));
+            }
+            else
+            {
+                var info = await clientDatabaseService.GetConfiguredMediaFoldersAsync(mediaConfigId);
+                if (!string.IsNullOrWhiteSpace(info.PrimaryFolder))
+                    ExistingFolders.Add(new FolderItem { Name = info.PrimaryFolder, Selected = true });
+
+                if (info.SecondaryFolders != null)
+                    AddExistingFolders(info.SecondaryFolders);
             }
         }
         catch (Exception e)
@@ -99,13 +138,35 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
             // Remove unchecked folders
             foreach (var item in ExistingFolders.Where(f => !f.Selected).ToList())
             {
-                await clientDatabaseService.RemoveMediaFromFolder(mediaConfigId, item.Name);
+                if (collectionId.HasValue || folderId.HasValue)
+                {
+                    var folder = await clientDatabaseService.GetMediaFolderFromPathAsync(item.Name);
+                    if (folder == null)
+                        continue;
+
+                    if (collectionId.HasValue)
+                    {
+                        await clientDatabaseService.RemoveCollectionFromFolder(collectionId.Value, folder.Id);
+                    }
+                    else
+                    {
+                        await clientDatabaseService.RemoveFolderFromFolder(folderId!.Value, folder.Id);
+                    }
+                }
+                else
+                {
+                    await clientDatabaseService.RemoveMediaFromFolder(mediaConfigId, item.Name);
+                }
             }
 
             // Add new folder if provided
-            if (!string.IsNullOrWhiteSpace(NewFolderPath))
+            if (AddToRoot)
             {
-                await clientDatabaseService.AddMediaToFolder(mediaConfigId, NewFolderPath.Trim(), true);
+                await AddToFolderAsync("/");
+            }
+            else if (!string.IsNullOrWhiteSpace(NewFolderPath) && NewFolderPath != "/")
+            {
+                await AddToFolderAsync(NewFolderPath.Trim());
             }
 
             return true;
@@ -116,6 +177,45 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
             windowService?.ShowErrorWindow("Failed to apply folder changes", e);
             return false;
         }
+    }
+
+    private async Task AddToFolderAsync(string path)
+    {
+        if (collectionId.HasValue || folderId.HasValue)
+        {
+            var folder = path == "/"
+                ? new MediaFolderDTO("Root") { Id = MediaFolderInfo.RootFolderId }
+                : await clientDatabaseService!.GetMediaFolderFromPathAsync(path);
+            if (folder == null)
+                throw new InvalidOperationException("The selected folder could not be found.");
+
+            if (collectionId.HasValue)
+                await clientDatabaseService!.AddCollectionToFolder(collectionId.Value, folder.Id);
+            else
+                await clientDatabaseService!.AddFolderToFolder(folderId!.Value, folder.Id);
+        }
+        else
+        {
+            await clientDatabaseService!.AddMediaToFolder(mediaConfigId, path, path == "/");
+        }
+    }
+
+    private void AddExistingFolders(IEnumerable<string> folders)
+    {
+        foreach (var folder in folders)
+        {
+            ExistingFolders.Add(new FolderItem
+            {
+                Name = folder,
+                Selected = true,
+            });
+        }
+    }
+
+    private void NotifyManagedItemTextChanged()
+    {
+        OnPropertyChanged(nameof(ExistingFoldersHeading));
+        OnPropertyChanged(nameof(AddFolderHeading));
     }
 
     private void OnFolderPickerPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
