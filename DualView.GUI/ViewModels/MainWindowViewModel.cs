@@ -30,7 +30,6 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private readonly ISignalRService? signalRService;
     private readonly IBackendAPI? backendAPI;
     private readonly IServiceProvider? serviceProvider;
-    private readonly MainWindowMediaActions? mediaActions;
 
     private readonly Stack<(string Path, Vector ScrollOffset, string SearchText)> navigationHistory = new();
 
@@ -75,7 +74,6 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         this.backendAPI = backendAPI;
         this.serviceProvider = serviceProvider;
 
-        mediaActions = new MainWindowMediaActions(this, windowService);
         Hamburger = new HamburgerMenuViewModel(backendStatusService);
 
         InitializeMenu();
@@ -412,7 +410,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                     {
                         Name = item.Name,
                         MediaToShow = new ServerMediaSource(item, serviceProvider!),
-                        MediaOpenResources = mediaActions,
+                        MediaOpenResources = new MainWindowMediaActions(this, windowService),
                         ShowingThumbnail = true,
                         AllowSelection = false,
                     });
