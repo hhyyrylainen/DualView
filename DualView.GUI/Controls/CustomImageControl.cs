@@ -159,7 +159,9 @@ public class CustomImageControl : Control, IBrushPreviewTarget
         }
     }
 
-    private Rect lastViewport = new(0, 0, 1, 1);
+    // An attached control has not been proven to be in the viewport until Avalonia reports its effective
+    // viewport. Start empty so off-screen controls cannot begin loading while waiting for that report.
+    private Rect lastViewport;
 
     public CustomImageControl()
     {
@@ -169,6 +171,11 @@ public class CustomImageControl : Control, IBrushPreviewTarget
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnAttachedToVisualTree(e);
+
+        // The control may be reused after being detached. Do not carry a previous in-viewport state into the
+        // new visual tree before the new effective viewport has been calculated.
+        lastViewport = new();
+        IsVisibleInViewport = false;
 
         if (TopLevel.GetTopLevel(this) is Window window)
         {
@@ -181,6 +188,8 @@ public class CustomImageControl : Control, IBrushPreviewTarget
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+
+        IsVisibleInViewport = false;
 
         if (TopLevel.GetTopLevel(this) is Window window)
         {
