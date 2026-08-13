@@ -27,7 +27,7 @@
         <SolidColorBrush x:Key="LightBackground" Color="#EFEFEF" />
 
         <SolidColorBrush x:Key="ImageBackground" Color="#FAFAFA" />
-        <SolidColorBrush x:Key="SelectedImage" Color="AliceBlue" />
+        <SolidColorBrush x:Key="SelectedImage" Color="LightSkyBlue" />
 
         <SolidColorBrush x:Key="BusA" Color="LightSkyBlue" />
         <SolidColorBrush x:Key="BusB" Color="PaleVioletRed" />
