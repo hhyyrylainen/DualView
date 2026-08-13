@@ -1,157 +1,85 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:controls="clr-namespace:DualView.GUI.Controls"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:controls="clr-namespace:DualView.GUI.Controls"
-        mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
         x:Class="DualView.GUI.Views.MediaCollectionWindow"
-        Width="1400" Height="700"
-        MinHeight="300" MinWidth="900"
         x:DataType="vm:MediaCollectionWindowViewModel"
-        Icon="/Assets/logo.ico"
-        Title="DualView - Media">
+        Width="1400" Height="800" MinWidth="900" MinHeight="400"
+        Icon="/Assets/logo.ico" Title="{Binding WindowCollectionTitle}">
 
     <Design.DataContext>
         <vm:MediaCollectionWindowViewModel />
     </Design.DataContext>
 
-    <SplitView IsPaneOpen="{Binding SidePanelOpen}"
-               DisplayMode="Inline"
-               OpenPaneLength="300">
-        <SplitView.Pane>
-            <Grid RowDefinitions="Auto,*,Auto,Auto">
-                <Grid ColumnDefinitions="*,Auto,*">
-                    <TextBlock Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20">
-                        Folders
-                    </TextBlock>
-                    <Button Grid.Column="2" HorizontalAlignment="Right" Command="{Binding CloseSidePanel}">
-                        &lt;
-                    </Button>
-                </Grid>
-                <ScrollViewer Grid.Row="1">
-                    <TreeView ItemsSource="{Binding Folders}"
-                              SelectionMode="Single" SelectedItem="{Binding SelectedFolderNode}">
-                        <TreeView.ItemTemplate>
-                            <TreeDataTemplate ItemsSource="{Binding SubNodes}">
-                                <StackPanel Orientation="Horizontal">
-                                    <Image Width="16" Height="16" Source="/Assets/Wenrexa Basket.png"
-                                           Stretch="Uniform" Margin="0 0 3 0" />
-                                    <TextBlock Text="{Binding Name}" />
-                                    <StackPanel.ContextMenu>
-                                        <ContextMenu>
-                                            <MenuItem Header="Copy Path"
-                                                      Command="{Binding TriggerCopyPath}"
-                                                      IsEnabled="{Binding HasCopyPathAction}" />
-                                        </ContextMenu>
-                                    </StackPanel.ContextMenu>
-                                </StackPanel>
-                            </TreeDataTemplate>
-                        </TreeView.ItemTemplate>
-                    </TreeView>
-                </ScrollViewer>
-                <StackPanel Grid.Row="2" HorizontalAlignment="Center" Orientation="Horizontal">
-                    <Button Margin="2 2" Command="{Binding OpenFolderCreation}">
-                        New Folder
-                    </Button>
-                    <Button Margin="2 2" IsEnabled="False">
-                        Rename Current
-                    </Button>
-                </StackPanel>
-                <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,*,Auto">
-                    <ContentControl DataContext="{Binding Hamburger}">
-                        <controls:HamburgerMenuControl />
-                    </ContentControl>
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Menu Grid.Row="0">
+            <MenuItem Header="File">
+                <MenuItem Header="Export..." Command="{Binding Export}" />
+                <MenuItem Header="Export (selected)..." Command="{Binding ExportSelected}" />
+                <Separator />
+                <MenuItem Header="Close" Command="{Binding Close}" />
+            </MenuItem>
+            <MenuItem Header="Collection">
+                <MenuItem Header="Select All" Command="{Binding SelectAll}" />
+                <MenuItem Header="Deselect All" Command="{Binding DeselectAll}" />
+                <MenuItem Header="Remove Selected" Command="{Binding RemoveSelected}" />
+                <MenuItem Header="DELETE selected" Command="{Binding DeleteSelected}" />
+                <Separator />
+                <MenuItem Header="Delete collection" Command="{Binding DeleteCollection}" />
+                <MenuItem Header="Delete collection and images" Command="{Binding DeleteCollectionAndImages}" />
+            </MenuItem>
+            <MenuItem Header="Tools">
+                <MenuItem Header="Get Info" Command="{Binding ShowCollectionInfo}" />
+            </MenuItem>
+        </Menu>
 
-                    <Button Grid.Column="2" Margin="2 2" Command="{Binding OpenImportWindow}"
-                            IsEnabled="{Binding SelectedFolderNode,Converter={x:Static ObjectConverters.IsNotNull}}">
-                        Import
-                    </Button>
-
-                    <Border Grid.Column="4" Width="32"></Border>
-                </Grid>
-            </Grid>
-        </SplitView.Pane>
-
-        <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,*">
-            <Button Grid.Row="0" Grid.Column="0" Command="{Binding OpenSidePanel}" VerticalAlignment="Top"
-                    IsVisible="{Binding !SidePanelOpen}" MinHeight="34">
-                &gt;
-            </Button>
-            <TextBlock Grid.Row="1" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       FontSize="24"
-                       IsVisible="{Binding SelectedFolderNode,Converter={x:Static ObjectConverters.IsNull}}">
-                Select a Folder to View Items
-            </TextBlock>
-
-            <Grid Grid.Row="0" Grid.Column="1"
-                  ColumnDefinitions="Auto,Auto, Auto, Auto, Auto, *, Auto, Auto, Auto" ColumnSpacing="4"
-                  Background="#F0F0F0" MinHeight="34"
-                  IsVisible="{Binding SelectedFolderNode,Converter={x:Static ObjectConverters.IsNotNull}}">
-
-                <TextBlock Grid.Column="0" VerticalAlignment="Center" Margin="8 0 0 0">Items on Page:</TextBlock>
-
-                <ComboBox Grid.Column="1" SelectedValue="{Binding PageSize}"
-                          ItemsSource="{Binding PageSizeOptions}" MinWidth="80">
-                </ComboBox>
-
-                <TextBlock Grid.Column="2" VerticalAlignment="Center" Margin="5 0 0 0">Sort by:</TextBlock>
-
-                <ComboBox Grid.Column="3" SelectedValue="{Binding SortColumn}"
-                          ItemsSource="{Binding SortColumnOptions}" MinWidth="135">
-                </ComboBox>
-
-                <ComboBox Grid.Column="4" SelectedValue="{Binding SortDirection}"
-                          ItemsSource="{Binding SortDirectionOptions}"
-                          MinWidth="125">
-                </ComboBox>
-
-                <Button Grid.Column="6" IsEnabled="{Binding CanNavigateBackwards}"
-                        Command="{Binding GoToPreviousPage}">
-                    <Button.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="First" Command="{Binding GoToFirstPage}" />
-                            <MenuItem Header="Backwards 5" Command="{Binding GoBackwards5}" />
-                            <MenuItem Header="Backwards 10" Command="{Binding GoBackwards10}" />
-                        </ContextMenu>
-                    </Button.ContextMenu>
-                    Previous
-                </Button>
-                <StackPanel Grid.Column="7" VerticalAlignment="Center" Orientation="Horizontal">
-                    <TextBlock Text="{Binding ItemPage}" VerticalAlignment="Center" />
-                    <TextBlock Text="/" VerticalAlignment="Center" />
-                    <TextBlock Text="{Binding MaxPages}" VerticalAlignment="Center" />
-                </StackPanel>
-                <Button Grid.Column="8" IsEnabled="{Binding CanNavigateForwards}"
-                        Command="{Binding GoToNextPage}">
-                    <Button.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Last" Command="{Binding GoToLastPage}" />
-                            <MenuItem Header="Forward 5" Command="{Binding GoForward5}" />
-                            <MenuItem Header="Forward 10" Command="{Binding GoForward10}" />
-                        </ContextMenu>
-                    </Button.ContextMenu>
-                    Next
-                </Button>
-            </Grid>
-
-            <ScrollViewer Grid.Row="1" Grid.Column="1" HorizontalScrollBarVisibility="Disabled"
-                          VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding FolderImages}" Padding="0 5 10 5">
-                    <!-- Use WrapPanel so items flow correctly -->
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <controls:MediaViewer Width="128" Height="196" Margin="5" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </ScrollViewer>
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="5"
+              Background="#F0F0F0" MinHeight="36" Margin="0 0 0 2">
+            <TextBlock Grid.Column="0" Text="Items per page:" VerticalAlignment="Center" Margin="8 0 0 0" />
+            <ComboBox Grid.Column="1" ItemsSource="{Binding PageSizeOptions}" SelectedValue="{Binding PageSize}"
+                      MinWidth="80" />
+            <TextBlock Grid.Column="2" Text="Sort by:" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="3" ItemsSource="{Binding SortColumnOptions}" SelectedValue="{Binding SortColumn}"
+                      MinWidth="140" />
+            <CheckBox Grid.Column="4" Content="Reverse" IsChecked="{Binding IsReversed}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="5" Text="{Binding SearchText}" PlaceholderText="Search item names..." Margin="5 2" />
+            <Button Grid.Column="7" Content="Previous" Command="{Binding GoToPreviousPage}"
+                    IsEnabled="{Binding CanNavigateBackwards}" />
+            <Button Grid.Column="8" Content="Next" Command="{Binding GoToNextPage}"
+                    IsEnabled="{Binding CanNavigateForwards}" />
         </Grid>
-    </SplitView>
+
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding CollectionItems}" Padding="0 5 10 10">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel Orientation="Horizontal" HorizontalAlignment="Left" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <controls:MediaViewer Width="128" Height="196" Margin="5" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Background="#F0F0F0" Height="42">
+            <ContentControl Grid.Column="0" Margin="6,0" DataContext="{Binding Hamburger}">
+                <controls:HamburgerMenuControl />
+            </ContentControl>
+            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                <TextBlock Text="{Binding CollectionCreatedAt, StringFormat='Created: {0:g}'}"
+                           VerticalAlignment="Center" Margin="8 0" />
+                <TextBlock Text="{Binding CollectionStatistics}" VerticalAlignment="Center" Margin="10 0 0 0" />
+            </StackPanel>
+            <TextBlock Grid.Column="2" Text="Page " VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="{Binding CurrentPage, StringFormat='{}{0} / '}" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="3" Text="{Binding TotalPages}" VerticalAlignment="Center" Margin="45 0 8 0" />
+            <Button Grid.Column="4" Content="Close" Command="{Binding Close}" Margin="4" />
+        </Grid>
+    </Grid>
 </Window>
