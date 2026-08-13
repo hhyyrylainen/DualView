@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Services;
@@ -95,31 +96,39 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
 
     private async Task LoadFolders()
     {
-        if (clientDatabaseService == null || mediaConfigId == 0)
+        if (clientDatabaseService == null ||
+            (mediaConfigId == 0 && !collectionId.HasValue && !folderId.HasValue))
+        {
             return;
+        }
 
         try
         {
-            ExistingFolders.Clear();
+            IEnumerable<string> folderNames;
             if (collectionId.HasValue)
             {
                 var paths = await clientDatabaseService.GetCollectionFolderPaths(collectionId.Value);
-                AddExistingFolders(paths.Select(path => path.Path));
+                folderNames = paths.Select(path => path.Path).ToList();
             }
             else if (folderId.HasValue)
             {
                 var paths = await clientDatabaseService.GetFolderParentFolderPaths(folderId.Value);
-                AddExistingFolders(paths.Select(path => path.Path));
+                folderNames = paths.Select(path => path.Path).ToList();
             }
             else
             {
                 var info = await clientDatabaseService.GetConfiguredMediaFoldersAsync(mediaConfigId);
-                if (!string.IsNullOrWhiteSpace(info.PrimaryFolder))
-                    ExistingFolders.Add(new FolderItem { Name = info.PrimaryFolder, Selected = true });
-
-                if (info.SecondaryFolders != null)
-                    AddExistingFolders(info.SecondaryFolders);
+                folderNames = new[] { info.PrimaryFolder }
+                    .Concat(info.SecondaryFolders ?? Enumerable.Empty<string>())
+                    .Where(folder => !string.IsNullOrWhiteSpace(folder))
+                    .ToList()!;
             }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                ExistingFolders.Clear();
+                AddExistingFolders(folderNames);
+            });
         }
         catch (Exception e)
         {
