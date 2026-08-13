@@ -302,7 +302,7 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
             get;
             set
             {
-                if (SetProperty(ref field, value) && ThumbnailViewer != null)
+                if (SetProperty(ref field, value))
                 {
                     ThumbnailViewer.Selected = value;
                 }
