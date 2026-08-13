@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Threading.Tasks;
+using System.Threading;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
@@ -37,6 +38,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private long? currentFolderId;
     private long? currentCollectionId;
     private string searchText = string.Empty;
+    private CancellationTokenSource? searchDebounceCancellation;
 
     private Vector? pendingScrollOffsetRestore;
 
@@ -118,6 +120,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref searchText, value))
             {
                 currentPage = 1;
+                ScheduleSearchRefresh();
             }
         }
     }
@@ -515,6 +518,28 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         Hamburger.Dispose();
+        searchDebounceCancellation?.Cancel();
+        searchDebounceCancellation?.Dispose();
+    }
+
+    private void ScheduleSearchRefresh()
+    {
+        searchDebounceCancellation?.Cancel();
+        searchDebounceCancellation?.Dispose();
+        searchDebounceCancellation = new CancellationTokenSource();
+        var cancellationToken = searchDebounceCancellation.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(333, cancellationToken);
+                await Dispatcher.UIThread.InvokeAsync(() => _ = RefreshItems());
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, cancellationToken);
     }
 
     private void RefreshBackendStatusString()
