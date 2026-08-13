@@ -47,15 +47,15 @@ public class MediaFolderController : Controller
         if (string.IsNullOrWhiteSpace(request.Name))
             return BadRequest("Name is empty");
 
+        if (request.Name.Length > 200)
+            return BadRequest("Folder name is too long");
+
         // TODO: add an all-lowercase name to make searching easier
 
         var parentId = request.ParentFolderId ?? MediaFolder.RootFolderId;
 
         if (await databaseService.GetMediaFolderAsync(parentId) == null)
             return BadRequest("Parent folder does not exist");
-
-        if (await databaseService.GetMediaFolderAsync(request.Name, parentId) != null)
-            return BadRequest("Folder with the same name already exists");
 
         var id = await databaseService.CreateMediaFolder(request.Name, parentId);
 
@@ -68,6 +68,12 @@ public class MediaFolderController : Controller
     [HttpPut("{id:long}/rename")]
     public async Task<IActionResult> Rename([Required] long id, [FromBody] [Required] string name)
     {
+        name = name.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest("Name is missing");
+        if (name.Length > 200)
+            return BadRequest("Folder name is too long");
+
         await databaseService.RenameMediaFolder(id, name);
         return Ok();
     }
@@ -76,8 +82,11 @@ public class MediaFolderController : Controller
     [HttpPost("{folderId:long}/collections")]
     public async Task<IActionResult> CreateCollection([Required] long folderId, [FromBody] [Required] string name)
     {
+        name = name.Trim();
         if (string.IsNullOrWhiteSpace(name))
             return BadRequest("Name is missing");
+        if (name.Length > 200)
+            return BadRequest("Collection name is too long");
 
         var id = await databaseService.CreateCollection(name, folderId);
         return Ok(id.ToString());

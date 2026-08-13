@@ -20,6 +20,7 @@ public interface IDatabaseCommonService
     public Task<long> CreateMediaFolder(string folderName, long parentId);
     public Task RenameMediaFolder(long folderId, string folderName);
     public Task<long> CreateCollection(string collectionName, long folderId);
+    public Task RenameCollection(long collectionId, string collectionName);
 
     public Task AddCollectionToFolder(long collectionId, long folderId);
     public Task AddFolderToFolder(long folderId, long parentFolderId);

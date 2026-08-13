@@ -92,17 +92,24 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<long> CreateMediaFolder(string folderName, long parentId)
     {
-        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty());
+        var trimmedName = folderName.TrimOrThrowIfEmpty();
+        if (trimmedName.Length > 200)
+            throw new ArgumentException("Folder name is too long");
+
+        var folder = new MediaFolder(trimmedName);
 
         var parent = await dbContext.MediaFolders.FindAsync(parentId);
-        if (parent != null)
-        {
-            folder.Parents.Add(parent);
-        }
-        else
-        {
+        if (parent == null)
             throw new Exception("Parent folder ID not found");
+
+        if (await dbContext.MediaFolders.AnyAsync(existing =>
+                existing.NameLowerCase == folder.NameLowerCase &&
+                existing.Parents.Any(parentFolder => parentFolder.Id == parentId)))
+        {
+            throw new InvalidOperationException("A folder with that name already exists here");
         }
+
+        folder.Parents.Add(parent);
 
         await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();
@@ -136,7 +143,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<long> CreateCollection(string collectionName, long folderId)
     {
-        var collection = new Collection(collectionName.TrimOrThrowIfEmpty());
+        var trimmedName = collectionName.TrimOrThrowIfEmpty();
+        if (trimmedName.Length > 200)
+            throw new ArgumentException("Collection name is too long");
+
+        var collection = new Collection(trimmedName);
+
+        if (await dbContext.Collections.AnyAsync(existing => existing.NameLowerCase == collection.NameLowerCase))
+            throw new InvalidOperationException("A collection with that name already exists");
 
         var folder = await dbContext.MediaFolders.FindAsync(folderId);
         if (folder != null)
@@ -152,6 +166,30 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await SaveAsync();
         await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
         return collection.Id;
+    }
+
+    public async Task RenameCollection(long collectionId, string collectionName)
+    {
+        var trimmedName = collectionName.TrimOrThrowIfEmpty();
+        if (trimmedName.Length > 200)
+            throw new ArgumentException("Collection name is too long");
+        if (trimmedName.Contains('/'))
+            throw new ArgumentException("Collection name cannot contain '/'");
+
+        var collection = await dbContext.Collections.FirstOrDefaultAsync(item => item.Id == collectionId);
+        if (collection == null)
+            throw new Exception("Collection not found");
+
+        var lowerName = trimmedName.ToLowerInvariant();
+        if (await dbContext.Collections.AnyAsync(existing =>
+                existing.Id != collectionId && existing.NameLowerCase == lowerName))
+        {
+            throw new InvalidOperationException("A collection with that name already exists");
+        }
+
+        collection.Name = trimmedName;
+        await SaveAsync();
+        await updateNotifier.NotifyCollectionUpdated(collectionId);
     }
 
     public async Task AddCollectionToFolder(long collectionId, long folderId)
@@ -413,17 +451,24 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<MediaFolder> CreateMediaFolderAsync(string folderName, long parentId)
     {
-        var folder = new MediaFolder(folderName.TrimOrThrowIfEmpty());
+        var trimmedName = folderName.TrimOrThrowIfEmpty();
+        if (trimmedName.Length > 200)
+            throw new ArgumentException("Folder name is too long");
+
+        var folder = new MediaFolder(trimmedName);
 
         var parent = await dbContext.MediaFolders.FindAsync(parentId);
-        if (parent != null)
-        {
-            folder.Parents.Add(parent);
-        }
-        else
-        {
+        if (parent == null)
             throw new Exception("Parent folder ID not found");
+
+        if (await dbContext.MediaFolders.AnyAsync(existing =>
+                existing.NameLowerCase == folder.NameLowerCase &&
+                existing.Parents.Any(parentFolder => parentFolder.Id == parentId)))
+        {
+            throw new InvalidOperationException("A folder with that name already exists here");
         }
+
+        folder.Parents.Add(parent);
 
         await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();

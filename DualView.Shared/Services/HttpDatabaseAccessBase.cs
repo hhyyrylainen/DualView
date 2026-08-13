@@ -210,6 +210,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return long.Parse(idString);
     }
 
+    public async Task RenameCollection(long collectionId, string collectionName)
+    {
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/collection/{collectionId}/rename", collectionName);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task AddCollectionToFolder(long collectionId, long folderId)
     {
         var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/addToFolder/{folderId}", null);

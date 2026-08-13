@@ -27,6 +27,19 @@ public class CollectionController : Controller
         return collection?.GetDTO();
     }
 
+    [HttpPut("{id:long}/rename")]
+    public async Task<IActionResult> Rename([Required] long id, [FromBody] [Required] string name)
+    {
+        name = name.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return BadRequest("Name is missing");
+        if (name.Length > 200)
+            return BadRequest("Collection name is too long");
+
+        await databaseService.RenameCollection(id, name);
+        return Ok();
+    }
+
     [HttpGet("deleted")]
     public async Task<ActionResult<List<CollectionDTO>>> GetDeleted([FromQuery] int limit = 100)
     {
