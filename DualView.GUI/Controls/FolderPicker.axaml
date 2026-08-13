@@ -30,7 +30,8 @@
         <TextBox Grid.Row="2" Text="{Binding SearchText}" PlaceholderText="Search folders..." Margin="0,0,0,5" />
 
         <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto" BringIntoViewOnFocusChange="False">
+                      VerticalScrollBarVisibility="Auto" BringIntoViewOnFocusChange="False"
+                      Offset="{Binding ScrollOffset, Mode=TwoWay}">
             <ItemsControl ItemsSource="{Binding Folders}" Padding="1,5,5,5">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>

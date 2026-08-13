@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Threading;
+using Avalonia;
 using DualView.GUI.Models;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
@@ -22,7 +23,7 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
     private readonly IWindowService? windowService;
     private readonly IServiceProvider? serviceProvider;
 
-    private List<MediaFolderInfo> allFolders = new();
+    private readonly Dictionary<long, MediaFolderInfo> visibleFolders = new();
     private long currentFolderId = MediaFolderInfo.RootFolderId;
     private CancellationTokenSource? searchDebounceCancellation;
 
@@ -65,6 +66,12 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
                 ScheduleSearchRefresh();
         }
     } = string.Empty;
+
+    public Vector ScrollOffset
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
 
     public Func<string, Task>? RequestCopyToClipboard { get; set; }
     public Func<Task<string>>? RequestPasteFromClipboard { get; set; }
@@ -110,8 +117,7 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
 
     public void NavigateIntoFolder(long folderId)
     {
-        var folder = allFolders.FirstOrDefault(item => item.Id == folderId);
-        if (folder == null)
+        if (!visibleFolders.TryGetValue(folderId, out var folder))
             return;
 
         NavigateToPath(CurrentPath == "/" ? $"/{folder.Name}" : $"{CurrentPath}/{folder.Name}");
@@ -119,8 +125,7 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
 
     public void ManageFolder(long folderId)
     {
-        var folder = allFolders.FirstOrDefault(item => item.Id == folderId);
-        if (folder == null)
+        if (!visibleFolders.TryGetValue(folderId, out var folder))
             return;
 
         windowService?.ShowEditMediaFolders(new ConfiguredMediaInfo(folder.Name, folder.Id, folder.Id,
@@ -133,6 +138,7 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
             folder.Dispose();
 
         Folders.Clear();
+        visibleFolders.Clear();
         searchDebounceCancellation?.Cancel();
         searchDebounceCancellation?.Dispose();
         GC.SuppressFinalize(this);
@@ -145,7 +151,6 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
 
         try
         {
-            allFolders = await LoadAllFoldersAsync();
             await NavigateToPathAsync(CurrentPath);
         }
         catch (Exception e)
@@ -178,22 +183,24 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
         CurrentPath = path;
         SelectedPath = path;
 
-        var children = allFolders.Where(item => currentFolderId == MediaFolderInfo.RootFolderId
-                ? item.ParentIds.Contains(MediaFolderInfo.RootFolderId)
-                : item.ParentIds.Contains(currentFolderId))
+        var children = (await clientDatabaseService.GetMediaFoldersAsync(currentFolderId))
             .Where(item => string.IsNullOrWhiteSpace(SearchText) ||
-                           item.Name.Contains(SearchText.Trim(), StringComparison.CurrentCultureIgnoreCase))
+                          item.Name.Contains(SearchText.Trim(), StringComparison.CurrentCultureIgnoreCase))
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
+            ScrollOffset = new Vector(0, 0);
+
             foreach (var existing in Folders)
                 existing.Dispose();
 
             Folders.Clear();
+            visibleFolders.Clear();
             foreach (var child in children)
             {
+                visibleFolders[child.Id] = child;
                 Folders.Add(new MediaViewerViewModel(logger!, windowService!)
                 {
                     Name = child.Name,
@@ -229,29 +236,6 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
             {
             }
         }, cancellationToken);
-    }
-
-    private async Task<List<MediaFolderInfo>> LoadAllFoldersAsync()
-    {
-        var folders = new List<MediaFolderInfo>();
-        var pendingParents = new Queue<long?>();
-        pendingParents.Enqueue(null);
-
-        while (pendingParents.Count > 0)
-        {
-            var parentId = pendingParents.Dequeue();
-            var children = await clientDatabaseService!.GetMediaFoldersAsync(parentId);
-            foreach (var child in children)
-            {
-                if (child.Id == MediaFolderInfo.RootFolderId || folders.Any(folder => folder.Id == child.Id))
-                    continue;
-
-                folders.Add(child);
-                pendingParents.Enqueue(child.Id);
-            }
-        }
-
-        return folders;
     }
 
     private async Task CopyPathAsync()
