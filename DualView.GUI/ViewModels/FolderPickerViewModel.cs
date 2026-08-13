@@ -301,6 +301,7 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
         }
 
         public void ShowView(IVisualMediaSource? mediaSource) => picker.NavigateIntoFolder(folderId);
+        public void Activate(IVisualMediaSource mediaSource) => picker.NavigateIntoFolder(folderId);
         public void ShowThumbnail(IVisualMediaSource mediaSource) => picker.NavigateIntoFolder(folderId);
 
         public void StartEditAction(IVisualMediaSource mediaSource)

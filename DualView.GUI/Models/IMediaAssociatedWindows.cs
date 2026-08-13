@@ -9,6 +9,7 @@ public interface IMediaAssociatedWindows
     {
         None,
         OpenView,
+        Activate,
         ViewThumbnail,
     }
 
@@ -37,6 +38,8 @@ public interface IMediaAssociatedWindows
     ///   Can be called with null media for certain item types that want to handle viewing even then
     /// </param>
     public void ShowView(IVisualMediaSource? mediaSource);
+
+    public void Activate(IVisualMediaSource mediaSource);
 
     public void ShowThumbnail(IVisualMediaSource mediaSource);
 
@@ -81,6 +84,11 @@ public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
 
         // Clone the media to not mess with the already loaded one
         windowService.ShowMediaViewer(mediaSource.Clone());
+    }
+
+    public void Activate(IVisualMediaSource mediaSource)
+    {
+        ShowView(mediaSource);
     }
 
     public void ShowThumbnail(IVisualMediaSource mediaSource)
@@ -155,6 +163,11 @@ public class OpenPromptWindow : IMediaAssociatedWindows
         // windowService.ShowPromptEditorWindow(promptId);
     }
 
+    public void Activate(IVisualMediaSource mediaSource)
+    {
+        ShowView(mediaSource);
+    }
+
     public void ShowThumbnail(IVisualMediaSource mediaSource)
     {
         windowService.ShowMediaViewer(mediaSource.Clone());
@@ -222,6 +235,11 @@ public class OpenPromptPartWindow : IMediaAssociatedWindows
         // windowService.ShowPromptPartEditorWindow(promptPartId);
     }
 
+    public void Activate(IVisualMediaSource mediaSource)
+    {
+        ShowView(mediaSource);
+    }
+
     public void ShowThumbnail(IVisualMediaSource mediaSource)
     {
         windowService.ShowMediaViewer(mediaSource.Clone());
@@ -287,6 +305,11 @@ public class OpenRemoteModelWindow : IMediaAssociatedWindows
     {
         // TODO: hook up the right thing
         // windowService.ShowRemoteModelEditorWindow(modelId);
+    }
+
+    public void Activate(IVisualMediaSource mediaSource)
+    {
+        ShowView(mediaSource);
     }
 
     public void ShowThumbnail(IVisualMediaSource mediaSource)

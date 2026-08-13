@@ -212,9 +212,9 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
             }
             else
             {
-                WantsDoubleClick = value.DefaultDoubleClickAction != IMediaAssociatedWindows.DoubleClickAction.None;
-
                 value.RefreshAvailableOptions(MediaToShow);
+
+                WantsDoubleClick = value.DefaultDoubleClickAction != IMediaAssociatedWindows.DoubleClickAction.None;
             }
 
             OnPropertyChanged(nameof(HasViewAction));
@@ -320,6 +320,9 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
             case IMediaAssociatedWindows.DoubleClickAction.OpenView:
                 OnViewResource();
                 return true;
+            case IMediaAssociatedWindows.DoubleClickAction.Activate:
+                OnActivate();
+                return true;
             case IMediaAssociatedWindows.DoubleClickAction.ViewThumbnail:
                 OnViewThumbnail();
                 return true;
@@ -342,6 +345,21 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
         catch (Exception e)
         {
             windowService?.ShowErrorWindow("Failed to open media", e);
+        }
+    }
+
+    public void OnActivate()
+    {
+        if (MediaOpenResources == null || MediaToShow == null)
+            return;
+
+        try
+        {
+            MediaOpenResources.Activate(MediaToShow);
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to activate media", e);
         }
     }
 

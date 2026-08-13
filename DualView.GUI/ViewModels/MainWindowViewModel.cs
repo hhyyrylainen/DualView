@@ -603,7 +603,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             this.windowService = windowService;
         }
 
-        public IMediaAssociatedWindows.DoubleClickAction DefaultDoubleClickAction =>
+        public IMediaAssociatedWindows.DoubleClickAction DefaultDoubleClickAction { get; private set; } =
             IMediaAssociatedWindows.DoubleClickAction.OpenView;
 
         public bool HasViewAction => true;
@@ -619,11 +619,15 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             {
                 HasEditAction = false;
                 HasManageFoldersAction = false;
+                DefaultDoubleClickAction = IMediaAssociatedWindows.DoubleClickAction.OpenView;
                 return;
             }
 
             HasEditAction = !serverSource.Info.IsCollection;
             HasManageFoldersAction = true;
+            DefaultDoubleClickAction = serverSource.Info.IsCollection
+                ? IMediaAssociatedWindows.DoubleClickAction.Activate
+                : IMediaAssociatedWindows.DoubleClickAction.OpenView;
         }
 
         public void ShowView(IVisualMediaSource? mediaSource)
@@ -645,6 +649,14 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                     // For normal media, we want to open it in a viewer
                     windowService.ShowMediaViewer(mediaSource.Clone());
                 }
+            }
+        }
+
+        public void Activate(IVisualMediaSource mediaSource)
+        {
+            if (mediaSource is ServerMediaSource serverMediaSource && serverMediaSource.Info.IsCollection)
+            {
+                viewModel.OpenCollection(serverMediaSource.ServerId, serverMediaSource.Info.Name);
             }
         }
 
