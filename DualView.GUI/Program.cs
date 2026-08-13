@@ -237,7 +237,6 @@ sealed class Program
         services.AddTransient<MaintenanceToolsWindowViewModel>();
         services.AddTransient<RenameWindowViewModel>();
         services.AddTransient<ReorderWindowViewModel>();
-        services.AddTransient<AddToFolderWindowViewModel>();
         services.AddTransient<RemoveFromFoldersWindowViewModel>();
         services.AddTransient<UploadWindowViewModel>();
     }
