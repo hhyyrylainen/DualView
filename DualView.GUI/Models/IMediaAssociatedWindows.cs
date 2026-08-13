@@ -113,7 +113,7 @@ public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
     {
         if (mediaSource is ServerMediaSource serverMediaSource)
         {
-            windowService.ShowEditMediaFolders(serverMediaSource.ServerId);
+            windowService.ShowEditMediaFolders(serverMediaSource.Info);
             return;
         }
 

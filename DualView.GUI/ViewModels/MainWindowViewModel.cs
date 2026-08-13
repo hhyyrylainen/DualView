@@ -635,7 +635,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         {
             if (mediaSource is ServerMediaSource serverMediaSource)
             {
-                windowService.ShowEditMediaFolders(serverMediaSource.ServerId);
+                windowService.ShowEditMediaFolders(serverMediaSource.Info);
             }
         }
     }

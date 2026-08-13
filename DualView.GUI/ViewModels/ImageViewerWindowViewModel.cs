@@ -323,6 +323,6 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        windowService?.ShowEditMediaFolders(serverMediaSource.ServerId);
+        windowService?.ShowEditMediaFolders(serverMediaSource.Info);
     }
 }
