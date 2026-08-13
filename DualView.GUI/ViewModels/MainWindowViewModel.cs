@@ -346,7 +346,9 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         if (currentCollectionId == null)
             return;
 
-        windowService?.ShowSingletonWindow<MediaCollectionWindowViewModel>();
+        var collectionWindow = windowService?.ShowSingletonWindow<MediaCollectionWindowViewModel>();
+        if (collectionWindow != null)
+            _ = collectionWindow.Initialize(currentCollectionId.Value, CurrentCollectionName);
     }
 
     public async Task RefreshItems()

@@ -112,26 +112,7 @@ public class ItemThumbnailEditorViewModel : ViewModelBase, IDisposable
     {
         if (EditedItem == null || windowService == null)
             return;
-
-        _ = Task.Run(async void () =>
-        {
-            try
-            {
-                var media = await windowService.ShowMediaSelectionWindow();
-
-                if (media != null)
-                {
-                    // A bit of a waste, but isn't too bad of a solution to get the media to the existing API
-                    var tempDataTransfer = new ServerMediaSource(media, serviceProvider!);
-                    OnMediaSelected(tempDataTransfer);
-                }
-            }
-            catch (Exception e)
-            {
-                logger?.LogError(e, "Failed to select media");
-                windowService?.ShowErrorWindow("Failed to select media", e);
-            }
-        });
+        windowService.ShowNoticeWindow("Media selection is not available yet.");
     }
 
     private void OnMediaSelected(IVisualMediaSource resource)
