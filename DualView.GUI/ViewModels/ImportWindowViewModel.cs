@@ -147,7 +147,8 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
     public void OpenMediaWindow()
     {
-        windowService?.ShowSingletonWindow<MediaCollectionWindowViewModel>();
+        // TODO: put this on the targets to open their target collection if it exists
+        // windowService?.ShowWindow<MediaCollectionWindowViewModel>();
     }
 
     public void StartImport()

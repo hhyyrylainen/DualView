@@ -130,7 +130,8 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
     public void OpenMediaWindow()
     {
-        windowService?.ShowSingletonWindow<MediaCollectionWindowViewModel>();
+        // TODO: open a picker that shows all collections this image is in
+        // windowService?.
     }
 
     public void OpenMediaEditorSetup()

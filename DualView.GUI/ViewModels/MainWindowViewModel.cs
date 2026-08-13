@@ -347,9 +347,10 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         if (currentCollectionId == null)
             return;
 
-        var collectionWindow = windowService?.ShowSingletonWindow<MediaCollectionWindowViewModel>();
-        if (collectionWindow != null)
+        windowService?.ShowWindow<MediaCollectionWindowViewModel>(collectionWindow =>
+        {
             _ = collectionWindow.Initialize(currentCollectionId.Value, CurrentCollectionName);
+        });
     }
 
     public async Task RefreshItems()
@@ -640,9 +641,10 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 }
                 else if (serverSource.Info.IsCollection)
                 {
-                    var collectionWindow = windowService.ShowSingletonWindow<MediaCollectionWindowViewModel>();
-                    if (collectionWindow != null)
+                    windowService.ShowWindow<MediaCollectionWindowViewModel>(collectionWindow =>
+                    {
                         _ = collectionWindow.Initialize(serverSource.ServerId, serverSource.Info.Name);
+                    });
                 }
                 else
                 {
