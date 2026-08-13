@@ -25,11 +25,15 @@ public class EditMediaFoldersWindowViewModel : ViewModelBase
 
     [ActivatorUtilitiesConstructor]
     public EditMediaFoldersWindowViewModel(ILogger<EditMediaFoldersWindowViewModel> logger,
-        IWindowService windowService, IClientDatabaseService clientDatabaseService)
+        ILogger<FolderPickerViewModel> folderPickerLogger, IWindowService windowService,
+        IClientDatabaseService clientDatabaseService, IServiceProvider serviceProvider)
     {
         this.logger = logger;
         this.windowService = windowService;
         this.clientDatabaseService = clientDatabaseService;
+        FolderPicker =
+            new FolderPickerViewModel(folderPickerLogger, clientDatabaseService, windowService, serviceProvider);
+        FolderPicker.PropertyChanged += OnFolderPickerPropertyChanged;
     }
 
     public FolderPickerViewModel FolderPicker { get; }

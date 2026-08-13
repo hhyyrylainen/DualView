@@ -4,6 +4,7 @@
     <option name="projectPerEditor">
       <map>
         <entry key="DualView.GUI/App.axaml" value="DualView.GUI/DualView.GUI.csproj" />
+        <entry key="DualView.GUI/Controls/FolderPicker.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Controls/MediaViewer.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Views/AboutWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Views/AddToFolderWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
