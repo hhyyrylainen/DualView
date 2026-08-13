@@ -8,6 +8,7 @@ using DualView.GUI.Models;
 using DualView.GUI.Services;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
+using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,21 +23,30 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
 
     public UploadWindowViewModel()
     {
+        Hamburger = new HamburgerMenuViewModel();
+        InitializeMenu();
+
         // Design time
         FilesToUpload.Add(new UploadFileEntry("image.png", null));
     }
 
     [ActivatorUtilitiesConstructor]
     public UploadWindowViewModel(ILogger<UploadWindowViewModel> logger,
-        IWindowService windowService, IBackendAPI backendAPI, IServiceProvider serviceProvider)
+        IWindowService windowService, IBackendAPI backendAPI, IBackendStatusService backendStatusService,
+        IServiceProvider serviceProvider)
     {
         this.logger = logger;
         this.windowService = windowService;
         this.backendAPI = backendAPI;
         this.serviceProvider = serviceProvider;
+
+        Hamburger = new HamburgerMenuViewModel(backendStatusService);
+        InitializeMenu();
     }
 
     public ObservableCollection<UploadFileEntry> FilesToUpload { get; } = new();
+
+    public HamburgerMenuViewModel Hamburger { get; }
 
     public bool IsUploading
     {
@@ -230,6 +240,20 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
             file.Dispose();
 
         FilesToUpload.Clear();
+        Hamburger.Dispose();
+    }
+
+    private void InitializeMenu()
+    {
+        MainWindowViewModel.AddDefaultMenuItems(Hamburger);
+
+        Hamburger.MenuItems.Add(new HamburgerMenuItem
+        {
+            Title = "Upload",
+            Command = new RelayCommand(() => _ = StartUpload()),
+        });
+
+        MainWindowViewModel.AddTrailingMenuItems(Hamburger, windowService);
     }
 
     private static bool IsSupportedMediaPath(string path)

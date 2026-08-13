@@ -62,13 +62,16 @@
         <ProgressBar Grid.Row="3" Value="{Binding TotalProgress}" Minimum="0" Maximum="1"
                      IsVisible="{Binding IsUploading}" Margin="0,0,0,10" />
 
-        <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" HorizontalAlignment="Stretch" ColumnSpacing="10">
-            <CheckBox Grid.Column="0" IsChecked="{Binding RemoveAfterUpload}">Remove after upload</CheckBox>
-            <Button Grid.Column="2" Content="Clear All" Command="{Binding RemoveAll}" />
-            <Button Grid.Column="3" Content="Select All" Command="{Binding SelectAll}" />
-            <Button Grid.Column="4" Content="Upload" Command="{Binding StartUpload}" IsEnabled="{Binding !IsUploading}"
+        <Grid Grid.Row="4" ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto,Auto" HorizontalAlignment="Stretch" ColumnSpacing="10">
+            <ContentControl Grid.Column="0" DataContext="{Binding Hamburger}" VerticalAlignment="Center">
+                <controls:HamburgerMenuControl />
+            </ContentControl>
+            <CheckBox Grid.Column="1" IsChecked="{Binding RemoveAfterUpload}">Remove after upload</CheckBox>
+            <Button Grid.Column="3" Content="Clear All" Command="{Binding RemoveAll}" />
+            <Button Grid.Column="4" Content="Select All" Command="{Binding SelectAll}" />
+            <Button Grid.Column="5" Content="Upload" Command="{Binding StartUpload}" IsEnabled="{Binding !IsUploading}"
                     Classes="accent" />
-            <Button Grid.Column="5" Content="Close" Click="OnCloseClick" />
+            <Button Grid.Column="6" Content="Close" Click="OnCloseClick" />
         </Grid>
     </Grid>
 </Window>
