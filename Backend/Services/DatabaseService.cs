@@ -141,12 +141,29 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (folder == null)
             throw new Exception("Folder not found");
 
+        var rootFolder = folderId == MediaFolder.RootFolderId
+            ? null
+            : collection.Folders.FirstOrDefault(f => f.Id == MediaFolder.RootFolderId);
+        var removedFromRoot = rootFolder != null;
+        if (rootFolder != null)
+            collection.Folders.Remove(rootFolder);
+
         if (collection.Folders.Any(f => f.Id == folderId))
+        {
+            if (removedFromRoot)
+            {
+                await SaveAsync();
+                await updateNotifier.NotifyMediaFolderContentsUpdated(MediaFolder.RootFolderId);
+            }
+
             return;
+        }
 
         collection.Folders.Add(folder);
         await SaveAsync();
         await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
+        if (removedFromRoot)
+            await updateNotifier.NotifyMediaFolderContentsUpdated(MediaFolder.RootFolderId);
     }
 
     public async Task AddFolderToFolder(long folderId, long parentFolderId)
