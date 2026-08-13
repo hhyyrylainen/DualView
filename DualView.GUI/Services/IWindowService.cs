@@ -86,6 +86,8 @@ public interface IWindowService
 
     public void ShowEditMediaFolders(long mediaConfigurationId);
 
+    public void ShowEditMediaFolders(IConfiguredMediaInfo item);
+
     /// <summary>
     ///   Shows the media selection window.
     /// </summary>

@@ -299,6 +299,14 @@ public sealed class WindowService : IWindowService
         Dispatcher.UIThread.Post(() => PerformInstanceWindowCreation(vm, scope));
     }
 
+    public void ShowEditMediaFolders(IConfiguredMediaInfo item)
+    {
+        var scope = services.CreateScope();
+        var vm = ActivatorUtilities.CreateInstance<EditMediaFoldersWindowViewModel>(scope.ServiceProvider);
+        vm.Initialize(item);
+        Dispatcher.UIThread.Post(() => PerformInstanceWindowCreation(vm, scope));
+    }
+
     public void ShowTextInputWindow(string title, string explanation, string? initialValue,
         Func<TextInputWindowViewModel, Task<bool>> onAccept, string? placeholder = null)
     {
