@@ -14,6 +14,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<MediaFolderDTO?> GetMediaFolderAsync(long id);
     public Task<MediaFolderDTO?> GetMediaFolderFromPathAsync(string path);
     public Task<MediaFileDTO?> GetMediaFileAsync(long mediaId);
+    public Task<CollectionDTO?> GetCollectionAsync(long collectionId);
     public Task<List<MediaFileDTO>> GetCollectionContents(long collectionId);
     public Task<List<MediaFileDTO>> GetMediaFileSiblingsAsync(long mediaId);
 

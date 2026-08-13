@@ -608,7 +608,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     }
 
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
-        FolderSortColumn sortColumn, SortDirection sortDirection, string? search = null)
+        CollectionSortColumn sortColumn, SortDirection sortDirection, string? search = null)
     {
         var query = dbContext.Set<CollectionItem>()
             .Where(ci => ci.CollectionId == collectionId);
@@ -621,8 +621,23 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         var total = await query.CountAsync();
 
-        // TODO: sorting
-        var items = await query.OrderBy(ci => ci.SequenceNumber)
+        IQueryable<CollectionItem> sortedQuery = sortColumn switch
+        {
+            CollectionSortColumn.Name => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(ci => ci.MediaFile.NameLowerCase)
+                : query.OrderByDescending(ci => ci.MediaFile.NameLowerCase),
+            CollectionSortColumn.ImportedAt => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(ci => ci.MediaFile.ImportedAt)
+                : query.OrderByDescending(ci => ci.MediaFile.ImportedAt),
+            CollectionSortColumn.LastViewed => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(ci => ci.MediaFile.LastViewed)
+                : query.OrderByDescending(ci => ci.MediaFile.LastViewed),
+            _ => sortDirection == SortDirection.Ascending
+                ? query.OrderBy(ci => ci.SequenceNumber)
+                : query.OrderByDescending(ci => ci.SequenceNumber),
+        };
+
+        var items = await sortedQuery
             .Skip(page * pageSize)
             .Take(pageSize)
             .Select(ci => ci.MediaFile.GetDTO())
@@ -1559,6 +1574,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var media = await GetMediaByIdAsync(mediaConfigId);
         return media != null ? new ConfiguredMediaDTO(media.GetDTO()) : null;
+    }
+
+    async Task<CollectionDTO?> IClientDatabaseService.GetCollectionAsync(long collectionId)
+    {
+        return (await GetCollectionAsync(collectionId))?.GetDTO();
     }
 
     async Task<MediaConfigFolderInfo> IClientDatabaseService.GetConfiguredMediaFoldersAsync(long mediaConfigId)

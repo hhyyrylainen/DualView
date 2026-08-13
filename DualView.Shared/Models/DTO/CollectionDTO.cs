@@ -12,5 +12,9 @@ public class CollectionDTO(string name)
 
     public List<long> FolderIds { get; set; } = new();
 
+    public DateTime CreatedAt { get; set; }
+
     public DateTime UpdatedAt { get; set; }
+
+    public DateTime? LastViewed { get; set; }
 }

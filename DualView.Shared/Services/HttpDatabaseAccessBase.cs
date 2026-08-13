@@ -89,7 +89,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     }
 
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
-        FolderSortColumn sortColumn, SortDirection sortDirection, string? search = null)
+        CollectionSortColumn sortColumn, SortDirection sortDirection, string? search = null)
     {
         var url =
             $"api/v1/collection/{collectionId}/contents?page={page}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}";
@@ -112,6 +112,11 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<MediaFileDTO?> GetMediaFileAsync(long mediaId)
     {
         return await HttpClient.GetFromJsonAsync<MediaFileDTO?>($"api/v1/media/{mediaId}");
+    }
+
+    public async Task<CollectionDTO?> GetCollectionAsync(long collectionId)
+    {
+        return await HttpClient.GetFromJsonAsync<CollectionDTO?>($"api/v1/collection/{collectionId}");
     }
 
     public async Task<List<long>> GetMediaCollectionsAsync(long mediaId)

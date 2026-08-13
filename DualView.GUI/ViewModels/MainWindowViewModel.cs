@@ -377,7 +377,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             if (currentCollectionId != null)
             {
                 var (contents, totalItems) = await databaseService.GetCollectionContents(currentCollectionId.Value,
-                    currentPage - 1, pageSize, FolderSortColumn.Name, SortDirection.Ascending, searchText);
+                    currentPage - 1, pageSize, CollectionSortColumn.Name, SortDirection.Ascending, searchText);
 
                 totalItemsCount = totalItems;
 

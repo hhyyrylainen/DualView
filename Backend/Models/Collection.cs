@@ -57,7 +57,10 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
         return new CollectionDTO(Name)
         {
             Id = Id,
-            FolderIds = Folders.Select(f => f.Id).ToList()
+            FolderIds = Folders.Select(f => f.Id).ToList(),
+            CreatedAt = CreatedAt,
+            UpdatedAt = UpdatedAt,
+            LastViewed = LastViewed,
         };
     }
 }

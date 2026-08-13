@@ -76,7 +76,7 @@ public class CollectionController : Controller
 
     [HttpGet("{id:long}/contents")]
     public async Task<ActionResult<Tuple<List<MediaFileDTO>, int>>> GetCollectionContents([Required] long id,
-        [Required] int page, int pageSize = 100, FolderSortColumn sortColumn = FolderSortColumn.DateCreated,
+        [Required] int page, int pageSize = 100, CollectionSortColumn sortColumn = CollectionSortColumn.CollectionOrder,
         SortDirection sortDirection = SortDirection.Descending, string? search = null)
     {
         return await databaseService.GetCollectionContents(id, page, pageSize, sortColumn, sortDirection, search);
