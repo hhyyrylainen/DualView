@@ -12,7 +12,7 @@
         <vm:FolderPickerViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,Auto,*" Margin="5">
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="5">
         <Grid ColumnDefinitions="Auto,Auto,Auto,*,Auto,Auto" Margin="0,0,0,5">
             <Button Grid.Column="0" Content="UP" Command="{Binding NavigateUp}" Margin="0,0,4,0" />
             <Button Grid.Column="1" Content="Copy" Command="{Binding CopyPath}" Margin="0,0,4,0" />
@@ -27,8 +27,9 @@
         </Grid>
 
         <TextBlock Grid.Row="1" Text="{Binding CurrentPath}" FontWeight="Bold" Margin="0,0,0,5" />
+        <TextBox Grid.Row="2" Text="{Binding SearchText}" PlaceholderText="Search folders..." Margin="0,0,0,5" />
 
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+        <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto" BringIntoViewOnFocusChange="False">
             <ItemsControl ItemsSource="{Binding Folders}" Padding="1,5,5,5">
                 <ItemsControl.ItemsPanel>
