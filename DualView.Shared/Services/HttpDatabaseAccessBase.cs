@@ -70,6 +70,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                throw new Exception("Failed to get folders");
     }
 
+    public async Task RenameMediaFolder(long folderId, string folderName)
+    {
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/mediaFolder/{folderId}/rename", folderName);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<MediaFolderDTO?> GetMediaFolderAsync(long id)
     {
         return await HttpClient.GetFromJsonAsync<MediaFolderDTO>($"api/v1/mediaFolder/{id}");

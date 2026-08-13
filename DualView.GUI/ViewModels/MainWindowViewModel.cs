@@ -610,14 +610,22 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
         public bool HasViewAction => true;
         public bool HasThumbnailAction => false;
-        public bool HasEditAction => true;
+        public bool HasEditAction { get; private set; }
         public bool HasMoveToFolderAction => false;
         public bool HasAddToFolderAction => false;
         public bool HasManageFoldersAction { get; private set; }
 
         public void RefreshAvailableOptions(IVisualMediaSource? mediaSource)
         {
-            HasManageFoldersAction = mediaSource is ServerMediaSource;
+            if (mediaSource is not ServerMediaSource serverSource)
+            {
+                HasEditAction = false;
+                HasManageFoldersAction = false;
+                return;
+            }
+
+            HasEditAction = !serverSource.Info.IsCollection;
+            HasManageFoldersAction = true;
         }
 
         public void ShowView(IVisualMediaSource? mediaSource)
@@ -630,7 +638,9 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 }
                 else if (serverSource.Info.IsCollection)
                 {
-                    viewModel.OpenCollection(serverSource.ServerId, serverSource.Info.Name);
+                    var collectionWindow = windowService.ShowSingletonWindow<MediaCollectionWindowViewModel>();
+                    if (collectionWindow != null)
+                        _ = collectionWindow.Initialize(serverSource.ServerId, serverSource.Info.Name);
                 }
                 else
                 {
@@ -649,8 +659,46 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         {
             if (mediaSource is ServerMediaSource serverMediaSource)
             {
-                windowService.ShowMediaEditSetup(serverMediaSource.ServerId);
+                if (serverMediaSource.Info.IsFolder)
+                {
+                    windowService.ShowWindow<RenameWindowViewModel>(renameWindow =>
+                    {
+                        renameWindow.Initialize(serverMediaSource.Info.Name,
+                            name => ValidateFolderNameAsync(serverMediaSource.ServerId, name),
+                            name => RenameFolderAsync(serverMediaSource.ServerId, name));
+                    });
+                    return;
+                }
+
+                if (!serverMediaSource.Info.IsCollection)
+                    windowService.ShowMediaEditSetup(serverMediaSource.ServerId);
             }
+        }
+
+        private async Task<(bool Valid, string Error)> ValidateFolderNameAsync(long folderId, string name)
+        {
+            var trimmedName = name.Trim();
+            if (string.IsNullOrWhiteSpace(trimmedName))
+                return (false, "Folder name cannot be empty");
+            if (trimmedName.Length > 200)
+                return (false, "Folder name cannot be longer than 200 characters");
+
+            var folder = viewModel.databaseService == null
+                ? null
+                : await viewModel.databaseService.GetMediaFolderAsync(folderId);
+            if (folder == null)
+                return (false, "Folder not found");
+
+            return (true, string.Empty);
+        }
+
+        private async Task<bool> RenameFolderAsync(long folderId, string name)
+        {
+            if (viewModel.databaseService == null)
+                return false;
+
+            await viewModel.databaseService.RenameMediaFolder(folderId, name.Trim());
+            return true;
         }
 
         public void StartMoveAction(IVisualMediaSource mediaSource) => throw new NotSupportedException();

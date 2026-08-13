@@ -65,6 +65,13 @@ public class MediaFolderController : Controller
         return Ok(id.ToString());
     }
 
+    [HttpPut("{id:long}/rename")]
+    public async Task<IActionResult> Rename([Required] long id, [FromBody] [Required] string name)
+    {
+        await databaseService.RenameMediaFolder(id, name);
+        return Ok();
+    }
+
     // TODO: should split out a separate collections controller
     [HttpPost("{folderId:long}/collections")]
     public async Task<IActionResult> CreateCollection([Required] long folderId, [FromBody] [Required] string name)

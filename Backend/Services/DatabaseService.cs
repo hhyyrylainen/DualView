@@ -110,6 +110,30 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return folder.Id;
     }
 
+    public async Task RenameMediaFolder(long folderId, string folderName)
+    {
+        var trimmedName = folderName.TrimOrThrowIfEmpty();
+        if (trimmedName.Length > 200)
+            throw new ArgumentException("Folder name is too long");
+
+        var folder = await dbContext.MediaFolders.Include(item => item.Parents)
+            .FirstOrDefaultAsync(item => item.Id == folderId);
+        if (folder == null)
+            throw new Exception("Folder not found");
+
+        var lowerName = trimmedName.ToLowerInvariant();
+        if (folder.Parents.Any(parent => dbContext.MediaFolders.Any(other =>
+                other.Id != folderId && other.NameLowerCase == lowerName &&
+                other.Parents.Any(parentFolder => parentFolder.Id == parent.Id))))
+        {
+            throw new Exception("A folder with that name already exists here");
+        }
+
+        folder.Name = trimmedName;
+        await SaveAsync();
+        await updateNotifier.NotifyMediaFoldersUpdated();
+    }
+
     public async Task<long> CreateCollection(string collectionName, long folderId)
     {
         var collection = new Collection(collectionName.TrimOrThrowIfEmpty());
