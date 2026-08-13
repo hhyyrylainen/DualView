@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Avalonia.Threading;
 using DualView.GUI.Models;
 using DualView.GUI.Services;
+using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -67,11 +68,27 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     }
 
-    public void AddFiles(string[] paths)
+    public async Task AddFilesAsync(string[] paths)
     {
-        foreach (var path in paths)
+        var mediaPaths = paths.Where(IsSupportedMediaPath).ToList();
+        var duplicatePaths = mediaPaths
+            .Where(path => FilesToUpload.Any(file => file.LocalPath == path))
+            .Distinct()
+            .ToList();
+
+        if (duplicatePaths.Count > 0)
         {
-            if (FilesToUpload.Any(f => f.LocalPath == path)) continue;
+            var addDuplicates = windowService == null || (await windowService.ShowConfirmationWindow(
+                    "Duplicate files",
+                    $"{duplicatePaths.Count} of the selected files are already in the upload list. Add them anyway?")) ==
+                true;
+
+            if (!addDuplicates)
+                mediaPaths = mediaPaths.Where(path => !duplicatePaths.Contains(path)).ToList();
+        }
+
+        foreach (var path in mediaPaths)
+        {
             FilesToUpload.Add(new UploadFileEntry(path, serviceProvider));
         }
     }
@@ -97,6 +114,37 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
     {
         foreach (var file in FilesToUpload)
             file.IsSelected = true;
+    }
+
+    public void ClearSelection()
+    {
+        foreach (var file in FilesToUpload)
+            file.IsSelected = false;
+    }
+
+    public void ReverseItems()
+    {
+        var selectedFiles = FilesToUpload.Where(file => file.IsSelected).ToList();
+        if (selectedFiles.Count == 0 || selectedFiles.Count == FilesToUpload.Count)
+        {
+            var reversedFiles = FilesToUpload.Reverse().ToList();
+            for (var index = 0; index < reversedFiles.Count; ++index)
+                FilesToUpload.Move(FilesToUpload.IndexOf(reversedFiles[index]), index);
+
+            return;
+        }
+
+        var reversedSelectedFiles = selectedFiles.AsEnumerable().Reverse().ToList();
+        var selectedIndex = 0;
+        for (var index = 0; index < FilesToUpload.Count; ++index)
+        {
+            if (!FilesToUpload[index].IsSelected)
+                continue;
+
+            var replacement = reversedSelectedFiles[selectedIndex++];
+            var currentIndex = FilesToUpload.IndexOf(replacement);
+            FilesToUpload.Move(currentIndex, index);
+        }
     }
 
     public async Task StartUpload()
@@ -182,6 +230,19 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
             file.Dispose();
 
         FilesToUpload.Clear();
+    }
+
+    private static bool IsSupportedMediaPath(string path)
+    {
+        try
+        {
+            MediaTypeExtensions.TypeFromExtension(Path.GetExtension(path).ToLowerInvariant());
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     public class UploadFileEntry : ViewModelBase, IDisposable

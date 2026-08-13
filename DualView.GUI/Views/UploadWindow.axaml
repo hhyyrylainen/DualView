@@ -4,7 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:DualView.GUI.ViewModels"
         xmlns:controls="using:DualView.GUI.Controls"
-        mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="400"
+        mc:Ignorable="d" d:DesignWidth="650" d:DesignHeight="400"
         x:Class="DualView.GUI.Views.UploadWindow"
         x:DataType="vm:UploadWindowViewModel"
         Title="Upload Files"
@@ -14,9 +14,25 @@
         <vm:UploadWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto, *, Auto, Auto" Margin="10">
-        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Stretch">
-            <Button Content="Add Files" Click="OnAddFilesClick" IsEnabled="{Binding !IsUploading}" />
+    <Grid RowDefinitions="Auto, Auto, *, Auto, Auto" Margin="10"
+          DragDrop.AllowDrop="True">
+        <Menu Grid.Row="0">
+            <MenuItem Header="File">
+                <MenuItem Header="Add Files" Click="OnAddFilesClick" IsEnabled="{Binding !IsUploading}" />
+                <MenuItem Header="Upload" Command="{Binding StartUpload}" IsEnabled="{Binding !IsUploading}" />
+                <Separator />
+                <MenuItem Header="Close" Click="OnCloseClick" />
+            </MenuItem>
+            <MenuItem Header="Edit">
+                <MenuItem Header="Select All" Command="{Binding SelectAll}" />
+                <MenuItem Header="Clear Selection" Command="{Binding ClearSelection}" />
+                <MenuItem Header="Remove Selected" Command="{Binding RemoveSelectedFiles}" />
+                <Separator />
+                <MenuItem Header="Reverse Items" Command="{Binding ReverseItems}" />
+            </MenuItem>
+        </Menu>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Stretch">
             <CheckBox IsChecked="{Binding DeleteAfterUpload}">Delete FILES After Upload</CheckBox>
 
             <TextBox PlaceholderText="Upload section name (optional, blank means current section)"
@@ -24,13 +40,13 @@
         </StackPanel>
 
 
-        <ListBox Grid.Row="1" ItemsSource="{Binding FilesToUpload}" Margin="0,10,0,10">
-            <ListBox.ItemsPanel>
+        <ItemsControl Grid.Row="2" ItemsSource="{Binding FilesToUpload}" Margin="0,10,0,10">
+            <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel />
                 </ItemsPanelTemplate>
-            </ListBox.ItemsPanel>
-            <ListBox.ItemTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
                 <DataTemplate>
                     <StackPanel Width="160" Margin="5">
                         <ContentControl DataContext="{Binding ThumbnailViewer}">
@@ -40,20 +56,19 @@
                                    TextWrapping="Wrap" />
                     </StackPanel>
                 </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
 
-        <ProgressBar Grid.Row="2" Value="{Binding TotalProgress}" Minimum="0" Maximum="1"
+        <ProgressBar Grid.Row="3" Value="{Binding TotalProgress}" Minimum="0" Maximum="1"
                      IsVisible="{Binding IsUploading}" Margin="0,0,0,10" />
 
-        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" HorizontalAlignment="Stretch" ColumnSpacing="10">
+        <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" HorizontalAlignment="Stretch" ColumnSpacing="10">
             <CheckBox Grid.Column="0" IsChecked="{Binding RemoveAfterUpload}">Remove after upload</CheckBox>
-            <Button Grid.Column="2" Content="Remove Selected" Command="{Binding RemoveSelectedFiles}" />
-            <Button Grid.Column="3" Content="Clear All" Command="{Binding RemoveAll}" />
-            <Button Grid.Column="4" Content="Select All" Command="{Binding SelectAll}" />
-            <Button Grid.Column="5" Content="Upload" Command="{Binding StartUpload}" IsEnabled="{Binding !IsUploading}"
+            <Button Grid.Column="2" Content="Clear All" Command="{Binding RemoveAll}" />
+            <Button Grid.Column="3" Content="Select All" Command="{Binding SelectAll}" />
+            <Button Grid.Column="4" Content="Upload" Command="{Binding StartUpload}" IsEnabled="{Binding !IsUploading}"
                     Classes="accent" />
-            <Button Grid.Column="6" Content="Close" Click="OnCloseClick" />
+            <Button Grid.Column="5" Content="Close" Click="OnCloseClick" />
         </Grid>
     </Grid>
 </Window>

@@ -1,6 +1,8 @@
 using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using DualView.GUI.ViewModels;
 
 namespace DualView.GUI.Views;
@@ -11,6 +13,9 @@ public partial class UploadWindow : Window
     {
         InitializeComponent();
 
+        AddHandler(DragDrop.DropEvent, OnDrop);
+        AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        AddHandler(PointerPressedEvent, OnPointerPressed, RoutingStrategies.Bubble, true);
         Closed += (s, e) => (DataContext as UploadWindowViewModel)?.RemoveAll();
     }
 
@@ -27,12 +32,70 @@ public partial class UploadWindow : Window
 
         if (files.Any() && DataContext is UploadWindowViewModel vm)
         {
-            vm.AddFiles(files.Select(f => f.Path.LocalPath).ToArray());
+            await vm.AddFilesAsync(files.Select(f => f.Path.LocalPath).ToArray());
         }
     }
 
     private void OnCloseClick(object? sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+        e.DragEffects = e.DataTransfer.Formats.Contains(DataFormat.File)
+            ? DragDropEffects.Copy
+            : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    private async void OnDrop(object? sender, DragEventArgs e)
+    {
+        if (DataContext is not UploadWindowViewModel vm)
+            return;
+
+        var paths = e.DataTransfer.Items
+            .Select(item => item.TryGetRaw(DataFormat.File))
+            .OfType<IStorageItem>()
+            .Select(item => item.Path.LocalPath)
+            .ToArray();
+
+        if (paths.Length > 0)
+            await vm.AddFilesAsync(paths);
+
+        e.Handled = true;
+    }
+
+    private void OnPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) || DataContext is not UploadWindowViewModel vm)
+            return;
+
+        var entry = FindUploadEntry(e.Source as Control);
+        if (entry == null || !entry.IsSelected)
+            return;
+
+        // Handle shift selection of items
+        var entryIndex = vm.FilesToUpload.IndexOf(entry);
+        var startIndex = entryIndex - 1;
+        while (startIndex >= 0 && !vm.FilesToUpload[startIndex].IsSelected)
+            --startIndex;
+
+        ++startIndex;
+        for (var index = startIndex; index <= entryIndex; ++index)
+            vm.FilesToUpload[index].IsSelected = true;
+    }
+
+    private static UploadWindowViewModel.UploadFileEntry? FindUploadEntry(Control? control)
+    {
+        while (control != null)
+        {
+            if (control.DataContext is UploadWindowViewModel.UploadFileEntry entry)
+                return entry;
+
+            control = control.Parent as Control;
+        }
+
+        return null;
     }
 }
