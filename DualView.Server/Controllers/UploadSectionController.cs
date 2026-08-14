@@ -1,6 +1,8 @@
 using System.ComponentModel.DataAnnotations;
 using Backend.Services;
 using Microsoft.AspNetCore.Mvc;
+using DualView.Shared.Requests;
+using DualView.Shared.Models.DTO;
 
 namespace DualView.Server.Controllers;
 
@@ -19,6 +21,64 @@ public class UploadSectionController : Controller
     public async Task<ActionResult<long>> GetOrCreateUploadSection([FromQuery] string? name)
     {
         return (await databaseService.GetOrCreateUploadSectionAsync(name)).Id;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<List<UploadSectionDTO>>> GetAll()
+    {
+        var sections = await databaseService.GetUploadSectionsAsync();
+        return sections.Select(section => new UploadSectionDTO
+        {
+            Id = section.Id, Name = section.Name, KeepTarget = section.KeepTarget,
+            Selected = section.Selected, RemoveAfterImport = section.RemoveAfterImport,
+            TargetFolderId = section.TargetFolderId,
+            TargetCollectionName = string.IsNullOrWhiteSpace(section.TargetCollectionName)
+                ? section.Name
+                : section.TargetCollectionName,
+            Media = section.Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
+        }).ToList();
+    }
+
+    [HttpPut("{sectionId:long}")]
+    public async Task<ActionResult> Update(long sectionId, UpdateUploadSectionRequest request)
+    {
+        var section = (await databaseService.GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == sectionId);
+        if (section == null) return NotFound();
+        section.Name = request.Name.Trim();
+        section.KeepTarget = request.KeepTarget;
+        section.RemoveAfterImport = request.RemoveAfterImport;
+        section.TargetFolderId = request.TargetFolderId;
+        section.TargetCollectionName = request.TargetCollectionName;
+        await databaseService.SaveUploadSectionAsync(section);
+        return Ok();
+    }
+
+    [HttpPost("active")]
+    public async Task<ActionResult> SetActive([FromBody] long? sectionId)
+    {
+        await databaseService.SetUploadSectionActiveAsync(sectionId);
+        return Ok();
+    }
+
+    [HttpPost("{sectionId:long}/removeMedia")]
+    public async Task<ActionResult> RemoveMedia(long sectionId, UploadSectionMediaRequest request)
+    {
+        await databaseService.RemoveMediaFromUploadSectionAsync(sectionId, request.MediaIds);
+        return Ok();
+    }
+
+    [HttpPost("{sectionId:long}/reorder")]
+    public async Task<ActionResult> Reorder(long sectionId, UploadSectionMediaRequest request)
+    {
+        await databaseService.ReorderUploadSectionAsync(sectionId, request.MediaIds);
+        return Ok();
+    }
+
+    [HttpPost("{sectionId:long}/import")]
+    public async Task<ActionResult> Import(long sectionId, [FromBody] List<long>? mediaIds)
+    {
+        await databaseService.ImportUploadSectionAsync(sectionId, mediaIds);
+        return Ok();
     }
 
     [HttpPost("{sectionId:long}/addMedia")]

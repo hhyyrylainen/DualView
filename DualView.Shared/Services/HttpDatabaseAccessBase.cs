@@ -468,6 +468,52 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<List<UploadSectionDTO>> GetUploadSectionsAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<UploadSectionDTO>>("api/v1/uploadSection") ?? new();
+    }
+
+    public async Task<UploadSectionDTO> GetOrCreateUploadSectionAsync(string? name)
+    {
+        var response = await HttpClient.PostAsync(
+            $"api/v1/uploadSection/getOrCreate?name={Uri.EscapeDataString(name ?? string.Empty)}", null);
+        response.EnsureSuccessStatusCode();
+        var id = await response.Content.ReadFromJsonAsync<long>();
+        return (await GetUploadSectionsAsync()).First(section => section.Id == id);
+    }
+
+    public async Task SaveUploadSectionAsync(long sectionId, UpdateUploadSectionRequest request)
+    {
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/uploadSection/{sectionId}", request);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/removeMedia",
+            new UploadSectionMediaRequest { MediaIds = mediaIds });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/reorder",
+            new UploadSectionMediaRequest { MediaIds = mediaIds });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task SetUploadSectionActiveAsync(long? sectionId)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/uploadSection/active", sectionId);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/import", mediaIds);
+        response.EnsureSuccessStatusCode();
+    }
+
     // Tags
     public async Task<long> CreateTagAsync(string name, TagCategory category)
     {

@@ -1,6 +1,7 @@
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Requests;
 
 namespace DualView.Shared.Services;
 
@@ -63,6 +64,13 @@ public interface IClientDatabaseService : IDatabaseCommonService
 
     // Import & Galleries
     public Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId);
+    public Task<List<UploadSectionDTO>> GetUploadSectionsAsync();
+    public Task<UploadSectionDTO> GetOrCreateUploadSectionAsync(string? name);
+    public Task SaveUploadSectionAsync(long sectionId, UpdateUploadSectionRequest request);
+    public Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds);
+    public Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds);
+    public Task SetUploadSectionActiveAsync(long? sectionId);
+    public Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds);
     public Task<List<DownloadGalleryDTO>> GetAllDownloadGalleriesAsync();
     public Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id);
 }
