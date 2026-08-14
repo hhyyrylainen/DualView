@@ -542,6 +542,23 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                 logger.LogError(e, "Failed to delete original media file during purge");
             }
         }
+        else
+        {
+            logger.LogWarning("Original media file {Path} does not exist (when purging)", originalPath);
+        }
+
+        var croppedPath = Path.Join(baseStorage, media.CroppedPathRelativeToStorage());
+        if (File.Exists(croppedPath))
+        {
+            try
+            {
+                File.Delete(croppedPath);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Failed to delete physical cropped media file {Path}", croppedPath);
+            }
+        }
 
         dbContext.MediaFiles.Remove(media);
         await SaveAsync();
@@ -1038,17 +1055,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return mediaItem;
     }
 
-    public async Task<List<MediaFile>> GetEligibleMediaFilesForPurgeAsync()
+    public async Task<List<MediaFile>> GetEligibleMediaFilesForPurgeAsync(TimeSpan timeSinceDeletion)
     {
-        return await dbContext.MediaFiles
-            .Where(m => m.IsDeleted)
-            .ToListAsync();
-    }
+        var cutoffTime = DateTime.UtcNow - timeSinceDeletion;
 
-    public async Task PurgeMediaFileAsync(MediaFile mediaFile)
-    {
-        dbContext.MediaFiles.Remove(mediaFile);
-        await SaveAsync();
+        return await dbContext.MediaFiles
+            .Where(m => m.IsDeleted && m.UpdatedAt <= cutoffTime)
+            .ToListAsync();
     }
 
     public async Task<MaintenanceJobRecord?> GetMaintenanceRecord(string name)

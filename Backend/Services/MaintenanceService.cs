@@ -11,6 +11,7 @@ public class MaintenanceService : IMaintenanceService
 {
     private static readonly TimeSpan OldThumbnailTime = TimeSpan.FromDays(90);
     private static readonly TimeSpan OldProcessedFileTime = TimeSpan.FromDays(60);
+    private static readonly TimeSpan DeletedImageTime = TimeSpan.FromDays(60);
 
     private readonly ILogger<MaintenanceService> logger;
     private readonly IServiceScopeFactory scopeFactory;
@@ -633,12 +634,8 @@ public class MaintenanceService : IMaintenanceService
         protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
             IDatabaseService databaseService, IServiceScope scope, CancellationToken cancellationToken)
         {
-            var dataFolderService = scope.ServiceProvider.GetRequiredService<IDataFolderService>();
-            var logger = scope.ServiceProvider.GetRequiredService<ILogger<PurgeDeletedMedia>>();
-            var storage = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
-
-            // Purge MediaFiles that are deleted and not marked keep
-            var filesToPurge = await databaseService.GetEligibleMediaFilesForPurgeAsync();
+            // Purge MediaFiles that are deleted for a while
+            var filesToPurge = await databaseService.GetEligibleMediaFilesForPurgeAsync(DeletedImageTime);
             int filesPurged = 0;
 
             foreach (var mediaFile in filesToPurge)
@@ -646,34 +643,7 @@ public class MaintenanceService : IMaintenanceService
                 if (cancellationToken.IsCancellationRequested)
                     break;
 
-                var path = Path.Join(storage, mediaFile.PathRelativeToStorage());
-                var croppedPath = Path.Join(storage, mediaFile.CroppedPathRelativeToStorage());
-
-                if (File.Exists(path))
-                {
-                    try
-                    {
-                        File.Delete(path);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogWarning(e, "Failed to delete physical media file {Path}", path);
-                    }
-                }
-
-                if (File.Exists(croppedPath))
-                {
-                    try
-                    {
-                        File.Delete(croppedPath);
-                    }
-                    catch (Exception e)
-                    {
-                        logger.LogWarning(e, "Failed to delete physical cropped media file {Path}", croppedPath);
-                    }
-                }
-
-                await databaseService.PurgeMediaFileAsync(mediaFile);
+                await databaseService.PurgeMediaAsync(mediaFile.Id);
                 filesPurged++;
             }
 
