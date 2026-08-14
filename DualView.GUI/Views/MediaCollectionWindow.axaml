@@ -31,15 +31,15 @@
                 <MenuItem Header="Delete collection" Command="{Binding DeleteCollection}" />
                 <MenuItem Header="Delete collection and images" Command="{Binding DeleteCollectionAndImages}" />
             </MenuItem>
+            <MenuItem Header="View">
+                <MenuItem Header="Sort by visual similarity" Command="{Binding StartVisualSimilaritySort}"
+                          IsEnabled="{Binding !IsVisualSimilarityMode}" />
+            </MenuItem>
             <MenuItem Header="Tools">
                 <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />
                 <MenuItem Header="Get Info" Command="{Binding ShowCollectionInfo}" />
                 <Separator />
                 <MenuItem Header="Paired image mode" ToggleType="CheckBox" IsChecked="{Binding IsPairedImageMode}" />
-            </MenuItem>
-            <MenuItem Header="View">
-                <MenuItem Header="Sort by visual similarity" Command="{Binding StartVisualSimilaritySort}"
-                          IsEnabled="{Binding !IsVisualSimilarityMode}" />
             </MenuItem>
         </Menu>
 
