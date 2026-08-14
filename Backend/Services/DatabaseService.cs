@@ -305,24 +305,80 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyMediaFoldersUpdated();
     }
 
-    public async Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber)
+    public async Task AddMediaToCollection(List<long> mediaIds, long collectionId, int firstSequenceNumber,
+        List<int>? sequenceNumbers = null)
     {
-        var alreadyExists = await dbContext.Set<CollectionItem>().AnyAsync(ci =>
-            ci.CollectionId == collectionId && ci.MediaFileId == mediaId);
+        if (sequenceNumbers != null && sequenceNumbers.Count != mediaIds.Count)
+            throw new ArgumentException("The sequence number list must match the media ID list length.");
 
-        if (alreadyExists)
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
+
+        if (mediaIds.Count == 0)
             return;
 
-        var item = new CollectionItem
+        var existingMediaIds = await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId && mediaIds.Contains(ci.MediaFileId))
+            .Select(ci => ci.MediaFileId)
+            .ToHashSetAsync();
+        var newMediaIds = new List<long>();
+        var sequenceNumbersByMediaId = new Dictionary<long, int>();
+        for (var index = 0; index < mediaIds.Count; ++index)
+        {
+            var mediaId = mediaIds[index];
+            if (existingMediaIds.Contains(mediaId) || !sequenceNumbersByMediaId.TryAdd(mediaId,
+                    sequenceNumbers == null ? firstSequenceNumber + index : sequenceNumbers[index]))
+            {
+                continue;
+            }
+
+            newMediaIds.Add(mediaId);
+        }
+
+        if (newMediaIds.Count == 0)
+            return;
+
+        var mediaFiles = await dbContext.MediaFiles
+            .Where(media => newMediaIds.Contains(media.Id))
+            .ToDictionaryAsync(media => media.Id);
+        if (mediaFiles.Count != newMediaIds.Count)
+            throw new ArgumentException("One or more media files were not found.");
+
+        var activeItemCount = await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId && !ci.MediaFile.IsDeleted)
+            .CountAsync();
+        var activeNewItemCount = newMediaIds.Count(mediaId => !mediaFiles[mediaId].IsDeleted);
+        if ((activeItemCount + activeNewItemCount) % collection.ImageGroupSize != 0)
+            throw new InvalidOperationException($"The collection requires images to be added in groups of {collection.ImageGroupSize}.");
+
+        var items = newMediaIds.Select(mediaId => new CollectionItem
         {
             CollectionId = collectionId,
             MediaFileId = mediaId,
-            SequenceNumber = sequenceNumber
-        };
+            SequenceNumber = sequenceNumbersByMediaId[mediaId],
+        }).ToList();
 
-        await dbContext.Set<CollectionItem>().AddAsync(item);
+        await dbContext.Set<CollectionItem>().AddRangeAsync(items);
         await SaveAsync();
         await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
+    }
+
+    public async Task SetCollectionImageGroupSizeAsync(long collectionId, int imageGroupSize)
+    {
+        if (imageGroupSize < 1)
+            throw new ArgumentOutOfRangeException(nameof(imageGroupSize));
+
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        var activeItemCount = await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId && !ci.MediaFile.IsDeleted)
+            .CountAsync();
+        if (activeItemCount % imageGroupSize != 0)
+            throw new InvalidOperationException($"The collection has {activeItemCount} active images, which is not divisible by {imageGroupSize}.");
+
+        collection.ImageGroupSize = imageGroupSize;
+        await SaveAsync();
+        await updateNotifier.NotifyCollectionUpdated(collectionId);
     }
 
     public async Task ReorderCollection(long collectionId, List<long> newImageOrderIds)
@@ -1028,12 +1084,20 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, long collectionId)
     {
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        var activeItemCount = await dbContext.Set<CollectionItem>()
+            .Where(ci => ci.CollectionId == collectionId && !ci.MediaFile.IsDeleted)
+            .CountAsync();
+        if ((activeItemCount + 1) % collection.ImageGroupSize != 0)
+            throw new InvalidOperationException($"The collection requires images to be added in groups of {collection.ImageGroupSize}.");
+
         await dbContext.MediaFiles.AddAsync(mediaItem);
         await SaveAsync();
 
         var sequenceNumber = await GetNextCollectionSequenceNumberAsync(collectionId);
 
-        await AddMediaToCollection(mediaItem.Id, collectionId, sequenceNumber);
+        await AddMediaToCollection([mediaItem.Id], collectionId, sequenceNumber);
 
         return mediaItem;
     }

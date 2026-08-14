@@ -76,6 +76,13 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task SetCollectionImageGroupSizeAsync(long collectionId, int imageGroupSize)
+    {
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/collection/{collectionId}/imageGroupSize",
+            imageGroupSize);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<MediaFolderDTO?> GetMediaFolderAsync(long id)
     {
         return await HttpClient.GetFromJsonAsync<MediaFolderDTO>($"api/v1/mediaFolder/{id}");
@@ -240,11 +247,16 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber)
+    public async Task AddMediaToCollection(List<long> mediaIds, long collectionId, int firstSequenceNumber,
+        List<int>? sequenceNumbers = null)
     {
-        var response = await HttpClient.PostAsync(
-            $"api/v1/collection/{collectionId}/addMedia?mediaId={mediaId}&sequenceNumber={sequenceNumber}",
-            null);
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/addMedia",
+            new CollectionMediaImportRequest
+            {
+                MediaIds = mediaIds,
+                FirstSequenceNumber = firstSequenceNumber,
+                SequenceNumbers = sequenceNumbers,
+            });
         response.EnsureSuccessStatusCode();
     }
 

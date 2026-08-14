@@ -21,6 +21,7 @@ public interface IDatabaseCommonService
     public Task RenameMediaFolder(long folderId, string folderName);
     public Task<long> CreateCollection(string collectionName, long folderId);
     public Task RenameCollection(long collectionId, string collectionName);
+    public Task SetCollectionImageGroupSizeAsync(long collectionId, int imageGroupSize);
 
     public Task AddCollectionToFolder(long collectionId, long folderId);
     public Task AddFolderToFolder(long folderId, long parentFolderId);
@@ -28,7 +29,8 @@ public interface IDatabaseCommonService
     public Task RemoveCollectionFromFolder(long collectionId, long folderId);
     public Task RemoveFolderFromFolder(long folderId, long parentFolderId);
 
-    public Task AddMediaToCollection(long mediaId, long collectionId, int sequenceNumber);
+    public Task AddMediaToCollection(List<long> mediaIds, long collectionId, int firstSequenceNumber,
+        List<int>? sequenceNumbers = null);
     public Task RemoveMediaFromCollection(long mediaId, long collectionId);
     public Task ReorderCollection(long collectionId, List<long> newImageOrderIds);
 

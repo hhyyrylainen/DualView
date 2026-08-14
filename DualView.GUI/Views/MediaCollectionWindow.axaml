@@ -34,6 +34,8 @@
             <MenuItem Header="Tools">
                 <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />
                 <MenuItem Header="Get Info" Command="{Binding ShowCollectionInfo}" />
+                <Separator />
+                <MenuItem Header="Paired image mode" ToggleType="CheckBox" IsChecked="{Binding IsPairedImageMode}" />
             </MenuItem>
         </Menu>
 

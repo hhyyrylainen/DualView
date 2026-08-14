@@ -70,6 +70,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
                 OnPropertyChanged(nameof(WindowCollectionTitle));
                 OnPropertyChanged(nameof(CollectionCreatedAt));
                 OnPropertyChanged(nameof(CollectionStatistics));
+                OnPropertyChanged(nameof(IsPairedImageMode));
             }
         }
     }
@@ -78,6 +79,18 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public DateTime? CollectionCreatedAt => Collection?.CreatedAt;
     public string CollectionStatistics => Collection == null ? "" : $"{CollectionItemCount} images";
     public int CollectionItemCount { get; private set; }
+
+    public bool IsPairedImageMode
+    {
+        get => Collection?.ImageGroupSize == 2;
+        set
+        {
+            if (Collection == null || value == IsPairedImageMode)
+                return;
+
+            _ = SetPairedImageMode(value);
+        }
+    }
 
     public string CollectionTags
     {
@@ -332,6 +345,24 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     }
 
     private void OnItemSelectionChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(SelectedCount));
+
+    private async Task SetPairedImageMode(bool enabled)
+    {
+        if (Collection == null || databaseService == null)
+            return;
+
+        try
+        {
+            await databaseService.SetCollectionImageGroupSizeAsync(Collection.Id, enabled ? 2 : 1);
+            Collection.ImageGroupSize = enabled ? 2 : 1;
+            OnPropertyChanged(nameof(IsPairedImageMode));
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to change paired image mode", ex);
+            OnPropertyChanged(nameof(IsPairedImageMode));
+        }
+    }
 
     private void ResetScrollPositionCache(bool resetPage)
     {

@@ -17,4 +17,6 @@ public class CollectionDTO(string name)
     public DateTime UpdatedAt { get; set; }
 
     public DateTime? LastViewed { get; set; }
+
+    public int ImageGroupSize { get; set; } = 1;
 }

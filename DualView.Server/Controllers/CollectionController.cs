@@ -40,6 +40,13 @@ public class CollectionController : Controller
         return Ok();
     }
 
+    [HttpPut("{id:long}/imageGroupSize")]
+    public async Task<IActionResult> SetImageGroupSize([Required] long id, [FromBody] int imageGroupSize)
+    {
+        await databaseService.SetCollectionImageGroupSizeAsync(id, imageGroupSize);
+        return Ok();
+    }
+
     [HttpGet("deleted")]
     public async Task<ActionResult<List<CollectionDTO>>> GetDeleted([FromQuery] int limit = 100)
     {
@@ -110,9 +117,10 @@ public class CollectionController : Controller
 
     [HttpPost("{id:long}/addMedia")]
     public async Task<IActionResult> AddMediaToCollection([Required] long id,
-        [Required] long mediaId, [Required] int sequenceNumber)
+        [FromBody] CollectionMediaImportRequest request)
     {
-        await databaseService.AddMediaToCollection(mediaId, id, sequenceNumber);
+        await databaseService.AddMediaToCollection(request.MediaIds, id, request.FirstSequenceNumber,
+            request.SequenceNumbers);
         return Ok();
     }
 

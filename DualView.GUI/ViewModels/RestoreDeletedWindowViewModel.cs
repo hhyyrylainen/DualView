@@ -201,6 +201,7 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
         try
         {
             await databaseService.RestoreMediaAsync(configId);
+            await WarnAboutUnbalancedPairedCollections(configId);
 
             Dispatcher.UIThread.Post(() =>
             {
@@ -228,6 +229,32 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
         {
             logger?.LogError(e, "Failed to restore media config {Id}", configId);
             windowService?.ShowErrorWindow($"Failed to restore media config {configId}", e);
+        }
+    }
+
+    private async Task WarnAboutUnbalancedPairedCollections(long mediaId)
+    {
+        if (databaseService == null || windowService == null)
+            return;
+
+        var unbalancedCollections = new System.Collections.Generic.List<string>();
+        foreach (var collectionId in await databaseService.GetMediaCollectionsAsync(mediaId))
+        {
+            var collection = await databaseService.GetCollectionAsync(collectionId);
+            if (collection == null || collection.ImageGroupSize <= 1)
+                continue;
+
+            var contents = await databaseService.GetCollectionContents(collectionId);
+            var activeCount = contents.Count(media => !media.IsDeleted);
+            if (activeCount % collection.ImageGroupSize != 0)
+                unbalancedCollections.Add(collection.Name);
+        }
+
+        if (unbalancedCollections.Count > 0)
+        {
+            windowService.ShowNoticeWindow(
+                $"Restoring this image made these paired collections unbalanced: {string.Join(", ", unbalancedCollections)}.",
+                "Warning");
         }
     }
 

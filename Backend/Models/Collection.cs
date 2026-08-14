@@ -44,6 +44,8 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
 
     public DateTime? LastViewed { get; set; }
 
+    public int ImageGroupSize { get; set; } = 1;
+
     public bool IsDeleted { get; set; }
 
     public ICollection<MediaFolder> Folders { get; set; } = new List<MediaFolder>();
@@ -61,6 +63,7 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
             CreatedAt = CreatedAt,
             UpdatedAt = UpdatedAt,
             LastViewed = LastViewed,
+            ImageGroupSize = ImageGroupSize,
         };
     }
 }

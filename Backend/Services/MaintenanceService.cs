@@ -206,13 +206,10 @@ public class MaintenanceService : IMaintenanceService
                         var uncategorizedCollection = await db.GetCollectionAsync(Collection.UncategorizedCollectionId);
                         if (uncategorizedCollection != null)
                         {
-                            int sequenceNumber =
+                            var sequenceNumber =
                                 await db.GetNextCollectionSequenceNumberAsync(Collection.UncategorizedCollectionId);
-                            foreach (var mediaId in orphanedMedia)
-                            {
-                                await db.AddMediaToCollection(mediaId, Collection.UncategorizedCollectionId,
-                                    sequenceNumber++);
-                            }
+                            await db.AddMediaToCollection(orphanedMedia, Collection.UncategorizedCollectionId,
+                                sequenceNumber);
 
                             m.Message =
                                 $"Added {orphanedMedia.Count} orphaned media files to Uncategorized collection.";
