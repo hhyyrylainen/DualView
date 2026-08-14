@@ -433,6 +433,111 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
     }
 
+    public async Task<CollectionMediaRemovalPreview> PreviewCollectionMediaRemovalAsync(long collectionId,
+        List<long> mediaIds)
+    {
+        var selectedIds = mediaIds.Distinct().ToList();
+        var collectionMediaIds = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId && selectedIds.Contains(item.MediaFileId))
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+
+        var orphanedMediaIds = await dbContext.Set<CollectionItem>()
+            .Where(item => collectionMediaIds.Contains(item.MediaFileId) && item.CollectionId != collectionId)
+            .Select(item => item.MediaFileId)
+            .Distinct()
+            .ToListAsync();
+
+        return new CollectionMediaRemovalPreview
+        {
+            OrphanedMediaIds = collectionMediaIds.Except(orphanedMediaIds).ToList(),
+        };
+    }
+
+    public async Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId,
+        List<long> mediaIds)
+    {
+        _ = await dbContext.Collections.FindAsync(collectionId) ?? throw new ArgumentException("Collection not found");
+        var selectedIds = mediaIds.Distinct().ToHashSet();
+        var items = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId && selectedIds.Contains(item.MediaFileId))
+            .ToListAsync();
+
+        var result = new CollectionMediaRemovalResult
+        {
+            CollectionId = collectionId,
+            RemovedItems = items.Select(item => new CollectionMediaRemovalItem
+            {
+                MediaId = item.MediaFileId,
+                SequenceNumber = item.SequenceNumber,
+            }).ToList(),
+        };
+
+        if (items.Count == 0)
+            return result;
+
+        dbContext.Set<CollectionItem>().RemoveRange(items);
+        var removedMediaIds = items.Select(item => item.MediaFileId).ToList();
+        var nonOrphanedMediaIds = await dbContext.Set<CollectionItem>()
+            .Where(item => removedMediaIds.Contains(item.MediaFileId) && item.CollectionId != collectionId)
+            .Select(item => item.MediaFileId)
+            .Distinct()
+            .ToListAsync();
+        var uncategorizedIds = removedMediaIds.Except(nonOrphanedMediaIds).ToList();
+        if (collectionId == Collection.UncategorizedCollectionId)
+            uncategorizedIds.Clear();
+
+        if (uncategorizedIds.Count > 0)
+        {
+            var nextSequenceNumber = await GetNextCollectionSequenceNumberAsync(Collection.UncategorizedCollectionId);
+            dbContext.Set<CollectionItem>().AddRange(uncategorizedIds.Select((mediaId, index) => new CollectionItem
+            {
+                CollectionId = Collection.UncategorizedCollectionId,
+                MediaFileId = mediaId,
+                SequenceNumber = nextSequenceNumber + index,
+            }));
+            result.AddedToUncategorizedMediaIds = uncategorizedIds;
+        }
+
+        await SaveAsync();
+        await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
+        if (result.AddedToUncategorizedMediaIds.Count > 0)
+            await updateNotifier.NotifyCollectionContentsUpdated(Collection.UncategorizedCollectionId);
+        return result;
+    }
+
+    public async Task UndoCollectionMediaRemovalAsync(CollectionMediaRemovalResult removal)
+    {
+        var collection = await dbContext.Collections.FindAsync(removal.CollectionId) ??
+                         throw new ArgumentException("Collection not found");
+        var mediaIds = removal.RemovedItems.Select(item => item.MediaId).ToList();
+        var existingItems = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == removal.CollectionId && mediaIds.Contains(item.MediaFileId))
+            .Select(item => item.MediaFileId)
+            .ToHashSetAsync();
+        var addedToUncategorized = removal.AddedToUncategorizedMediaIds.ToHashSet();
+        var uncategorizedItems = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == Collection.UncategorizedCollectionId &&
+                           addedToUncategorized.Contains(item.MediaFileId))
+            .ToListAsync();
+        dbContext.Set<CollectionItem>().RemoveRange(uncategorizedItems);
+
+        var itemsToRestore = removal.RemovedItems
+            .Where(item => !existingItems.Contains(item.MediaId))
+            .Select(item => new CollectionItem
+            {
+                CollectionId = removal.CollectionId,
+                MediaFileId = item.MediaId,
+                SequenceNumber = item.SequenceNumber,
+            })
+            .ToList();
+        dbContext.Set<CollectionItem>().AddRange(itemsToRestore);
+        await SaveAsync();
+        await updateNotifier.NotifyCollectionContentsUpdated(collection.Id);
+        if (uncategorizedItems.Count > 0)
+            await updateNotifier.NotifyCollectionContentsUpdated(Collection.UncategorizedCollectionId);
+    }
+
     public async Task<List<long>> GetMediaCollectionsAsync(long mediaId)
     {
         return await dbContext.Set<CollectionItem>()

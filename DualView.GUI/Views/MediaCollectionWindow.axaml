@@ -19,6 +19,7 @@
             <MenuItem Header="File">
                 <MenuItem Header="Export..." Command="{Binding Export}" />
                 <MenuItem Header="Export (selected)..." Command="{Binding ExportSelected}" />
+                <MenuItem Header="Undo remove" Command="{Binding UndoRemove}" IsEnabled="{Binding CanUndoRemoval}" />
                 <Separator />
                 <MenuItem Header="Close" Command="{Binding Close}" />
             </MenuItem>

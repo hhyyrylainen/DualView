@@ -18,6 +18,11 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<List<MediaFileDTO>> GetCollectionContents(long collectionId);
     public Task<List<MediaFileDTO>> GetMediaFileSiblingsAsync(long mediaId);
 
+    public Task<CollectionMediaRemovalPreview> PreviewCollectionMediaRemovalAsync(long collectionId,
+        List<long> mediaIds);
+    public Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId, List<long> mediaIds);
+    public Task UndoCollectionMediaRemovalAsync(CollectionMediaRemovalResult removal);
+
     public Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId);
     public Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId);
     public Task<string> GetMediaFolderPath(long folderId);

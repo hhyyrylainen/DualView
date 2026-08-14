@@ -269,6 +269,30 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<CollectionMediaRemovalPreview> PreviewCollectionMediaRemovalAsync(long collectionId,
+        List<long> mediaIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/previewRemoveMedia", mediaIds);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CollectionMediaRemovalPreview>() ??
+               throw new Exception("Failed to read collection removal preview");
+    }
+
+    public async Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId,
+        List<long> mediaIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/removeSelectedMedia", mediaIds);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CollectionMediaRemovalResult>() ??
+               throw new Exception("Failed to read collection removal result");
+    }
+
+    public async Task UndoCollectionMediaRemovalAsync(CollectionMediaRemovalResult removal)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/collection/undoRemoveMedia", removal);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task ReorderCollection(long collectionId, List<long> newImageOrderIds)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/reorder", newImageOrderIds);

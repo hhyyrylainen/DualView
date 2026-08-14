@@ -158,6 +158,27 @@ public class CollectionController : Controller
         return Ok();
     }
 
+    [HttpPost("{id:long}/previewRemoveMedia")]
+    public async Task<ActionResult<CollectionMediaRemovalPreview>> PreviewRemoveMedia([Required] long id,
+        [FromBody] List<long> mediaIds)
+    {
+        return await databaseService.PreviewCollectionMediaRemovalAsync(id, mediaIds);
+    }
+
+    [HttpPost("{id:long}/removeSelectedMedia")]
+    public async Task<ActionResult<CollectionMediaRemovalResult>> RemoveSelectedMedia([Required] long id,
+        [FromBody] List<long> mediaIds)
+    {
+        return await databaseService.RemoveMediaFromCollectionAsync(id, mediaIds);
+    }
+
+    [HttpPost("undoRemoveMedia")]
+    public async Task<IActionResult> UndoRemoveMedia([FromBody] CollectionMediaRemovalResult removal)
+    {
+        await databaseService.UndoCollectionMediaRemovalAsync(removal);
+        return Ok();
+    }
+
     [HttpPost("{id:long}/appliedTag")]
     public async Task<ActionResult<long>> AddAppliedTag([Required] long id, [FromBody] AddAppliedTagRequest request)
     {
