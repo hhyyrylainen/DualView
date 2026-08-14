@@ -45,7 +45,8 @@ public interface IDatabaseCommonService
     ///   Pages API to get a subset of media in a collection
     /// </summary>
     public Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
-        CollectionSortColumn sortColumn, SortDirection sortDirection, string? search = null);
+        CollectionSortColumn sortColumn = CollectionSortColumn.CollectionOrder,
+        SortDirection sortDirection = SortDirection.Ascending, string? search = null);
 
     public Task<bool> IsMediaSafeToDeleteAsync(long mediaId);
     public Task DeleteMediaAsync(long mediaId);

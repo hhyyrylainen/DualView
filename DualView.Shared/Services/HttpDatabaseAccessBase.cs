@@ -102,7 +102,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     }
 
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
-        CollectionSortColumn sortColumn, SortDirection sortDirection, string? search = null)
+        CollectionSortColumn sortColumn = CollectionSortColumn.CollectionOrder,
+        SortDirection sortDirection = SortDirection.Ascending, string? search = null)
     {
         var url =
             $"api/v1/collection/{collectionId}/contents?page={page}&pageSize={pageSize}&sortColumn={sortColumn}&sortDirection={sortDirection}";

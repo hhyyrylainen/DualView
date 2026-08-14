@@ -64,4 +64,30 @@ public class DatabaseServiceReorderTests
         Assert.Equal(1, items[1].SequenceNumber);
         Assert.Equal(2, items[2].SequenceNumber);
     }
+
+    [Fact]
+    public async Task GetCollectionContents_DefaultsToCollectionOrder()
+    {
+        // Arrange
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+
+        var collection = new Collection("Test");
+        var media1 = new MediaFile("z-file", "h1") { Id = 10 };
+        var media2 = new MediaFile("a-file", "h2") { Id = 20 };
+        await context.Collections.AddAsync(collection);
+        await context.MediaFiles.AddRangeAsync(media1, media2);
+
+        collection.Items.Add(new CollectionItem { Collection = collection, MediaFile = media1, SequenceNumber = 0 });
+        collection.Items.Add(new CollectionItem { Collection = collection, MediaFile = media2, SequenceNumber = 1 });
+        await context.SaveChangesAsync();
+
+        // Act
+        var (items, total) = await service.GetCollectionContents(collection.Id, 0, 10);
+
+        // Assert
+        Assert.Equal(2, total);
+        Assert.Equal([10, 20], items.Select(item => item.Id));
+    }
 }

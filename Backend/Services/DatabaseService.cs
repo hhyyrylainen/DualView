@@ -767,7 +767,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     }
 
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
-        CollectionSortColumn sortColumn, SortDirection sortDirection, string? search = null)
+        CollectionSortColumn sortColumn = CollectionSortColumn.CollectionOrder,
+        SortDirection sortDirection = SortDirection.Ascending, string? search = null)
     {
         var query = dbContext.Set<CollectionItem>()
             .Where(ci => ci.CollectionId == collectionId);
