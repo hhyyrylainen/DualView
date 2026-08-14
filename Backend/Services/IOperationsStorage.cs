@@ -8,6 +8,8 @@ public interface IOperationsStorage
 {
     public IRunningOperation? GetOperation(long id);
 
+    public IRunningOperation? RemoveOperation(long id);
+
     public long GetNextOperationId();
 
     public void RegisterOperation(IRunningOperation operation);
@@ -44,6 +46,17 @@ public class OperationsStorage : IOperationsStorage
     public long GetNextOperationId()
     {
         return Interlocked.Increment(ref nextId);
+    }
+
+    public IRunningOperation? RemoveOperation(long id)
+    {
+        lock (operations)
+        {
+            if (!operations.Remove(id, out var operation))
+                return null;
+
+            return operation;
+        }
     }
 
     public void RegisterOperation(IRunningOperation operation)
