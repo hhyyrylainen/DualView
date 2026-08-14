@@ -112,6 +112,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<AppliedTag>> GetMediaAppliedTagsAsync(long mediaId);
     public Task<List<AppliedTag>> GetCollectionAppliedTagsAsync(long collectionId);
     public Task<AppliedTag?> GetAppliedTagAsync(long id);
+    public Task DeleteOrphanedAppliedTagsAsync();
 
     public Task<Tag?> GetTagByNameOrAliasAsync(string name);
     public Task<TagBreakRule?> GetTagBreakRuleByStrAsync(string str);

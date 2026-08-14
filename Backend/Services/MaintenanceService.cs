@@ -38,6 +38,7 @@ public class MaintenanceService : IMaintenanceService
         allJobs.Add(new DeleteOldProcessed());
         allJobs.Add(new PurgeDeletedMedia());
         allJobs.Add(new PurgeDeletedCollections());
+        allJobs.Add(new DeleteOrphanedAppliedTags());
 
         maintenanceThread = new Thread(Run);
         maintenanceThread.Start();
@@ -671,6 +672,23 @@ public class MaintenanceService : IMaintenanceService
             }
 
             jobRecord.StatusMessage = $"Purged {collectionsPurged} collections";
+            return true;
+        }
+    }
+
+    private class DeleteOrphanedAppliedTags : MaintenanceJob
+    {
+        public override string Name => "DeleteOrphanedAppliedTags";
+        public override TimeSpan Interval => TimeSpan.FromDays(14);
+
+        protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
+            IDatabaseService databaseService, IServiceScope scope, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return false;
+
+            await databaseService.DeleteOrphanedAppliedTagsAsync();
+            jobRecord.StatusMessage = "Deleted orphaned applied tags";
             return true;
         }
     }

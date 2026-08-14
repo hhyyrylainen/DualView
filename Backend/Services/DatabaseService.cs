@@ -1651,6 +1651,21 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
     }
 
+    public async Task DeleteOrphanedAppliedTagsAsync()
+    {
+        var orphanedAppliedTags = await dbContext.AppliedTags
+            .IgnoreQueryFilters()
+            .Where(appliedTag => !appliedTag.MediaFiles.Any() && !appliedTag.Collections.Any())
+            .ToListAsync();
+
+        if (orphanedAppliedTags.Count == 0)
+            return;
+
+        dbContext.AppliedTags.RemoveRange(orphanedAppliedTags);
+        await SaveAsync();
+        logger.LogInformation("Deleted {Count} orphaned applied tags", orphanedAppliedTags.Count);
+    }
+
     // Download Galleries
     public async Task<long> CreateDownloadGalleryAsync(string galleryUrl)
     {
