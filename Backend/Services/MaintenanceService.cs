@@ -12,6 +12,7 @@ public class MaintenanceService : IMaintenanceService
     private static readonly TimeSpan OldProcessedFileTime = TimeSpan.FromDays(60);
     private static readonly TimeSpan DeletedImageTime = TimeSpan.FromDays(60);
     private static readonly TimeSpan DeletedCollectionTime = TimeSpan.FromHours(48);
+    private static readonly TimeSpan TemporaryMediaTime = TimeSpan.FromHours(24);
 
     private readonly ILogger<MaintenanceService> logger;
     private readonly IServiceScopeFactory scopeFactory;
@@ -37,6 +38,7 @@ public class MaintenanceService : IMaintenanceService
         allJobs.Add(new DeleteOldProcessed());
         allJobs.Add(new PurgeDeletedMedia());
         allJobs.Add(new PurgeDeletedCollections());
+        allJobs.Add(new PurgeTemporaryMedia());
         allJobs.Add(new DeleteOrphanedAppliedTags());
 
         maintenanceThread = new Thread(Run);
@@ -682,6 +684,32 @@ public class MaintenanceService : IMaintenanceService
             }
 
             jobRecord.StatusMessage = $"Purged {collectionsPurged} collections";
+            return true;
+        }
+    }
+
+    private class PurgeTemporaryMedia : MaintenanceJob
+    {
+        public override string Name => "PurgeTemporaryMedia";
+        public override TimeSpan Interval => TimeSpan.FromDays(1);
+        protected override bool IsPurgeJob => true;
+
+        protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
+            IDatabaseService databaseService, IServiceScope scope, CancellationToken cancellationToken)
+        {
+            var temporaryMedia = await databaseService.GetEligibleTemporaryMediaFilesForPurgeAsync(TemporaryMediaTime);
+            var mediaPurged = 0;
+            foreach (var media in temporaryMedia)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                await databaseService.DeleteMediaAsync(media.Id);
+                await databaseService.PurgeMediaAsync(media.Id);
+                ++mediaPurged;
+            }
+
+            jobRecord.StatusMessage = $"Purged {mediaPurged} temporary media files";
             return true;
         }
     }

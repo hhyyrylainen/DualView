@@ -1380,6 +1380,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
+    public async Task<List<MediaFile>> GetEligibleTemporaryMediaFilesForPurgeAsync(TimeSpan timeSinceUpdate)
+    {
+        var cutoffTime = DateTime.UtcNow - timeSinceUpdate;
+
+        return await dbContext.MediaFiles
+            .IgnoreQueryFilters()
+            .Where(media => media.IsTemporary && media.UpdatedAt <= cutoffTime)
+            .ToListAsync();
+    }
+
     public async Task<List<Collection>> GetEligibleCollectionsForPurgeAsync(TimeSpan timeSinceDeletion)
     {
         var cutoffTime = DateTime.UtcNow - timeSinceDeletion;
