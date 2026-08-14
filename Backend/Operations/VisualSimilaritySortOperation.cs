@@ -12,14 +12,16 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
 {
     private readonly long collectionId;
     private readonly List<MediaFile> orderedCollectionItems = new();
+    private readonly List<MediaFile> imageItems = new();
     private readonly List<SimilarityImage> images = new();
-    private readonly List<(int First, int Second)> comparisons = new();
 
     private int groupSize = 1;
 
     private double[,] similarityScores = new double[0, 0];
 
-    private int comparisonIndex;
+    private string? storageLocation;
+    private int loadedImageCount;
+    private int similarityImageIndex;
 
     public IReadOnlyList<long>? SortedOrder { get; private set; }
 
@@ -39,9 +41,13 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
             Completed = Completed,
             Paused = RunnerPaused,
             Error = HasError,
-            Message = comparisonIndex == 0
-                ? "Loading collection images..."
-                : $"Compared {Processed} of {Total} image pairs",
+            Message = Processed == 0
+                ? "Loading collection information..."
+                : loadedImageCount < imageItems.Count
+                    ? $"Loaded {loadedImageCount} of {imageItems.Count} images"
+                    : similarityImageIndex < images.Count
+                        ? $"Calculating similarities for image {similarityImageIndex + 1} of {images.Count}"
+                        : "Creating sorted order...",
         };
     }
 
@@ -54,56 +60,49 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
         orderedCollectionItems.AddRange(collectionItems);
 
         var dataFolderService = CreatedScope.ServiceProvider.GetRequiredService<IDataFolderService>();
-        var storage = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
+        storageLocation = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
 
-        // TODO: should we load all the images here? This seems pretty long for a first step...
-        foreach (var media in collectionItems.Where(media => !media.IsDeleted && media.MediaType.IsImage()))
+        imageItems.AddRange(collectionItems.Where(media => !media.IsDeleted && media.MediaType.IsImage()));
+
+        groupSize = Math.Max(1, collection.ImageGroupSize);
+        similarityScores = new double[imageItems.Count, imageItems.Count];
+
+        // Count the database-loading phase as the first completed step.
+        Processed = 1;
+
+        return 1 + imageItems.Count * 2;
+    }
+
+    protected override async Task<bool> ProcessNextItem()
+    {
+        if (loadedImageCount < imageItems.Count)
         {
-            var path = Path.Join(storage, media.PathRelativeToStorage());
+            var media = imageItems[loadedImageCount++];
+            var path = Path.Join(storageLocation, media.PathRelativeToStorage());
             var image = new MagickImage(path);
             image.AutoOrient();
 
             // TODO: pick the most optimal size
             image.Resize(new MagickGeometry(96, 96) { IgnoreAspectRatio = true });
             images.Add(new SimilarityImage(media.Id, image));
+            return true;
         }
 
-        similarityScores = new double[images.Count, images.Count];
-        groupSize = Math.Max(1, collection.ImageGroupSize);
-        if (groupSize <= 1)
+        if (similarityImageIndex < images.Count)
         {
-            for (var first = 0; first < images.Count; ++first)
+            var groupEnd = groupSize <= 1
+                ? images.Count
+                : Math.Min((similarityImageIndex / groupSize + 1) * groupSize, images.Count);
+            for (var second = similarityImageIndex + 1; second < groupEnd; ++second)
             {
-                for (var second = first + 1; second < images.Count; ++second)
-                    comparisons.Add((first, second));
+                var score = images[similarityImageIndex].Image.Compare(images[second].Image,
+                    ErrorMetric.RootMeanSquared);
+                similarityScores[similarityImageIndex, second] = score;
+                similarityScores[second, similarityImageIndex] = score;
             }
-        }
-        else
-        {
-            for (var first = 0; first < images.Count; first += groupSize)
-            {
-                var groupEnd = Math.Min(first + groupSize, images.Count);
-                for (var groupFirst = first; groupFirst < groupEnd; ++groupFirst)
-                {
-                    for (var groupSecond = groupFirst + 1; groupSecond < groupEnd; ++groupSecond)
-                        comparisons.Add((groupFirst, groupSecond));
-                }
-            }
-        }
 
-        return comparisons.Count;
-    }
-
-    protected override async Task<bool> ProcessNextItem()
-    {
-        if (comparisonIndex < comparisons.Count)
-        {
-            var (first, second) = comparisons[comparisonIndex++];
-            var score = images[first].Image.Compare(images[second].Image, ErrorMetric.RootMeanSquared);
-            similarityScores[first, second] = score;
-            similarityScores[second, first] = score;
-            if (comparisonIndex < comparisons.Count)
-                return true;
+            ++similarityImageIndex;
+            return true;
         }
 
         CreateSortedOrder();
@@ -139,7 +138,7 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
 
         var sortedImageIds = images.Count == 0
             ? new List<long>()
-            : comparisons.Count == 0
+            : images.Count == 1
                 ? images.Select(image => image.MediaId).ToList()
                 : BuildSortedImageIds();
         var sortedImageIndex = 0;
