@@ -16,4 +16,6 @@ public sealed class CollectionMediaRemovalResult
     public long CollectionId { get; set; }
     public List<CollectionMediaRemovalItem> RemovedItems { get; set; } = new();
     public List<long> AddedToUncategorizedMediaIds { get; set; } = new();
+    public List<long> DeletedMediaIds { get; set; } = new();
+    public bool CollectionWasDeleted { get; set; }
 }

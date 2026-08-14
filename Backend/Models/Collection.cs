@@ -63,6 +63,7 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
             CreatedAt = CreatedAt,
             UpdatedAt = UpdatedAt,
             LastViewed = LastViewed,
+            IsDeleted = IsDeleted,
             ImageGroupSize = ImageGroupSize,
         };
     }

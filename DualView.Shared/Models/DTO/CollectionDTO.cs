@@ -19,4 +19,6 @@ public class CollectionDTO(string name)
     public DateTime? LastViewed { get; set; }
 
     public int ImageGroupSize { get; set; } = 1;
+
+    public bool IsDeleted { get; set; }
 }
