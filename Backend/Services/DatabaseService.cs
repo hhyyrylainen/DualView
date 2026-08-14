@@ -986,10 +986,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.Collections.Where(c => c.Folders.Any(f => f.Id == folderId)).ToListAsync();
     }
 
-    public async Task<Collection?> GetCollectionByNameAndFolder(string name, long folderId)
+    public async Task<Collection?> GetCollectionByNameAsync(string name)
     {
-        return await dbContext.Collections.FirstOrDefaultAsync(c =>
-            c.Name == name && c.Folders.Any(f => f.Id == folderId));
+        var lowercaseName = name.Trim().ToLowerInvariant();
+        return await dbContext.Collections.FirstOrDefaultAsync(c => c.NameLowerCase == lowercaseName);
     }
 
     public async Task<Collection?> GetCollectionAsync(long id)
@@ -1295,10 +1295,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task SaveUploadSectionAsync(UploadSection section)
     {
         section.Name = section.Name.Trim();
-        section.TargetCollectionName = section.TargetCollectionName.Trim();
-        var targetCollection = await GetCollectionByNameAndFolder(section.TargetCollectionName, section.TargetFolderId);
+        var targetCollection = await GetCollectionByNameAsync(section.Name);
         if (targetCollection != null)
-            section.TargetCollectionName = targetCollection.Name;
+            section.Name = targetCollection.Name;
         section.UpdatedAt = DateTime.UtcNow;
 
         // TODO: signal R notice about section details update
@@ -1358,10 +1357,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (selectedIds.Count == 0)
             return;
 
-        var targetCollectionName = string.IsNullOrWhiteSpace(section.TargetCollectionName)
-            ? section.Name.Trim()
-            : section.TargetCollectionName.Trim();
-        var collection = await GetCollectionByNameAndFolder(targetCollectionName, section.TargetFolderId);
+        var targetCollectionName = section.Name.Trim();
+        var collection = await GetCollectionByNameAsync(targetCollectionName);
         if (collection == null)
         {
             collection =
@@ -1372,7 +1369,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
         else
         {
-            section.TargetCollectionName = collection.Name;
+            section.Name = collection.Name;
         }
 
         var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
@@ -2052,9 +2049,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             Selected = section.Selected,
             RemoveAfterImport = section.RemoveAfterImport,
             TargetFolderId = section.TargetFolderId,
-            TargetCollectionName = string.IsNullOrWhiteSpace(section.TargetCollectionName)
-                ? section.Name
-                : section.TargetCollectionName,
             Media = section.Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
         }).ToList();
     }
@@ -2065,15 +2059,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return (await ((IClientDatabaseService)this).GetUploadSectionsAsync()).First(item => item.Id == section.Id);
     }
 
-    async Task IClientDatabaseService.SaveUploadSectionAsync(long sectionId, UpdateUploadSectionRequest request)
+    async Task IClientDatabaseService.SaveUploadSectionAsync(UploadSectionDTO request)
     {
-        var section = (await GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == sectionId)
+        var section = (await GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == request.Id)
                       ?? throw new ArgumentException("Section not found");
         section.Name = request.Name;
         section.KeepTarget = request.KeepTarget;
         section.RemoveAfterImport = request.RemoveAfterImport;
         section.TargetFolderId = request.TargetFolderId;
-        section.TargetCollectionName = request.TargetCollectionName;
         await SaveUploadSectionAsync(section);
     }
 

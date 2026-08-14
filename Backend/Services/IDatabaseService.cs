@@ -30,7 +30,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<MediaFolder?> GetMediaFolderFromPathAsync(string path);
 
     public Task<List<Collection>> GetCollectionsInFolderAsync(long folderId);
-    public Task<Collection?> GetCollectionByNameAndFolder(string name, long folderId);
+    public Task<Collection?> GetCollectionByNameAsync(string name);
 
     // Collections
     public Task<Collection?> GetCollectionAsync(long id);
