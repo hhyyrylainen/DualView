@@ -113,6 +113,12 @@
                         </ButtonSpinner>
 
                         <Border Grid.Column="0" Grid.Row="11" MinHeight="25"></Border>
+
+                        <CheckBox Grid.Column="1" Grid.Row="12" Grid.ColumnSpan="2"
+                                  IsChecked="{Binding HoldPurge}"
+                                  ToolTip.Tip="Prevents maintenance jobs from permanently deleting deleted items until this is turned on.">
+                            Hold purge
+                        </CheckBox>
                     </Grid>
                 </ScrollViewer>
                 <StackPanel Grid.Row="2" HorizontalAlignment="Center" Orientation="Horizontal"

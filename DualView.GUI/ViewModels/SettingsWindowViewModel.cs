@@ -171,6 +171,20 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public bool HoldPurge
+    {
+        get => generalSettings?.HoldPurge ?? false;
+        set
+        {
+            if (generalSettings == null || generalSettings.HoldPurge == value)
+                return;
+
+            generalSettings.HoldPurge = value;
+            UnsavedMainSettings = true;
+            OnPropertyChanged();
+        }
+    }
+
     // Other properties
 
     public HamburgerMenuViewModel Hamburger { get; }
@@ -264,6 +278,7 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(AIRunManagerUrl));
         OnPropertyChanged(nameof(AudioBufferingMs));
         OnPropertyChanged(nameof(AudioBufferingMsText));
+        OnPropertyChanged(nameof(HoldPurge));
     }
 
     public void Dispose()

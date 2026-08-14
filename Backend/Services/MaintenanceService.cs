@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security.Cryptography;
 using Backend.Models;
 using DualView.Shared.Utils;
 using Microsoft.Extensions.DependencyInjection;
@@ -474,11 +473,20 @@ public class MaintenanceService : IMaintenanceService
     {
         public abstract string Name { get; }
         public abstract TimeSpan Interval { get; }
+        protected virtual bool IsPurgeJob => false;
 
         public virtual async Task Run(MaintenanceJobRecord jobRecord, IDatabaseService databaseService,
             IServiceScope scope, CancellationToken cancellationToken)
         {
             jobRecord.StatusMessage = string.Empty;
+
+            if (IsPurgeJob && (await databaseService.GetAppSettingsAsync()).HoldPurge)
+            {
+                jobRecord.StatusMessage = "Skipped because purge hold is enabled";
+                jobRecord.LastPerformed = DateTime.UtcNow;
+                jobRecord.Failed = false;
+                return;
+            }
 
             if (await RunInternal(jobRecord, databaseService, scope, cancellationToken))
             {
@@ -630,6 +638,7 @@ public class MaintenanceService : IMaintenanceService
     {
         public override string Name => "PurgeDeletedMedia";
         public override TimeSpan Interval => TimeSpan.FromDays(1);
+        protected override bool IsPurgeJob => true;
 
         protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
             IDatabaseService databaseService, IServiceScope scope, CancellationToken cancellationToken)
@@ -656,6 +665,7 @@ public class MaintenanceService : IMaintenanceService
     {
         public override string Name => "PurgeDeletedCollections";
         public override TimeSpan Interval => TimeSpan.FromHours(6);
+        protected override bool IsPurgeJob => true;
 
         protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
             IDatabaseService databaseService, IServiceScope scope, CancellationToken cancellationToken)

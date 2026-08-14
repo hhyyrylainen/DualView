@@ -21,6 +21,8 @@ public class DualViewSettings
 
     public int AudioBufferingMs { get; set; } = 60;
 
+    public bool HoldPurge { get; set; }
+
     public void UpdateFromClient(DualViewSettings newSettings)
     {
         if (newSettings.LocalMediaStorageLocation != null)
@@ -30,5 +32,6 @@ public class DualViewSettings
             GUIStartupCommand = newSettings.GUIStartupCommand;
 
         AudioBufferingMs = newSettings.AudioBufferingMs;
+        HoldPurge = newSettings.HoldPurge;
     }
 }
