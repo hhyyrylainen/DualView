@@ -399,8 +399,16 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
-        visualSimilarityCancellation?.Cancel();
-        visualSimilarityCancellation?.Dispose();
+        try
+        {
+            visualSimilarityCancellation?.Cancel();
+            visualSimilarityCancellation?.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Not serious if already disposed
+        }
+
         foreach (var item in CollectionItems)
             item.Dispose();
         Hamburger.Dispose();
