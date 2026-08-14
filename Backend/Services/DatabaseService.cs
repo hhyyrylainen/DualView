@@ -349,7 +349,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .CountAsync();
         var activeNewItemCount = newMediaIds.Count(mediaId => !mediaFiles[mediaId].IsDeleted);
         if ((activeItemCount + activeNewItemCount) % collection.ImageGroupSize != 0)
-            throw new InvalidOperationException($"The collection requires images to be added in groups of {collection.ImageGroupSize}.");
+        {
+            throw new InvalidOperationException(
+                $"The collection requires images to be added in groups of {collection.ImageGroupSize}.");
+        }
 
         var items = newMediaIds.Select(mediaId => new CollectionItem
         {
@@ -374,7 +377,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Where(ci => ci.CollectionId == collectionId && !ci.MediaFile.IsDeleted)
             .CountAsync();
         if (activeItemCount % imageGroupSize != 0)
-            throw new InvalidOperationException($"The collection has {activeItemCount} active images, which is not divisible by {imageGroupSize}.");
+        {
+            throw new InvalidOperationException(
+                $"The collection has {activeItemCount} active images, which is not divisible by {imageGroupSize}.");
+        }
 
         collection.ImageGroupSize = imageGroupSize;
         await SaveAsync();
@@ -1091,7 +1097,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Where(ci => ci.CollectionId == collectionId && !ci.MediaFile.IsDeleted)
             .CountAsync();
         if ((activeItemCount + 1) % collection.ImageGroupSize != 0)
-            throw new InvalidOperationException($"The collection requires images to be added in groups of {collection.ImageGroupSize}.");
+        {
+            throw new InvalidOperationException(
+                $"The collection requires images to be added in groups of {collection.ImageGroupSize}.");
+        }
 
         await dbContext.MediaFiles.AddAsync(mediaItem);
         await SaveAsync();
