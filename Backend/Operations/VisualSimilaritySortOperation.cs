@@ -170,23 +170,86 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
                 .ToList();
         }
 
+        return BuildGreedyInsertedImageOrder()
+            .Select(index => images[index].MediaId)
+            .ToList();
+    }
+
+    private List<int> BuildGreedyInsertedImageOrder()
+    {
+        if (images.Count == 0)
+            return new List<int>();
+
+        if (images.Count == 1)
+            return [0];
+
         var remaining = new HashSet<int>(Enumerable.Range(0, images.Count));
-        var result = new List<long>(images.Count);
-        while (remaining.Count > 0)
+
+        var bestFirst = 0;
+        var bestSecond = 1;
+        var bestScore = similarityScores[bestFirst, bestSecond];
+
+        for (var first = 0; first < images.Count; ++first)
         {
-            var first = remaining.Min();
-            remaining.Remove(first);
-            result.Add(images[first].MediaId);
-
-            if (remaining.Count == 0)
-                break;
-
-            var mostSimilar = remaining.MinBy(index => similarityScores[first, index]);
-            remaining.Remove(mostSimilar);
-            result.Add(images[mostSimilar].MediaId);
+            for (var second = first + 1; second < images.Count; ++second)
+            {
+                var score = similarityScores[first, second];
+                if (score < bestScore)
+                {
+                    bestScore = score;
+                    bestFirst = first;
+                    bestSecond = second;
+                }
+            }
         }
 
-        return result;
+        var ordered = new List<int> { bestFirst, bestSecond };
+        remaining.Remove(bestFirst);
+        remaining.Remove(bestSecond);
+
+        while (remaining.Count > 0)
+        {
+            var bestCandidate = -1;
+            var bestInsertIndex = -1;
+            var bestInsertCost = double.PositiveInfinity;
+
+            foreach (var candidate in remaining)
+            {
+                for (var insertIndex = 0; insertIndex <= ordered.Count; ++insertIndex)
+                {
+                    var cost = GetInsertionCost(ordered, insertIndex, candidate);
+
+                    if (cost < bestInsertCost ||
+                        (cost.Equals(bestInsertCost) && candidate < bestCandidate))
+                    {
+                        bestInsertCost = cost;
+                        bestCandidate = candidate;
+                        bestInsertIndex = insertIndex;
+                    }
+                }
+            }
+
+            ordered.Insert(bestInsertIndex, bestCandidate);
+            remaining.Remove(bestCandidate);
+        }
+
+        return ordered;
+    }
+
+    private double GetInsertionCost(IReadOnlyList<int> ordered, int insertIndex, int candidate)
+    {
+        if (insertIndex == 0)
+            return similarityScores[candidate, ordered[0]];
+
+        if (insertIndex == ordered.Count)
+            return similarityScores[ordered[^1], candidate];
+
+        var previous = ordered[insertIndex - 1];
+        var next = ordered[insertIndex];
+
+        return similarityScores[previous, candidate]
+               + similarityScores[candidate, next]
+               - similarityScores[previous, next];
     }
 
     private double GetScoreForGroup(IEnumerable<(SimilarityImage image, int index)> group, int itemIndex)
