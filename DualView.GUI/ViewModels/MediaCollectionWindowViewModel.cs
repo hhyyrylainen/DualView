@@ -79,6 +79,12 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public string CollectionStatistics => Collection == null ? "" : $"{CollectionItemCount} images";
     public int CollectionItemCount { get; private set; }
 
+    public string CollectionTags
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "TODO: implement tag fetching";
+
     public string SearchText
     {
         get => searchText;
@@ -165,6 +171,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
                 CollectionScrollOffset = new Vector(0, 0);
                 _ = RefreshItems();
             }
+
             OnPropertyChanged(nameof(CanNavigateBackwards));
             OnPropertyChanged(nameof(CanNavigateForwards));
         }
@@ -242,6 +249,11 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
             $"Folder IDs: {folders}", "Collection information");
     }
 
+    public void ShowTagEditor()
+    {
+        // TODO: Implement tag editor
+    }
+
     public async Task RefreshItems()
     {
         if (databaseService == null || collectionId == null)
@@ -290,10 +302,10 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
                     {
                         await Task.Delay(50);
                         Dispatcher.UIThread.Post(() =>
-                        {
-                            if (restoreVersion == scrollOffsetRestoreVersion)
-                                CollectionScrollOffset = scrollOffset;
-                        },
+                            {
+                                if (restoreVersion == scrollOffsetRestoreVersion)
+                                    CollectionScrollOffset = scrollOffset;
+                            },
                             DispatcherPriority.Background);
                     });
                 }

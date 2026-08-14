@@ -32,6 +32,7 @@
                 <MenuItem Header="Delete collection and images" Command="{Binding DeleteCollectionAndImages}" />
             </MenuItem>
             <MenuItem Header="Tools">
+                <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />
                 <MenuItem Header="Get Info" Command="{Binding ShowCollectionInfo}" />
             </MenuItem>
         </Menu>
@@ -76,6 +77,8 @@
                 <TextBlock Text="{Binding CollectionCreatedAt, StringFormat='Created: {0:g}'}"
                            VerticalAlignment="Center" Margin="8 0" />
                 <TextBlock Text="{Binding CollectionStatistics}" VerticalAlignment="Center" Margin="10 0 0 0" />
+                <TextBlock Text="{Binding CollectionTags}" VerticalAlignment="Center" Margin="10 0 0 0" MaxLines="1"
+                           TextTrimming="CharacterEllipsis" />
             </StackPanel>
             <TextBlock Grid.Column="2" Text="Page " VerticalAlignment="Center" />
             <TextBlock Grid.Column="3" Text="{Binding CurrentPage, StringFormat='{}{0} / '}" VerticalAlignment="Center" />
