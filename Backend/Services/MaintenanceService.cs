@@ -12,6 +12,7 @@ public class MaintenanceService : IMaintenanceService
     private static readonly TimeSpan OldThumbnailTime = TimeSpan.FromDays(90);
     private static readonly TimeSpan OldProcessedFileTime = TimeSpan.FromDays(60);
     private static readonly TimeSpan DeletedImageTime = TimeSpan.FromDays(60);
+    private static readonly TimeSpan DeletedCollectionTime = TimeSpan.FromHours(48);
 
     private readonly ILogger<MaintenanceService> logger;
     private readonly IServiceScopeFactory scopeFactory;
@@ -36,6 +37,7 @@ public class MaintenanceService : IMaintenanceService
         allJobs.Add(new DeleteOldThumbnails());
         allJobs.Add(new DeleteOldProcessed());
         allJobs.Add(new PurgeDeletedMedia());
+        allJobs.Add(new PurgeDeletedCollections());
 
         maintenanceThread = new Thread(Run);
         maintenanceThread.Start();
@@ -645,6 +647,30 @@ public class MaintenanceService : IMaintenanceService
             }
 
             jobRecord.StatusMessage = $"Purged {filesPurged} media files";
+            return true;
+        }
+    }
+
+    private class PurgeDeletedCollections : MaintenanceJob
+    {
+        public override string Name => "PurgeDeletedCollections";
+        public override TimeSpan Interval => TimeSpan.FromHours(6);
+
+        protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
+            IDatabaseService databaseService, IServiceScope scope, CancellationToken cancellationToken)
+        {
+            var collectionsToPurge = await databaseService.GetEligibleCollectionsForPurgeAsync(DeletedCollectionTime);
+            var collectionsPurged = 0;
+            foreach (var collection in collectionsToPurge)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                await databaseService.PurgeCollectionAsync(collection.Id);
+                ++collectionsPurged;
+            }
+
+            jobRecord.StatusMessage = $"Purged {collectionsPurged} collections";
             return true;
         }
     }
