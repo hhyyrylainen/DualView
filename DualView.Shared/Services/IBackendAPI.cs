@@ -16,6 +16,8 @@ public interface IBackendAPI
     public Task<bool> PauseOperation(long operationId);
     public Task<bool> ResumeOperation(long operationId);
     public Task<bool> CancelOperation(long operationId);
+    public Task<long> StartCollectionVisualSimilaritySort(long collectionId);
+    public Task<List<long>> GetCollectionVisualSimilarityOrder(long operationId);
 
     // Maintenance
     public Task<long> StartImageExistCheck();

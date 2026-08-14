@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using Avalonia;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
@@ -20,6 +21,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly ILogger<MediaCollectionWindowViewModel>? logger;
     private readonly IClientDatabaseService? databaseService;
+    private readonly IBackendAPI? backendAPI;
     private readonly IWindowService? windowService;
     private readonly IServiceProvider? serviceProvider;
 
@@ -33,6 +35,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 
     private Vector? pendingScrollOffsetRestore;
     private int scrollOffsetRestoreVersion;
+    private CancellationTokenSource? visualSimilarityCancellation;
+    private List<long>? visualSimilarityOrder;
 
     public MediaCollectionWindowViewModel()
     {
@@ -44,10 +48,11 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     [ActivatorUtilitiesConstructor]
     public MediaCollectionWindowViewModel(ILogger<MediaCollectionWindowViewModel> logger, IWindowService windowService,
         IClientDatabaseService databaseService, IBackendStatusService backendStatusService,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider, IBackendAPI backendAPI)
     {
         this.logger = logger;
         this.databaseService = databaseService;
+        this.backendAPI = backendAPI;
         this.windowService = windowService;
         this.serviceProvider = serviceProvider;
         Hamburger = new HamburgerMenuViewModel(backendStatusService);
@@ -79,6 +84,25 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public DateTime? CollectionCreatedAt => Collection?.CreatedAt;
     public string CollectionStatistics => Collection == null ? "" : $"{CollectionItemCount} images";
     public int CollectionItemCount { get; private set; }
+
+    public bool IsVisualSimilarityMode
+    {
+        get;
+        private set
+        {
+            if (SetProperty(ref field, value))
+            {
+                OnPropertyChanged(nameof(CanNavigateBackwards));
+                OnPropertyChanged(nameof(CanNavigateForwards));
+            }
+        }
+    }
+
+    public string VisualSimilarityStatus
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = string.Empty;
 
     public bool IsPairedImageMode
     {
@@ -213,13 +237,14 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    public bool CanNavigateBackwards => CurrentPage > 1;
-    public bool CanNavigateForwards => CurrentPage < TotalPages;
+    public bool CanNavigateBackwards => !IsVisualSimilarityMode && CurrentPage > 1;
+    public bool CanNavigateForwards => !IsVisualSimilarityMode && CurrentPage < TotalPages;
     public int SelectedCount => CollectionItems.Count(item => item.Selected);
     public event EventHandler? CloseRequested;
 
     public async Task Initialize(long id, string? fallbackName = null)
     {
+        ExitVisualSimilarityMode();
         collectionId = id;
         pageScrollOffsets.Clear();
         pendingScrollOffsetRestore = null;
@@ -267,6 +292,26 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         // TODO: Implement tag editor
     }
 
+    public void StartVisualSimilaritySort()
+    {
+        _ = StartVisualSimilaritySortAsync();
+    }
+
+    public void ExitVisualSimilarityMode()
+    {
+        visualSimilarityCancellation?.Cancel();
+        visualSimilarityCancellation?.Dispose();
+        visualSimilarityCancellation = null;
+
+        if (!IsVisualSimilarityMode && string.IsNullOrEmpty(VisualSimilarityStatus))
+            return;
+
+        IsVisualSimilarityMode = false;
+        visualSimilarityOrder = null;
+        VisualSimilarityStatus = string.Empty;
+        _ = RefreshItems();
+    }
+
     public async Task RefreshItems()
     {
         if (databaseService == null || collectionId == null)
@@ -274,10 +319,32 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var (content, totalItems) = await databaseService.GetCollectionContents(collectionId.Value, CurrentPage - 1,
-                PageSize, SortColumn, SortDirection, SearchText);
+            List<MediaFileDTO> content;
+            int totalItems;
+            if (IsVisualSimilarityMode)
+            {
+                content = await databaseService.GetCollectionContents(collectionId.Value);
+                if (visualSimilarityOrder != null)
+                {
+                    var contentById = content.ToDictionary(item => item.Id);
+                    content = visualSimilarityOrder
+                        .Where(contentById.ContainsKey)
+                        .Select(mediaId => contentById[mediaId])
+                        .ToList();
+                }
+
+                if (IsReversed)
+                    content.Reverse();
+                totalItems = content.Count;
+            }
+            else
+            {
+                (content, totalItems) = await databaseService.GetCollectionContents(collectionId.Value,
+                    CurrentPage - 1, PageSize, SortColumn, SortDirection, SearchText);
+            }
+
             var collectionTotal = totalItems;
-            if (!string.IsNullOrWhiteSpace(SearchText))
+            if (!IsVisualSimilarityMode && !string.IsNullOrWhiteSpace(SearchText))
             {
                 var (_, unfilteredTotal) = await databaseService.GetCollectionContents(collectionId.Value, 0, 1,
                     SortColumn, SortDirection);
@@ -289,7 +356,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
                 CollectionItemCount = collectionTotal;
                 OnPropertyChanged(nameof(CollectionItemCount));
                 OnPropertyChanged(nameof(CollectionStatistics));
-                TotalPages = (int)Math.Ceiling((double)totalItems / PageSize);
+                TotalPages = IsVisualSimilarityMode ? 1 : (int)Math.Ceiling((double)totalItems / PageSize);
                 foreach (var item in CollectionItems)
                     item.Dispose();
                 CollectionItems.Clear();
@@ -332,6 +399,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        visualSimilarityCancellation?.Cancel();
+        visualSimilarityCancellation?.Dispose();
         foreach (var item in CollectionItems)
             item.Dispose();
         Hamburger.Dispose();
@@ -344,7 +413,81 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectedCount));
     }
 
-    private void OnItemSelectionChanged(object? sender, EventArgs e) => OnPropertyChanged(nameof(SelectedCount));
+    private void OnItemSelectionChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(SelectedCount));
+    }
+
+    private async Task StartVisualSimilaritySortAsync()
+    {
+        if (Collection == null || backendAPI == null || IsVisualSimilarityMode)
+            return;
+
+        IsVisualSimilarityMode = true;
+        visualSimilarityOrder = null;
+        VisualSimilarityStatus = "Starting visual similarity sorting...";
+        searchText = string.Empty;
+        currentPage = 1;
+        OnPropertyChanged(nameof(SearchText));
+        OnPropertyChanged(nameof(CurrentPage));
+
+        visualSimilarityCancellation = new CancellationTokenSource();
+        try
+        {
+            var operationId = await backendAPI.StartCollectionVisualSimilaritySort(Collection.Id);
+            await MonitorVisualSimilaritySort(operationId, visualSimilarityCancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to sort collection by visual similarity", ex);
+            ExitVisualSimilarityMode();
+        }
+    }
+
+    private async Task MonitorVisualSimilaritySort(long operationId, CancellationToken cancellationToken)
+    {
+        if (backendAPI == null)
+            throw new InvalidOperationException("Backend API is not initialized");
+
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            var status = await backendAPI.GetOperationStatus(operationId);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                var progress = Math.Clamp(status.CompletionFraction * 100, 0, 100);
+                VisualSimilarityStatus =
+                    $"Visual similarity mode: {progress:0.#}% — {status.Message ?? status.MainStatusText}";
+            });
+
+            if (status.Error && !status.Completed)
+            {
+                VisualSimilarityStatus = "Visual similarity sorting failed or was lost.";
+                return;
+            }
+
+            if (status.Completed)
+            {
+                if (status.Error)
+                {
+                    VisualSimilarityStatus = "Visual similarity sorting failed.";
+                }
+                else
+                {
+                    visualSimilarityOrder = await backendAPI.GetCollectionVisualSimilarityOrder(operationId);
+                    VisualSimilarityStatus =
+                        "Visual similarity sorting complete. Most similar images are first (or last if reversed).";
+                    await RefreshItems();
+                }
+
+                return;
+            }
+
+            await Task.Delay(500, cancellationToken);
+        }
+    }
 
     private async Task SetPairedImageMode(bool enabled)
     {

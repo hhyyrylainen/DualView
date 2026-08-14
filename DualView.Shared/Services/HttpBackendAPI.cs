@@ -67,6 +67,20 @@ public class HttpBackendAPI : IBackendAPI
         return response.IsSuccessStatusCode;
     }
 
+    public async Task<long> StartCollectionVisualSimilaritySort(long collectionId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/sortByVisualSimilarity", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<long>();
+    }
+
+    public async Task<List<long>> GetCollectionVisualSimilarityOrder(long operationId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<long>>(
+                   $"api/v1/collection/sortByVisualSimilarity/{operationId}") ??
+               new List<long>();
+    }
+
     public async Task<long> StartImageExistCheck()
     {
         var response = await HttpClient.PostAsync("api/v1/maintenance/checkFiles", null);

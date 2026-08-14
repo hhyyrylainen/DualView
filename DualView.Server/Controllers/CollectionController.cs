@@ -14,10 +14,36 @@ namespace DualView.Server.Controllers;
 public class CollectionController : Controller
 {
     private readonly IDatabaseService databaseService;
+    private readonly ICollectionSimilarityService collectionSimilarityService;
 
-    public CollectionController(IDatabaseService databaseService)
+    public CollectionController(IDatabaseService databaseService,
+        ICollectionSimilarityService collectionSimilarityService)
     {
         this.databaseService = databaseService;
+        this.collectionSimilarityService = collectionSimilarityService;
+    }
+
+    [HttpPost("{id:long}/sortByVisualSimilarity")]
+    public async Task<ActionResult<long>> SortByVisualSimilarity([Required] long id)
+    {
+        return await collectionSimilarityService.StartSortByVisualSimilarity(id);
+    }
+
+    [HttpGet("sortByVisualSimilarity/{operationId:long}")]
+    public ActionResult<List<long>> GetVisualSimilarityOrder([Required] long operationId)
+    {
+        try
+        {
+            return collectionSimilarityService.GetVisualSimilarityOrder(operationId);
+        }
+        catch (KeyNotFoundException)
+        {
+            return NotFound();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
     }
 
     [HttpGet("{id:long}")]
