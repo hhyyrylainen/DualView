@@ -37,6 +37,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     private int scrollOffsetRestoreVersion;
     private CancellationTokenSource? visualSimilarityCancellation;
     private List<long>? visualSimilarityOrder;
+    private CollectionMediaRemovalResult? latestRemoval;
 
     public MediaCollectionWindowViewModel()
     {
@@ -240,6 +241,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public bool CanNavigateBackwards => !IsVisualSimilarityMode && CurrentPage > 1;
     public bool CanNavigateForwards => !IsVisualSimilarityMode && CurrentPage < TotalPages;
     public int SelectedCount => CollectionItems.Count(item => item.Selected);
+    public bool CanUndoRemoval => latestRemoval != null;
+
     public event EventHandler? CloseRequested;
 
     public async Task Initialize(long id, string? fallbackName = null)
@@ -267,8 +270,9 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public void Close() => CloseRequested?.Invoke(this, EventArgs.Empty);
     public void SelectAll() => SetSelection(true);
     public void DeselectAll() => SetSelection(false);
-    public void RemoveSelected() => Placeholder("Remove Selected");
-    public void DeleteSelected() => Placeholder("DELETE selected");
+    public void RemoveSelected() => _ = RemoveSelectedAsync();
+    public void UndoRemove() => _ = UndoRemoveAsync();
+    public void DeleteSelected() => _ = DeleteSelectedAsync();
     public void DeleteCollection() => Placeholder("Delete collection");
     public void DeleteCollectionAndImages() => Placeholder("Delete collection and images");
     public void Export() => Placeholder("Export");
@@ -424,6 +428,105 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         foreach (var item in CollectionItems)
             item.Selected = selected;
         OnPropertyChanged(nameof(SelectedCount));
+    }
+
+    private List<long> GetSelectedMediaIds()
+    {
+        return CollectionItems
+            .Where(item => item.Selected)
+            .Select(item => item.MediaToShow)
+            .OfType<ServerMediaSource>()
+            .Select(source => source.Info.MediaFileId)
+            .Distinct()
+            .ToList();
+    }
+
+    private async Task RemoveSelectedAsync()
+    {
+        if (collectionId == null || databaseService == null)
+            return;
+
+        var mediaIds = GetSelectedMediaIds();
+        if (mediaIds.Count == 0)
+            return;
+
+        try
+        {
+            var preview = await databaseService.PreviewCollectionMediaRemovalAsync(collectionId.Value, mediaIds);
+            if (preview.OrphanedMediaIds.Count > 0)
+            {
+                var proceed = await windowService!.ShowConfirmationWindow("Remove selected media?",
+                    $"{preview.OrphanedMediaIds.Count} selected image(s) would no longer be in any collection. " +
+                    "They will be added to the Uncategorized collection. Continue?", true);
+                if (proceed != true)
+                    return;
+            }
+
+            latestRemoval = await databaseService.RemoveMediaFromCollectionAsync(collectionId.Value, mediaIds);
+            OnPropertyChanged(nameof(CanUndoRemoval));
+            await RefreshItems();
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to remove selected media", ex);
+        }
+    }
+
+    private async Task UndoRemoveAsync()
+    {
+        if (latestRemoval == null || databaseService == null)
+            return;
+
+        try
+        {
+            var removal = latestRemoval;
+            latestRemoval = null;
+            OnPropertyChanged(nameof(CanUndoRemoval));
+            await databaseService.UndoCollectionMediaRemovalAsync(removal);
+            await RefreshItems();
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to undo media removal", ex);
+        }
+    }
+
+    private async Task DeleteSelectedAsync()
+    {
+        if (collectionId == null || databaseService == null)
+            return;
+
+        var mediaIds = GetSelectedMediaIds();
+        if (mediaIds.Count == 0)
+            return;
+
+        try
+        {
+            var inOtherCollections = 0;
+            foreach (var mediaId in mediaIds)
+            {
+                var collections = await databaseService.GetMediaCollectionsAsync(mediaId);
+                if (collections.Any(id => id != collectionId.Value))
+                    ++inOtherCollections;
+            }
+
+            if (inOtherCollections > 0)
+            {
+                var proceed = await windowService!.ShowConfirmationWindow("Delete selected media?",
+                    $"{inOtherCollections} selected image(s) are also in another collection. " +
+                    "They will be marked as deleted everywhere and removed during purge. Continue?", true);
+                if (proceed != true)
+                    return;
+            }
+
+            foreach (var mediaId in mediaIds)
+                await databaseService.DeleteMediaAsync(mediaId);
+            await RefreshItems();
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to delete selected media", ex);
+        }
     }
 
     private void OnItemSelectionChanged(object? sender, EventArgs e)
