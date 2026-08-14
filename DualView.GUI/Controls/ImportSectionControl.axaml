@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DualView.GUI.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:controls="using:DualView.GUI.Controls"
+             x:Class="DualView.GUI.Controls.ImportSectionControl"
+             x:DataType="vm:ImportSectionViewModel"
+             d:DesignWidth="800" d:DesignHeight="450">
+    <Border BorderBrush="Gray" BorderThickness="1" Margin="4" Padding="4">
+        <StackPanel>
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Height="34">
+                <CheckBox Grid.Column="0" Margin="8,0" IsChecked="{Binding IsActive}"
+                          Command="{Binding SetActiveAsync}">
+                    Active
+                </CheckBox>
+                <TextBox Grid.Column="1" Text="{Binding Name}" VerticalContentAlignment="Center" />
+
+                <ToggleButton Grid.Column="2" Margin="4,0" IsChecked="{Binding CollectionTabSelected}"
+                              Command="{Binding SelectCollectionTab}">
+                    Collection
+                </ToggleButton>
+                <ToggleButton Grid.Column="3" Margin="4,0" IsChecked="{Binding ImagesTabSelected}"
+                              Command="{Binding SelectImagesTab}">
+                    Images
+                </ToggleButton>
+                <!-- TODO: this should also be a toggle button so it is three state: collection, images, or collapsed-->
+                <Button Grid.Column="4" Margin="4,0" Command="{Binding Collapse}">Collapse</Button>
+
+                <Button Grid.Column="5" Margin="4,0" Command="{Binding ImportAsync}" Background="#2878D0">Import</Button>
+            </Grid>
+            <StackPanel IsVisible="{Binding !IsCollapsed}">
+                <StackPanel IsVisible="{Binding CollectionTabSelected}">
+                    <WrapPanel>
+                        <CheckBox Margin="2" IsChecked="{Binding KeepEvenWhenEmpty}">Keep even when empty</CheckBox>
+                        <CheckBox Margin="8,0" IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
+                    </WrapPanel>
+
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,*">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Margin="2" HorizontalAlignment="Center">Target folder:</TextBlock>
+                        <controls:FolderPicker Grid.Row="1" Grid.Column="0" DataContext="{Binding FolderPicker}"
+                                               Height="240" />
+
+                        <TextBlock Grid.Row="0" Grid.Column="1" Margin="2" HorizontalAlignment="Center">Collection tags:</TextBlock>
+                        <TextBlock Grid.Row="1" Grid.Column="1">TODO: add tag editor here</TextBlock>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Margin="2" Text="{Binding ImageCount}" /><TextBlock>images</TextBlock>
+                    </StackPanel>
+                </StackPanel>
+                <Grid IsVisible="{Binding ImagesTabSelected}">
+                    <Grid RowDefinitions="Auto,*">
+                        <WrapPanel ItemSpacing="5">
+                            <Button Command="{Binding RemoveSelectedAsync}">Remove selected</Button>
+                            <CheckBox IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
+                            <TextBlock VerticalAlignment="Center">Selected: {Binding SelectedCount}</TextBlock>
+                        </WrapPanel>
+                        <ScrollViewer Grid.Row="1" Height="180">
+                            <ItemsControl ItemsSource="{Binding Media}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <controls:MediaViewer Width="110" Height="145" Margin="2" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Grid>
+                </Grid>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>
