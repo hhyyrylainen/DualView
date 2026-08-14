@@ -100,6 +100,18 @@ public class CollectionController : Controller
         return Ok();
     }
 
+    [HttpGet("{id:long}/orphanedMediaCount")]
+    public async Task<ActionResult<int>> GetOrphanedMediaCount([Required] long id)
+    {
+        return await databaseService.GetCollectionOrphanedMediaCountAsync(id);
+    }
+
+    [HttpPost("{id:long}/deleteAndImages")]
+    public async Task<ActionResult<CollectionMediaRemovalResult>> DeleteAndImages([Required] long id)
+    {
+        return await databaseService.DeleteCollectionAndImagesAsync(id);
+    }
+
     [HttpPost("{id:long}/addToFolder/{folderId:long}")]
     public async Task<IActionResult> AddToFolder([Required] long id, [Required] long folderId)
     {

@@ -58,6 +58,8 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
         List<long> mediaIds);
     public Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId, List<long> mediaIds);
     public Task UndoCollectionMediaRemovalAsync(CollectionMediaRemovalResult removal);
+    public Task<CollectionMediaRemovalResult> DeleteCollectionAndImagesAsync(long collectionId);
+    public Task<List<Collection>> GetEligibleCollectionsForPurgeAsync(TimeSpan timeSinceDeletion);
 
     public Task<List<MediaFile>> GetDeletedMediaAsync(int limit);
     public Task<List<MediaFolder>> GetDeletedMediaFoldersAsync(int limit);

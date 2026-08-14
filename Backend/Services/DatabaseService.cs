@@ -508,10 +508,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task UndoCollectionMediaRemovalAsync(CollectionMediaRemovalResult removal)
     {
-        var collection = await dbContext.Collections.FindAsync(removal.CollectionId) ??
+        var collection = await dbContext.Collections.IgnoreQueryFilters().Include(item => item.Folders)
+                             .FirstOrDefaultAsync(item => item.Id == removal.CollectionId) ??
                          throw new ArgumentException("Collection not found");
         var mediaIds = removal.RemovedItems.Select(item => item.MediaId).ToList();
         var existingItems = await dbContext.Set<CollectionItem>()
+            .IgnoreQueryFilters()
             .Where(item => item.CollectionId == removal.CollectionId && mediaIds.Contains(item.MediaFileId))
             .Select(item => item.MediaFileId)
             .ToHashSetAsync();
@@ -532,8 +534,31 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             })
             .ToList();
         dbContext.Set<CollectionItem>().AddRange(itemsToRestore);
+        if (removal.CollectionWasDeleted)
+        {
+            collection.IsDeleted = false;
+            collection.UpdatedAt = DateTime.UtcNow;
+            var deletedMedia = await dbContext.MediaFiles
+                .IgnoreQueryFilters()
+                .Where(media => removal.DeletedMediaIds.Contains(media.Id))
+                .ToListAsync();
+            foreach (var media in deletedMedia)
+            {
+                media.IsDeleted = false;
+                media.UpdatedAt = DateTime.UtcNow;
+            }
+        }
+
         await SaveAsync();
         await updateNotifier.NotifyCollectionContentsUpdated(collection.Id);
+        if (removal.CollectionWasDeleted)
+        {
+            foreach (var folder in collection.Folders)
+                await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
+            foreach (var mediaId in removal.DeletedMediaIds)
+                await updateNotifier.NotifyMediaUpdated(mediaId);
+        }
+
         if (uncategorizedItems.Count > 0)
             await updateNotifier.NotifyCollectionContentsUpdated(Collection.UncategorizedCollectionId);
     }
@@ -1005,8 +1030,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task DeleteCollectionAsync(long collectionId)
     {
+        if (collectionId == Collection.UncategorizedCollectionId)
+            throw new InvalidOperationException("The Uncategorized collection cannot be deleted");
+
         var collection =
-            await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == collectionId) ??
+            await dbContext.Collections.IgnoreQueryFilters().Include(c => c.Folders)
+                .FirstOrDefaultAsync(c => c.Id == collectionId) ??
             throw new ArgumentException("Collection not found");
         collection.IsDeleted = true;
         collection.UpdatedAt = DateTime.UtcNow;
@@ -1017,6 +1046,66 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
     }
 
+    public async Task<int> GetCollectionOrphanedMediaCountAsync(long collectionId)
+    {
+        if (collectionId == Collection.UncategorizedCollectionId)
+            return 0;
+
+        var mediaIds = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId)
+            .Select(item => item.MediaFileId)
+            .Distinct()
+            .ToListAsync();
+        var mediaInOtherCollections = await dbContext.Set<CollectionItem>()
+            .Where(item => mediaIds.Contains(item.MediaFileId) && item.CollectionId != collectionId)
+            .Select(item => item.MediaFileId)
+            .Distinct()
+            .ToListAsync();
+        return mediaIds.Except(mediaInOtherCollections).Count();
+    }
+
+    public async Task<CollectionMediaRemovalResult> DeleteCollectionAndImagesAsync(long collectionId)
+    {
+        if (collectionId == Collection.UncategorizedCollectionId)
+            throw new InvalidOperationException("The Uncategorized collection cannot be deleted");
+
+        var collection = await dbContext.Collections.Include(item => item.Folders)
+                             .FirstOrDefaultAsync(item => item.Id == collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        var items = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId)
+            .ToListAsync();
+        var mediaIds = items.Select(item => item.MediaFileId).Distinct().ToList();
+        var mediaFiles = await dbContext.MediaFiles
+            .Where(media => mediaIds.Contains(media.Id) && !media.IsDeleted)
+            .ToListAsync();
+        collection.IsDeleted = true;
+        collection.UpdatedAt = DateTime.UtcNow;
+        foreach (var media in mediaFiles)
+        {
+            media.IsDeleted = true;
+            media.UpdatedAt = DateTime.UtcNow;
+        }
+
+        await SaveAsync();
+        foreach (var folder in collection.Folders)
+            await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
+        foreach (var media in mediaFiles)
+            await updateNotifier.NotifyMediaUpdated(media.Id);
+
+        return new CollectionMediaRemovalResult
+        {
+            CollectionId = collectionId,
+            RemovedItems = items.Select(item => new CollectionMediaRemovalItem
+            {
+                MediaId = item.MediaFileId,
+                SequenceNumber = item.SequenceNumber,
+            }).ToList(),
+            DeletedMediaIds = mediaFiles.Select(media => media.Id).ToList(),
+            CollectionWasDeleted = true,
+        };
+    }
+
     public async Task DeleteCollectionAsync(Collection collection)
     {
         await DeleteCollectionAsync(collection.Id);
@@ -1025,7 +1114,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task RestoreCollectionAsync(long collectionId)
     {
         var collection =
-            await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == collectionId) ??
+            await dbContext.Collections.IgnoreQueryFilters().Include(c => c.Folders)
+                .FirstOrDefaultAsync(c => c.Id == collectionId) ??
             throw new ArgumentException("Collection not found");
         collection.IsDeleted = false;
         collection.UpdatedAt = DateTime.UtcNow;
@@ -1039,12 +1129,35 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task PurgeCollectionAsync(long collectionId)
     {
         var collection =
-            await dbContext.Collections.Include(c => c.Folders).FirstOrDefaultAsync(c => c.Id == collectionId) ??
+            await dbContext.Collections.IgnoreQueryFilters().Include(c => c.Folders)
+                .FirstOrDefaultAsync(c => c.Id == collectionId) ??
             throw new ArgumentException("Collection not found");
         if (!collection.IsDeleted)
             throw new InvalidOperationException("Cannot purge non-deleted collection");
 
         var folderIds = collection.Folders.Select(f => f.Id).ToList();
+        var activeMediaIds = await dbContext.Set<CollectionItem>()
+            .IgnoreQueryFilters()
+            .Where(item => item.CollectionId == collectionId && !item.MediaFile.IsDeleted)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        var existingUncategorizedMediaIds = await dbContext.Set<CollectionItem>()
+            .Where(item => activeMediaIds.Contains(item.MediaFileId) &&
+                           item.CollectionId == Collection.UncategorizedCollectionId)
+            .Select(item => item.MediaFileId)
+            .ToHashSetAsync();
+        var mediaToCategorize = activeMediaIds.Except(existingUncategorizedMediaIds).ToList();
+        if (mediaToCategorize.Count > 0)
+        {
+            var nextSequenceNumber = await GetNextCollectionSequenceNumberAsync(Collection.UncategorizedCollectionId);
+            dbContext.Set<CollectionItem>().AddRange(mediaToCategorize.Select((mediaId, index) => new CollectionItem
+            {
+                CollectionId = Collection.UncategorizedCollectionId,
+                MediaFileId = mediaId,
+                SequenceNumber = nextSequenceNumber + index,
+            }));
+        }
+
         dbContext.Collections.Remove(collection);
         await SaveAsync();
 
@@ -1240,6 +1353,15 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         return await dbContext.MediaFiles
             .Where(m => m.IsDeleted && m.UpdatedAt <= cutoffTime)
+            .ToListAsync();
+    }
+
+    public async Task<List<Collection>> GetEligibleCollectionsForPurgeAsync(TimeSpan timeSinceDeletion)
+    {
+        var cutoffTime = DateTime.UtcNow - timeSinceDeletion;
+        return await dbContext.Collections
+            .IgnoreQueryFilters()
+            .Where(collection => collection.IsDeleted && collection.UpdatedAt <= cutoffTime)
             .ToListAsync();
     }
 

@@ -58,6 +58,7 @@ public interface IDatabaseCommonService
     public Task PurgeMediaFolderAsync(long folderId);
 
     public Task DeleteCollectionAsync(long collectionId);
+    public Task<int> GetCollectionOrphanedMediaCountAsync(long collectionId);
     public Task RestoreCollectionAsync(long collectionId);
     public Task PurgeCollectionAsync(long collectionId);
 

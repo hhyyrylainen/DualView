@@ -22,6 +22,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
         List<long> mediaIds);
     public Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId, List<long> mediaIds);
     public Task UndoCollectionMediaRemovalAsync(CollectionMediaRemovalResult removal);
+    public Task<CollectionMediaRemovalResult> DeleteCollectionAndImagesAsync(long collectionId);
 
     public Task<List<FolderPathDTO>> GetCollectionFolderPaths(long collectionId);
     public Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId);

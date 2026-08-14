@@ -293,6 +293,19 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<int> GetCollectionOrphanedMediaCountAsync(long collectionId)
+    {
+        return await HttpClient.GetFromJsonAsync<int>($"api/v1/collection/{collectionId}/orphanedMediaCount");
+    }
+
+    public async Task<CollectionMediaRemovalResult> DeleteCollectionAndImagesAsync(long collectionId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/deleteAndImages", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<CollectionMediaRemovalResult>() ??
+               throw new Exception("Failed to read collection deletion result");
+    }
+
     public async Task ReorderCollection(long collectionId, List<long> newImageOrderIds)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/reorder", newImageOrderIds);
