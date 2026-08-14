@@ -2,7 +2,6 @@ using DualView.Shared.Models.Enums;
 using Backend.Models;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
-using System.Security.Cryptography;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using Backend.Utilities;
@@ -201,7 +200,7 @@ public class MediaImportHandler : IMediaImportHandler
             {
                 // We need to calculate the next sequence number
                 var sequenceNumber = await GetNextSequenceNumber(targetCollectionId);
-                await databaseService.AddMediaToCollection(existing.Id, targetCollectionId, sequenceNumber);
+                await databaseService.AddMediaToCollection([existing.Id], targetCollectionId, sequenceNumber);
             }
             catch (Exception e)
             {

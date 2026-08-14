@@ -1,12 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
 
-[Index(nameof(NameLowercase), IsUnique = true)]
+[Index(nameof(NameLowercase))]
 [Index(nameof(DisplayIndex), IsUnique = true)]
 public class UploadSection : UpdateableModel
 {
@@ -14,6 +12,7 @@ public class UploadSection : UpdateableModel
     {
         Name = name;
         NameLowercase = name.ToLowerInvariant();
+        TargetCollectionName = name;
     }
 
     [Key]
@@ -49,6 +48,22 @@ public class UploadSection : UpdateableModel
     ///   Only one section can be active as the default import target
     /// </summary>
     public bool Selected { get; set; }
+
+    /// <summary>
+    ///   The folder in which the target collection should be created.
+    /// </summary>
+    public long TargetFolderId { get; set; } = MediaFolder.RootFolderId;
+
+    /// <summary>
+    ///   The collection name to import into. The server resolves this case-insensitively.
+    /// </summary>
+    [MaxLength(200)]
+    public string TargetCollectionName { get; set; }
+
+    /// <summary>
+    ///   Removes imported media from this section after a successful import.
+    /// </summary>
+    public bool RemoveAfterImport { get; set; } = true;
 
     public ICollection<UploadSectionItem> Items { get; set; } = new List<UploadSectionItem>();
 }

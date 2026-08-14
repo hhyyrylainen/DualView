@@ -210,6 +210,12 @@ public class AppDbContext : DbContext
             builder.HasIndex(s => s.Selected)
                 .IsUnique()
                 .HasFilter("[Selected] = 1");
+
+            builder.HasOne<MediaFolder>()
+                .WithMany()
+                .HasForeignKey(s => s.TargetFolderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
         });
 
         modelBuilder.Entity<UploadSectionItem>(builder =>
