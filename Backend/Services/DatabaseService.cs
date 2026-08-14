@@ -4,6 +4,7 @@ using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using DualView.Shared.Utils;
+using DualView.Shared.Requests;
 using Backend.Database;
 using Backend.Models;
 using Backend.Utilities;
@@ -1256,6 +1257,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             sectionName = "";
         }
 
+        sectionName = sectionName.Trim();
         var lowercase = sectionName.ToLowerInvariant();
         var existing = await dbContext.UploadSections.FirstOrDefaultAsync(s => s.NameLowercase == lowercase);
 
@@ -1281,8 +1283,132 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return newSection;
     }
 
+    public async Task<List<UploadSection>> GetUploadSectionsAsync()
+    {
+        return await dbContext.UploadSections
+            .Include(section => section.Items)
+            .ThenInclude(item => item.MediaFile)
+            .OrderBy(section => section.DisplayIndex)
+            .ToListAsync();
+    }
+
+    public async Task SaveUploadSectionAsync(UploadSection section)
+    {
+        section.Name = section.Name.Trim();
+        section.TargetCollectionName = section.TargetCollectionName.Trim();
+        var targetCollection = await GetCollectionByNameAndFolder(section.TargetCollectionName, section.TargetFolderId);
+        if (targetCollection != null)
+            section.TargetCollectionName = targetCollection.Name;
+        section.UpdatedAt = DateTime.UtcNow;
+
+        // TODO: signal R notice about section details update
+        await SaveAsync();
+    }
+
+    public async Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds)
+    {
+        var items = await dbContext.UploadSectionItems
+            .Where(item => item.UploadSectionId == sectionId && mediaIds.Contains(item.MediaFileId))
+            .ToListAsync();
+        dbContext.UploadSectionItems.RemoveRange(items);
+
+        // TODO: signal R notice about section content update
+        await SaveAsync();
+    }
+
+    public async Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds)
+    {
+        var items = await dbContext.UploadSectionItems
+            .Where(item => item.UploadSectionId == sectionId)
+            .ToListAsync();
+        var itemsById = items.ToDictionary(item => item.MediaFileId);
+        var nextIndex = 0;
+        foreach (var mediaId in mediaIds.Distinct())
+        {
+            if (itemsById.Remove(mediaId, out var item))
+                item.Index = nextIndex++;
+        }
+
+        foreach (var item in itemsById.Values.OrderBy(item => item.Index))
+            item.Index = nextIndex++;
+
+        // TODO: signal R notice about section content update
+        await SaveAsync();
+    }
+
+    public async Task SetUploadSectionActiveAsync(long? sectionId)
+    {
+        var sections = await dbContext.UploadSections.ToListAsync();
+        foreach (var section in sections)
+            section.Selected = sectionId.HasValue && section.Id == sectionId.Value;
+        // TODO: signal R notices so that all GUIs (if there are multiple) can stay up to date
+        await SaveAsync();
+    }
+
+    public async Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
+    {
+        var section = await dbContext.UploadSections
+            .Include(item => item.Items)
+            .FirstOrDefaultAsync(item => item.Id == sectionId) ?? throw new ArgumentException("Section not found");
+        var selectedIds = section.Items.OrderBy(item => item.Index)
+            .Select(item => item.MediaFileId)
+            .Where(id => mediaIds == null || mediaIds.Contains(id))
+            .Distinct()
+            .ToList();
+        if (selectedIds.Count == 0)
+            return;
+
+        var targetCollectionName = string.IsNullOrWhiteSpace(section.TargetCollectionName)
+            ? section.Name.Trim()
+            : section.TargetCollectionName.Trim();
+        var collection = await GetCollectionByNameAndFolder(targetCollectionName, section.TargetFolderId);
+        if (collection == null)
+        {
+            collection =
+                new Collection(string.IsNullOrWhiteSpace(targetCollectionName) ? "Imported" : targetCollectionName);
+            await dbContext.Collections.AddAsync(collection);
+            await SaveAsync();
+            await AddCollectionToFolder(collection.Id, section.TargetFolderId);
+        }
+        else
+        {
+            section.TargetCollectionName = collection.Name;
+        }
+
+        var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
+        await AddMediaToCollection(selectedIds, collection.Id, nextSequence);
+
+        if (section.RemoveAfterImport)
+        {
+            // TODO: signal R notice
+            var items = section.Items.Where(item => selectedIds.Contains(item.MediaFileId)).ToList();
+            dbContext.UploadSectionItems.RemoveRange(items);
+            await SaveAsync();
+        }
+
+        if (!section.KeepTarget &&
+            !await dbContext.UploadSectionItems.AnyAsync(item => item.UploadSectionId == section.Id))
+        {
+            // TODO: signal R notice
+            dbContext.UploadSections.Remove(section);
+            await SaveAsync();
+        }
+    }
+
     public async Task AddMediaToUploadSectionAsync(long mediaId, long sectionId, int index)
     {
+        if (await dbContext.UploadSectionItems.AnyAsync(item => item.MediaFileId == mediaId &&
+                                                                item.UploadSectionId == sectionId))
+        {
+            return;
+        }
+
+        if (await dbContext.UploadSectionItems.AnyAsync(item => item.UploadSectionId == sectionId &&
+                                                                item.Index == index))
+        {
+            index = await GetNextUploadSectionIndexAsync(sectionId);
+        }
+
         var item = new UploadSectionItem
         {
             UploadSectionId = sectionId,
@@ -1915,6 +2041,52 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await SaveAsync();
     }
+
+    async Task<List<UploadSectionDTO>> IClientDatabaseService.GetUploadSectionsAsync()
+    {
+        return (await GetUploadSectionsAsync()).Select(section => new UploadSectionDTO
+        {
+            Id = section.Id,
+            Name = section.Name,
+            KeepTarget = section.KeepTarget,
+            Selected = section.Selected,
+            RemoveAfterImport = section.RemoveAfterImport,
+            TargetFolderId = section.TargetFolderId,
+            TargetCollectionName = string.IsNullOrWhiteSpace(section.TargetCollectionName)
+                ? section.Name
+                : section.TargetCollectionName,
+            Media = section.Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
+        }).ToList();
+    }
+
+    async Task<UploadSectionDTO> IClientDatabaseService.GetOrCreateUploadSectionAsync(string? name)
+    {
+        var section = await GetOrCreateUploadSectionAsync(name);
+        return (await ((IClientDatabaseService)this).GetUploadSectionsAsync()).First(item => item.Id == section.Id);
+    }
+
+    async Task IClientDatabaseService.SaveUploadSectionAsync(long sectionId, UpdateUploadSectionRequest request)
+    {
+        var section = (await GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == sectionId)
+                      ?? throw new ArgumentException("Section not found");
+        section.Name = request.Name;
+        section.KeepTarget = request.KeepTarget;
+        section.RemoveAfterImport = request.RemoveAfterImport;
+        section.TargetFolderId = request.TargetFolderId;
+        section.TargetCollectionName = request.TargetCollectionName;
+        await SaveUploadSectionAsync(section);
+    }
+
+    Task IClientDatabaseService.RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds) =>
+        RemoveMediaFromUploadSectionAsync(sectionId, mediaIds);
+
+    Task IClientDatabaseService.ReorderUploadSectionAsync(long sectionId, List<long> mediaIds) =>
+        ReorderUploadSectionAsync(sectionId, mediaIds);
+
+    Task IClientDatabaseService.SetUploadSectionActiveAsync(long? sectionId) => SetUploadSectionActiveAsync(sectionId);
+
+    Task IClientDatabaseService.ImportUploadSectionAsync(long sectionId, List<long>? mediaIds) =>
+        ImportUploadSectionAsync(sectionId, mediaIds);
 
     public async Task<List<DownloadGallery>> GetDownloadGalleriesAsync()
     {
