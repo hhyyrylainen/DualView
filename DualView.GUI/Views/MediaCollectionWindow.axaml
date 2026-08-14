@@ -39,7 +39,11 @@
                 <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />
                 <MenuItem Header="Get Info" Command="{Binding ShowCollectionInfo}" />
                 <Separator />
-                <MenuItem Header="Paired image mode" ToggleType="CheckBox" IsChecked="{Binding IsPairedImageMode}" />
+
+                <!-- NOTE: this needs the Click handler to work! For some reason the binding cannot set the property on -->
+                <MenuItem Header="Paired image mode" ToggleType="CheckBox"
+                          IsChecked="{Binding IsPairedImageMode, Mode=OneWay}"
+                          Click="OnPairedImageModeClick" />
             </MenuItem>
         </Menu>
 

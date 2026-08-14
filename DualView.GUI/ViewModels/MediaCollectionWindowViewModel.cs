@@ -112,7 +112,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
             if (Collection == null || value == IsPairedImageMode)
                 return;
 
-            _ = SetPairedImageMode(value);
+            _ = SavePairedImageMode(value);
         }
     }
 
@@ -290,6 +290,11 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public void ShowTagEditor()
     {
         // TODO: Implement tag editor
+    }
+
+    public void SetPairedImageMode(bool enabled)
+    {
+        _ = SavePairedImageMode(enabled);
     }
 
     public void StartVisualSimilaritySort()
@@ -497,7 +502,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task SetPairedImageMode(bool enabled)
+    private async Task SavePairedImageMode(bool enabled)
     {
         if (Collection == null || databaseService == null)
             return;
