@@ -482,9 +482,9 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return (await GetUploadSectionsAsync()).First(section => section.Id == id);
     }
 
-    public async Task SaveUploadSectionAsync(long sectionId, UpdateUploadSectionRequest request)
+    public async Task SaveUploadSectionAsync(UploadSectionDTO section)
     {
-        var response = await HttpClient.PutAsJsonAsync($"api/v1/uploadSection/{sectionId}", request);
+        var response = await HttpClient.PutAsJsonAsync($"api/v1/uploadSection/{section.Id}", section);
         response.EnsureSuccessStatusCode();
     }
 

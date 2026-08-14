@@ -12,7 +12,6 @@ public class UploadSection : UpdateableModel
     {
         Name = name;
         NameLowercase = name.ToLowerInvariant();
-        TargetCollectionName = name;
     }
 
     [Key]
@@ -53,12 +52,6 @@ public class UploadSection : UpdateableModel
     ///   The folder in which the target collection should be created.
     /// </summary>
     public long TargetFolderId { get; set; } = MediaFolder.RootFolderId;
-
-    /// <summary>
-    ///   The collection name to import into. The server resolves this case-insensitively.
-    /// </summary>
-    [MaxLength(200)]
-    public string TargetCollectionName { get; set; }
 
     /// <summary>
     ///   Removes imported media from this section after a successful import.

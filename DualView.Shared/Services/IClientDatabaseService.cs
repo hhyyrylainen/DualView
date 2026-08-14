@@ -66,7 +66,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId);
     public Task<List<UploadSectionDTO>> GetUploadSectionsAsync();
     public Task<UploadSectionDTO> GetOrCreateUploadSectionAsync(string? name);
-    public Task SaveUploadSectionAsync(long sectionId, UpdateUploadSectionRequest request);
+    public Task SaveUploadSectionAsync(UploadSectionDTO section);
     public Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task SetUploadSectionActiveAsync(long? sectionId);

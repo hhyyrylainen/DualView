@@ -324,10 +324,10 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     // This is probably needed just for the name change text box
     public async Task SaveAsync()
     {
-        await databaseService.SaveUploadSectionAsync(id, new UpdateUploadSectionRequest
+        await databaseService.SaveUploadSectionAsync(new UploadSectionDTO
         {
-            Name = Name.Trim(), KeepTarget = KeepEvenWhenEmpty, RemoveAfterImport = RemoveAfterImport,
-            TargetFolderId = TargetFolderId, TargetCollectionName = Name.Trim(),
+            Id = id, Name = Name.Trim(), KeepTarget = KeepEvenWhenEmpty, RemoveAfterImport = RemoveAfterImport,
+            TargetFolderId = TargetFolderId,
         });
     }
 

@@ -32,15 +32,12 @@ public class UploadSectionController : Controller
             Id = section.Id, Name = section.Name, KeepTarget = section.KeepTarget,
             Selected = section.Selected, RemoveAfterImport = section.RemoveAfterImport,
             TargetFolderId = section.TargetFolderId,
-            TargetCollectionName = string.IsNullOrWhiteSpace(section.TargetCollectionName)
-                ? section.Name
-                : section.TargetCollectionName,
             Media = section.Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
         }).ToList();
     }
 
     [HttpPut("{sectionId:long}")]
-    public async Task<ActionResult> Update(long sectionId, UpdateUploadSectionRequest request)
+    public async Task<ActionResult> Update(long sectionId, UploadSectionDTO request)
     {
         var section = (await databaseService.GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == sectionId);
         if (section == null) return NotFound();
@@ -48,7 +45,6 @@ public class UploadSectionController : Controller
         section.KeepTarget = request.KeepTarget;
         section.RemoveAfterImport = request.RemoveAfterImport;
         section.TargetFolderId = request.TargetFolderId;
-        section.TargetCollectionName = request.TargetCollectionName;
         await databaseService.SaveUploadSectionAsync(section);
         return Ok();
     }
