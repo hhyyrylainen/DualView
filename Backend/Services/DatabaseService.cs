@@ -354,6 +354,26 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                 $"The collection requires images to be added in groups of {collection.ImageGroupSize}.");
         }
 
+        List<CollectionItem> uncategorizedItems = new();
+        var temporaryMediaIds = new List<long>();
+        if (collectionId != Collection.UncategorizedCollectionId)
+        {
+            foreach (var mediaFile in mediaFiles.Values)
+            {
+                if (mediaFile.IsTemporary)
+                {
+                    mediaFile.IsTemporary = false;
+                    temporaryMediaIds.Add(mediaFile.Id);
+                }
+            }
+
+            uncategorizedItems = await dbContext.Set<CollectionItem>()
+                .Where(item => item.CollectionId == Collection.UncategorizedCollectionId &&
+                               newMediaIds.Contains(item.MediaFileId))
+                .ToListAsync();
+            dbContext.Set<CollectionItem>().RemoveRange(uncategorizedItems);
+        }
+
         var items = newMediaIds.Select(mediaId => new CollectionItem
         {
             CollectionId = collectionId,
@@ -364,6 +384,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.Set<CollectionItem>().AddRangeAsync(items);
         await SaveAsync();
         await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
+        if (uncategorizedItems.Count > 0)
+            await updateNotifier.NotifyCollectionContentsUpdated(Collection.UncategorizedCollectionId);
+        foreach (var mediaId in temporaryMediaIds)
+            await updateNotifier.NotifyMediaUpdated(mediaId);
     }
 
     public async Task SetCollectionImageGroupSizeAsync(long collectionId, int imageGroupSize)
