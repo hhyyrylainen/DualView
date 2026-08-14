@@ -14,7 +14,7 @@
         <vm:MediaCollectionWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
         <Menu Grid.Row="0">
             <MenuItem Header="File">
                 <MenuItem Header="Export..." Command="{Binding Export}" />
@@ -37,25 +37,40 @@
                 <Separator />
                 <MenuItem Header="Paired image mode" ToggleType="CheckBox" IsChecked="{Binding IsPairedImageMode}" />
             </MenuItem>
+            <MenuItem Header="View">
+                <MenuItem Header="Sort by visual similarity" Command="{Binding StartVisualSimilaritySort}"
+                          IsEnabled="{Binding !IsVisualSimilarityMode}" />
+            </MenuItem>
         </Menu>
 
-        <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="5"
+        <Grid Grid.Row="1" Grid.ColumnSpan="1" ColumnDefinitions="*,Auto" Background="#FFF4D6"
+              IsVisible="{Binding IsVisualSimilarityMode}" MinHeight="32">
+            <TextBlock Grid.Column="0" Text="{Binding VisualSimilarityStatus}" VerticalAlignment="Center"
+                       Margin="8 0" TextTrimming="CharacterEllipsis" />
+            <Button Grid.Column="1" Content="Exit special mode" Command="{Binding ExitVisualSimilarityMode}"
+                    Margin="4" />
+        </Grid>
+
+        <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto,Auto,Auto" ColumnSpacing="5"
               Background="#F0F0F0" MinHeight="36" Margin="0 0 0 2">
-            <TextBlock Grid.Column="0" Text="Items per page:" VerticalAlignment="Center" Margin="8 0 0 0" />
+            <TextBlock Grid.Column="0" Text="Items per page:" VerticalAlignment="Center" Margin="8 0 0 0"
+                       IsEnabled="{Binding !IsVisualSimilarityMode}" />
             <ComboBox Grid.Column="1" ItemsSource="{Binding PageSizeOptions}" SelectedValue="{Binding PageSize}"
-                      MinWidth="80" />
-            <TextBlock Grid.Column="2" Text="Sort by:" VerticalAlignment="Center" />
+                      MinWidth="80" IsEnabled="{Binding !IsVisualSimilarityMode}" />
+            <TextBlock Grid.Column="2" Text="Sort by:" VerticalAlignment="Center"
+                       IsEnabled="{Binding !IsVisualSimilarityMode}" />
             <ComboBox Grid.Column="3" ItemsSource="{Binding SortColumnOptions}" SelectedValue="{Binding SortColumn}"
-                      MinWidth="140" />
+                      MinWidth="140" IsEnabled="{Binding !IsVisualSimilarityMode}" />
             <CheckBox Grid.Column="4" Content="Reverse" IsChecked="{Binding IsReversed}" VerticalAlignment="Center" />
-            <TextBox Grid.Column="5" Text="{Binding SearchText}" PlaceholderText="Search item names..." Margin="5 2" />
+            <TextBox Grid.Column="5" Text="{Binding SearchText}" PlaceholderText="Search item names..." Margin="5 2"
+                     IsEnabled="{Binding !IsVisualSimilarityMode}" />
             <Button Grid.Column="7" Content="Previous" Command="{Binding GoToPreviousPage}"
                     IsEnabled="{Binding CanNavigateBackwards}" />
             <Button Grid.Column="8" Content="Next" Command="{Binding GoToNextPage}"
                     IsEnabled="{Binding CanNavigateForwards}" />
         </Grid>
 
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+        <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
                       Offset="{Binding CollectionScrollOffset, Mode=TwoWay}">
             <ItemsControl ItemsSource="{Binding CollectionItems}" Padding="0 5 10 10">
                 <ItemsControl.ItemsPanel>
@@ -71,7 +86,7 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <Grid Grid.Row="3" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Background="#F0F0F0" Height="42">
+        <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Background="#F0F0F0" Height="42">
             <ContentControl Grid.Column="0" Margin="6,0" DataContext="{Binding Hamburger}">
                 <controls:HamburgerMenuControl />
             </ContentControl>
