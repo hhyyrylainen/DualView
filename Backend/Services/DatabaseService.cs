@@ -1370,6 +1370,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         else
         {
             section.Name = collection.Name;
+
+            // Collections are globally unique, but a collection can be linked to multiple folders.
+            // Ensure an existing collection is linked to the selected non-root target folder too.
+            if (section.TargetFolderId != MediaFolder.RootFolderId)
+                await AddCollectionToFolder(collection.Id, section.TargetFolderId);
         }
 
         var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
