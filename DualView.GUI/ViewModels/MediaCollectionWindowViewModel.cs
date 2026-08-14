@@ -19,6 +19,8 @@ namespace DualView.GUI.ViewModels;
 
 public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 {
+    private const long UncategorizedCollectionId = 1;
+
     private readonly ILogger<MediaCollectionWindowViewModel>? logger;
     private readonly IClientDatabaseService? databaseService;
     private readonly IBackendAPI? backendAPI;
@@ -74,6 +76,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref field, value))
             {
                 OnPropertyChanged(nameof(WindowCollectionTitle));
+                OnPropertyChanged(nameof(DeleteCollectionHeader));
+                OnPropertyChanged(nameof(CanDeleteCollection));
                 OnPropertyChanged(nameof(CollectionCreatedAt));
                 OnPropertyChanged(nameof(CollectionStatistics));
                 OnPropertyChanged(nameof(IsPairedImageMode));
@@ -82,6 +86,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     }
 
     public string WindowCollectionTitle => "DualView - " + (Collection?.Name ?? "No collection selected");
+    public string DeleteCollectionHeader => Collection?.IsDeleted == true ? "Restore collection" : "Delete collection";
+    public bool CanDeleteCollection => Collection?.Id != UncategorizedCollectionId;
     public DateTime? CollectionCreatedAt => Collection?.CreatedAt;
     public string CollectionStatistics => Collection == null ? "" : $"{CollectionItemCount} images";
     public int CollectionItemCount { get; private set; }
@@ -273,8 +279,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public void RemoveSelected() => _ = RemoveSelectedAsync();
     public void UndoRemove() => _ = UndoRemoveAsync();
     public void DeleteSelected() => _ = DeleteSelectedAsync();
-    public void DeleteCollection() => Placeholder("Delete collection");
-    public void DeleteCollectionAndImages() => Placeholder("Delete collection and images");
+    public void DeleteCollection() => _ = DeleteCollectionAsync();
+    public void DeleteCollectionAndImages() => _ = DeleteCollectionAndImagesAsync();
     public void Export() => Placeholder("Export");
     public void ExportSelected() => Placeholder("Export selected");
     public void Placeholder(string action) => windowService?.ShowNoticeWindow($"{action} is not implemented yet.");
@@ -483,6 +489,13 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
             latestRemoval = null;
             OnPropertyChanged(nameof(CanUndoRemoval));
             await databaseService.UndoCollectionMediaRemovalAsync(removal);
+            if (removal.CollectionWasDeleted && Collection?.Id == removal.CollectionId)
+            {
+                Collection.IsDeleted = false;
+                OnPropertyChanged(nameof(Collection));
+                OnPropertyChanged(nameof(DeleteCollectionHeader));
+            }
+
             await RefreshItems();
         }
         catch (Exception ex)
@@ -526,6 +539,125 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             windowService?.ShowErrorWindow("Failed to delete selected media", ex);
+        }
+    }
+
+    private async Task DeleteCollectionAsync()
+    {
+        if (Collection == null || databaseService == null)
+            return;
+
+        if (Collection.IsDeleted)
+        {
+            await RestoreDeletedCollectionAsync();
+            return;
+        }
+
+        try
+        {
+            var orphanedCount = await databaseService.GetCollectionOrphanedMediaCountAsync(Collection.Id);
+            if (orphanedCount > 0)
+            {
+                var proceed = await windowService!.ShowConfirmationWindow("Delete collection?",
+                    $"{orphanedCount} non-deleted image(s) would become orphaned and will eventually be moved to " +
+                    "the Uncategorized collection. Continue?", true);
+                if (proceed != true)
+                    return;
+            }
+
+            await databaseService.DeleteCollectionAsync(Collection.Id);
+            Collection.IsDeleted = true;
+            OnPropertyChanged(nameof(Collection));
+            OnPropertyChanged(nameof(DeleteCollectionHeader));
+            await RefreshItems();
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to delete collection", ex);
+        }
+    }
+
+    private async Task DeleteCollectionAndImagesAsync()
+    {
+        if (Collection == null || databaseService == null)
+            return;
+
+        if (Collection.IsDeleted)
+        {
+            var undo = await windowService!.ShowConfirmationWindow("Undo collection deletion?",
+                "This collection is already deleted. Do you want to undo the deletion?", true);
+            if (undo == true)
+                await RestoreDeletedCollectionAsync();
+            return;
+        }
+
+        var start = await windowService!.ShowConfirmationWindow("DELETE collection AND images?",
+            "This will mark the collection and every non-deleted image in it as deleted. " +
+            "This is a dangerous operation. Continue?", true);
+        if (start != true)
+            return;
+
+        try
+        {
+            var contents = await databaseService.GetCollectionContents(Collection.Id);
+            var inOtherCollections = 0;
+            foreach (var media in contents)
+            {
+                var collections = await databaseService.GetMediaCollectionsAsync(media.Id);
+                if (collections.Any(id => id != Collection.Id))
+                    ++inOtherCollections;
+            }
+
+            if (inOtherCollections > 0)
+            {
+                var proceed = await windowService.ShowConfirmationWindow("Confirm DELETE collection AND images?",
+                    $"{inOtherCollections} image(s) are also in other collections and will be marked as deleted there too. " +
+                    "Continue?", true);
+                if (proceed != true)
+                    return;
+            }
+
+            latestRemoval = await databaseService.DeleteCollectionAndImagesAsync(Collection.Id);
+            Collection.IsDeleted = true;
+            OnPropertyChanged(nameof(Collection));
+            OnPropertyChanged(nameof(DeleteCollectionHeader));
+            OnPropertyChanged(nameof(CanUndoRemoval));
+            await RefreshItems();
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to delete collection and images", ex);
+        }
+    }
+
+    private async Task RestoreDeletedCollectionAsync()
+    {
+        if (Collection == null || databaseService == null)
+            return;
+
+        var undo = latestRemoval?.CollectionWasDeleted == true && latestRemoval.CollectionId == Collection.Id;
+        var proceed = await windowService!.ShowConfirmationWindow(
+            undo ? "Undo collection deletion?" : "Restore collection?",
+            undo ? "Undo the collection and image deletion?" : "Restore this collection?", true);
+        if (proceed != true)
+            return;
+
+        try
+        {
+            if (undo)
+                await UndoRemoveAsync();
+            else
+            {
+                await databaseService.RestoreCollectionAsync(Collection.Id);
+                Collection.IsDeleted = false;
+                OnPropertyChanged(nameof(Collection));
+                OnPropertyChanged(nameof(DeleteCollectionHeader));
+                await RefreshItems();
+            }
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to restore collection", ex);
         }
     }
 

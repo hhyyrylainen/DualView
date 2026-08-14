@@ -29,8 +29,10 @@
                 <MenuItem Header="Remove Selected" Command="{Binding RemoveSelected}" />
                 <MenuItem Header="DELETE selected" Command="{Binding DeleteSelected}" />
                 <Separator />
-                <MenuItem Header="Delete collection" Command="{Binding DeleteCollection}" />
-                <MenuItem Header="DELETE collection AND IMAGES" Command="{Binding DeleteCollectionAndImages}" />
+                <MenuItem Header="{Binding DeleteCollectionHeader}" Command="{Binding DeleteCollection}"
+                          IsEnabled="{Binding CanDeleteCollection}" />
+                <MenuItem Header="DELETE collection AND IMAGES" Command="{Binding DeleteCollectionAndImages}"
+                          IsEnabled="{Binding CanDeleteCollection}" />
             </MenuItem>
             <MenuItem Header="View">
                 <MenuItem Header="Sort by visual similarity" Command="{Binding StartVisualSimilaritySort}"
