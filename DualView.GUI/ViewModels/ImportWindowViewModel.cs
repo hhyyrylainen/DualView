@@ -274,6 +274,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
                 Selected = false,
             };
             Media.Add(viewer);
+            viewer.OnSelectionChanged += OnMediaSelectionChanged;
         }
     }
 
@@ -347,17 +348,22 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             selected.Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList());
         foreach (var item in selected)
         {
+            item.OnSelectionChanged -= OnMediaSelectionChanged;
             item.Dispose();
             Media.Remove(item);
         }
 
         OnPropertyChanged(nameof(ImageCount));
+        OnPropertyChanged(nameof(SelectedCount));
     }
 
     public void Dispose()
     {
         foreach (var media in Media)
+        {
+            media.OnSelectionChanged -= OnMediaSelectionChanged;
             media.Dispose();
+        }
         FolderPicker.PropertyChanged -= OnFolderPickerPropertyChanged;
         FolderPicker.Dispose();
     }
@@ -393,5 +399,10 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
             // TODO: trigger backend save immediately
         }
+    }
+
+    private void OnMediaSelectionChanged(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(SelectedCount));
     }
 }
