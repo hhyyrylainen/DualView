@@ -42,7 +42,10 @@
                              PlaceholderText="Upload section name (optional, blank means current section)"
                              Text="{Binding UploadSectionName}"
                              ItemsSource="{Binding TargetNameSuggestions}"
-                             MinimumPrefixLength="3" />
+                             MinimumPrefixLength="3"
+                             FilterMode="None"
+                             SelectedItem="{Binding SelectedTargetName}"
+                             TextChanged="OnTargetNameTextChanged" />
         </Grid>
 
 

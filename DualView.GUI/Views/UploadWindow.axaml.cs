@@ -41,6 +41,15 @@ public partial class UploadWindow : Window
         Close();
     }
 
+    private void OnTargetNameTextChanged(object? sender, TextChangedEventArgs e)
+    {
+        if (sender is AutoCompleteBox { SelectedItem: null, Text: var text } &&
+            DataContext is UploadWindowViewModel viewModel)
+        {
+            _ = viewModel.LoadTargetNameSuggestionsAsync(text ?? string.Empty);
+        }
+    }
+
     private void OnDragOver(object? sender, DragEventArgs e)
     {
         e.DragEffects = e.DataTransfer.Formats.Contains(DataFormat.File)

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -75,12 +76,31 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
         get;
         set
         {
-            if (SetProperty(ref field, value))
-                _ = LoadTargetNameSuggestionsAsync(value);
+            SetProperty(ref field, value);
+
+            // Important! Somehow trying to load suggestions here, breaks the auto-complete selection
+            //_ = LoadTargetNameSuggestionsAsync(value);
         }
     } = "";
 
-    public ObservableCollection<string> TargetNameSuggestions { get; } = new();
+    public string? SelectedTargetName
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                if (value != null && UploadSectionName != value)
+                    UploadSectionName = value;
+            }
+        }
+    }
+
+    public List<string> TargetNameSuggestions
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = new();
 
     public double TotalProgress
     {
@@ -118,7 +138,7 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
         var searchVersion = ++targetNameSearchVersion;
         if (databaseService == null || search.Trim().Length <= 2)
         {
-            TargetNameSuggestions.Clear();
+            TargetNameSuggestions = [];
             return;
         }
 
@@ -133,9 +153,7 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
                 if (searchVersion != targetNameSearchVersion)
                     return;
 
-                TargetNameSuggestions.Clear();
-                foreach (var name in names)
-                    TargetNameSuggestions.Add(name);
+                TargetNameSuggestions = names;
             });
         }
         catch (Exception ex)
