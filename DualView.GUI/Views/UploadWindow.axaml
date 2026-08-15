@@ -32,12 +32,15 @@
             </MenuItem>
         </Menu>
 
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" HorizontalAlignment="Stretch">
-            <CheckBox IsChecked="{Binding DeleteAfterUpload}">Delete FILES After Upload</CheckBox>
+        <Grid ColumnDefinitions="Auto,*" Grid.Row="1" HorizontalAlignment="Stretch">
+            <CheckBox Grid.Column="0" IsChecked="{Binding DeleteAfterUpload}"
+                      Margin="5 0">
+                Delete FILES After Upload
+            </CheckBox>
 
-            <TextBox PlaceholderText="Upload section name (optional, blank means current section)"
+            <TextBox Grid.Column="1" PlaceholderText="Upload section name (optional, blank means current section)"
                      Text="{Binding UploadSectionName}" HorizontalAlignment="Stretch" />
-        </StackPanel>
+        </Grid>
 
 
         <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
