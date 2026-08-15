@@ -3,6 +3,7 @@ using DualView.GUI.ViewModels;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
+using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 
@@ -15,7 +16,8 @@ public partial class ImageViewerWindow : Window
         InitializeComponent();
 
         CloseButton.Click += (_, _) => Close();
-        KeyDown += OnKeyDown;
+        Opened += (_, _) => Focus();
+        AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, true);
 
         DataContextChanged += (s, e) =>
         {

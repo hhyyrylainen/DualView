@@ -9,6 +9,7 @@
         Height="1000" Width="800"
         x:Class="DualView.GUI.Views.ImageViewerWindow"
         x:DataType="vm:ImageViewerWindowViewModel"
+        Focusable="True"
         DragDrop.AllowDrop="True"
         Icon="/Assets/logo.ico"
         Title="{Binding Title}">
