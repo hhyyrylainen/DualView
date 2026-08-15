@@ -34,6 +34,7 @@
 
         <Grid ColumnDefinitions="Auto,*" Grid.Row="1" HorizontalAlignment="Stretch">
             <CheckBox Grid.Column="0" IsChecked="{Binding DeleteAfterUpload}"
+                      IsEnabled="{Binding RemoveAfterUpload}"
                       Margin="5 0">
                 Delete FILES After Upload
             </CheckBox>

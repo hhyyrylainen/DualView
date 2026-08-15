@@ -266,7 +266,8 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
         }
         finally
         {
-            if (DeleteAfterUpload)
+            // Only delete it if we also want to remove the entries
+            if (DeleteAfterUpload && RemoveAfterUpload)
             {
                 foreach (var file in FilesToUpload.Where(f => f.Status == "Done").ToList())
                 {
