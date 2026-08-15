@@ -1046,10 +1046,63 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
+    public async Task<CollectionBrowseInfoDTO> GetCollectionBrowseInfoAsync(long collectionId, long? mediaId = null)
+    {
+        var query = dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId);
+        var count = await query.CountAsync();
+        int? index = null;
+
+        if (mediaId.HasValue)
+        {
+            var currentItem = await query
+                .Where(item => item.MediaFileId == mediaId.Value)
+                .Select(item => new
+                {
+                    item.SequenceNumber,
+                    item.MediaFileId,
+                })
+                .FirstOrDefaultAsync();
+            if (currentItem != null)
+            {
+                // Count actual rows before this item. Sequence numbers can have gaps after deletions.
+                index = await query.CountAsync(item =>
+                    item.SequenceNumber < currentItem.SequenceNumber ||
+                    item.SequenceNumber == currentItem.SequenceNumber && item.MediaFileId < currentItem.MediaFileId);
+            }
+        }
+
+        return new CollectionBrowseInfoDTO
+        {
+            Count = count,
+            Index = index,
+        };
+    }
+
+    public async Task<MediaFileDTO?> GetCollectionMediaAtIndexAsync(long collectionId, int index)
+    {
+        if (index < 0)
+            return null;
+
+        return await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId)
+            .OrderBy(item => item.SequenceNumber)
+            .ThenBy(item => item.MediaFileId)
+            .Skip(index)
+            .Select(item => item.MediaFile.GetDTO())
+            .FirstOrDefaultAsync();
+    }
+
     async Task<List<MediaFileDTO>> IClientDatabaseService.GetCollectionContents(long collectionId)
     {
         return (await GetCollectionContents(collectionId)).ConvertToDTO<MediaFile, MediaFileDTO>();
     }
+
+    Task<CollectionBrowseInfoDTO> IClientDatabaseService.GetCollectionBrowseInfoAsync(long collectionId,
+        long? mediaId) => GetCollectionBrowseInfoAsync(collectionId, mediaId);
+
+    Task<MediaFileDTO?> IClientDatabaseService.GetCollectionMediaAtIndexAsync(long collectionId, int index) =>
+        GetCollectionMediaAtIndexAsync(collectionId, index);
 
     public async Task<List<Collection>> GetCollectionsInFolderAsync(long folderId)
     {
