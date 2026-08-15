@@ -17,18 +17,23 @@
             <Button Grid.Column="0" Content="UP" Command="{Binding NavigateUp}" Margin="0,0,4,0" />
             <Button Grid.Column="1" Content="Copy" Command="{Binding CopyPath}" Margin="0,0,4,0" />
             <Button Grid.Column="2" Content="Paste" Command="{Binding PastePath}" Margin="0,0,4,0" />
-            <TextBox Grid.Column="3" Text="{Binding CurrentPath}" VerticalContentAlignment="Center">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding NavigateToEnteredPath}" />
-                </TextBox.KeyBindings>
-            </TextBox>
-            <Button Grid.Column="4" Content="Go" Command="{Binding NavigateToEnteredPath}" Margin="4,0,4,0" />
+            <TextBox Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="Search folders..." Margin="0,0,0,0"
+                     VerticalAlignment="Stretch" />
             <Button Grid.Column="5" Content="New Folder" Command="{Binding CreateNewFolder}" />
         </Grid>
 
         <!-- This kind of ends up being basically a duplicate of the text box above, so this is not shown to save space -->
         <TextBlock Grid.Row="1" Text="{Binding CurrentPath}" FontWeight="Bold" Margin="0,0,0,5" IsVisible="False" />
-        <TextBox Grid.Row="2" Text="{Binding SearchText}" PlaceholderText="Search folders..." Margin="0,0,0,5" />
+
+        <!-- Path is here below the "toolbar" as in a narrow scenario the path is otherwise visible just by a few characters -->
+        <Grid Grid.Row="2" ColumnDefinitions="*,Auto">
+            <TextBox Grid.Column="0" Text="{Binding CurrentPath}" HorizontalAlignment="Stretch">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding NavigateToEnteredPath}" />
+                </TextBox.KeyBindings>
+            </TextBox>
+            <Button Grid.Column="1" Content="Go" Command="{Binding NavigateToEnteredPath}" Margin="4,0,4,0" />
+        </Grid>
 
         <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto" BringIntoViewOnFocusChange="False"
