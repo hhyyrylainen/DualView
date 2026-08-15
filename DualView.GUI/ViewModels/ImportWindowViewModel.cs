@@ -204,8 +204,6 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
                 RecentNames.Clear();
                 foreach (var section in sections)
                 {
-                    Sections.Add(new ImportSectionViewModel(section, databaseService, logger, windowService,
-                        folderPickerLogger, serviceProvider, signalRService));
                     if (!string.IsNullOrWhiteSpace(section.Name) &&
                         RecentNames.All(item => !item.Name.Equals(section.Name, StringComparison.Ordinal)))
                     {
