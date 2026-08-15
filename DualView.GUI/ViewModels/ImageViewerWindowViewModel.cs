@@ -116,12 +116,15 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         ICollectionBrowse? browsingSupport)
     {
         Media.MediaToShow = source;
-        Media.MediaOpenResources = extraData;
 
         if (!ReferenceEquals(collectionBrowse, browsingSupport))
             previousBrowseIndex = null;
 
         collectionBrowse = browsingSupport;
+        Media.MediaOpenResources = extraData ??
+                                   (windowService == null
+                                       ? null
+                                       : new ShowMediaInSeparateWindow(windowService, browsingSupport));
         var displayVersion = ++mediaDisplayVersion;
         BrowsePosition = string.Empty;
         OnPropertyChanged(nameof(ImageInfo));
@@ -346,7 +349,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
             // Wrapping around
             if (targetIndex < 0)
-                targetIndex = count -1;
+                targetIndex = count - 1;
 
             if (targetIndex >= count)
                 targetIndex = 0;
