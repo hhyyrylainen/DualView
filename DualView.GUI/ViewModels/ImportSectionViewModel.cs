@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
@@ -28,6 +29,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     private CancellationTokenSource? nameSaveCancellation;
     private bool isInitialized;
     private bool isRefreshingActive;
+    private int targetNameSearchVersion;
 
     // Preview constructor
     public ImportSectionViewModel()
@@ -122,6 +124,25 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public string? SelectedTargetName
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                if (value != null && Name != value)
+                    Name = value;
+            }
+        }
+    }
+
+    public List<string> TargetNameSuggestions
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = new();
+
     public long TargetFolderId
     {
         get;
@@ -164,6 +185,33 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     public int ImageCount => Media.Count;
     public int SelectedCount => Media.Count(item => item.Selected);
+
+    public async Task LoadTargetNameSuggestionsAsync(string search)
+    {
+        var searchVersion = ++targetNameSearchVersion;
+        if (search.Trim().Length <= 2)
+        {
+            TargetNameSuggestions = [];
+            return;
+        }
+
+        try
+        {
+            var names = await databaseService.SearchUploadTargetNamesAsync(search);
+            if (searchVersion != targetNameSearchVersion)
+                return;
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (searchVersion == targetNameSearchVersion)
+                    TargetNameSuggestions = names;
+            });
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Failed to load upload target name suggestions");
+        }
+    }
 
     public void SelectCollectionTab()
     {

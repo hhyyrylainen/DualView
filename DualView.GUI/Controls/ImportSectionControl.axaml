@@ -17,7 +17,12 @@
                 <CheckBox Grid.Column="0" Margin="8,0" IsChecked="{Binding IsActive}">
                     Active
                 </CheckBox>
-                <TextBox Grid.Column="1" Text="{Binding Name}" VerticalContentAlignment="Center" />
+                <AutoCompleteBox Grid.Column="1" Text="{Binding Name}"
+                                 ItemsSource="{Binding TargetNameSuggestions}"
+                                 MinimumPrefixLength="3"
+                                 FilterMode="None"
+                                 SelectedItem="{Binding SelectedTargetName}"
+                                 TextChanged="OnTargetNameTextChanged" />
 
                 <ToggleButton Grid.Column="2" Margin="4,0" IsChecked="{Binding CollectionTabSelected}"
                               Command="{Binding SelectCollectionTab}">
