@@ -45,6 +45,7 @@ public abstract class SignalRServiceBase : ISignalRService
     public event Action? OnDatasetsListUpdated;
     public event Action<long>? OnDatasetUpdated;
     public event Action<long>? OnDatasetContentsUpdated;
+    public event Action<long?>? OnUploadSectionActiveChanged;
 
     public event Action<OperationStatusUpdate>? OnBackgroundOperationStatusUpdate;
 
@@ -238,6 +239,12 @@ public abstract class SignalRServiceBase : ISignalRService
         {
             Logger.LogInformation("Received dataset contents update");
             OnDatasetContentsUpdated?.Invoke(datasetId);
+        });
+
+        hubConnection.On(nameof(IDataHub.UploadSectionActiveChanged), (long? sectionId) =>
+        {
+            Logger.LogInformation("Received upload section active update");
+            OnUploadSectionActiveChanged?.Invoke(sectionId);
         });
     }
 }

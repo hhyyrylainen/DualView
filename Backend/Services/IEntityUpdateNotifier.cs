@@ -57,4 +57,5 @@ public interface IEntityUpdateNotifier
     public Task NotifyTagModifiersUpdated();
     public Task NotifyDownloadGalleriesUpdated();
     public Task NotifyDownloadGalleryUpdated(long id);
+    public Task NotifyUploadSectionActiveChanged(long? sectionId);
 }

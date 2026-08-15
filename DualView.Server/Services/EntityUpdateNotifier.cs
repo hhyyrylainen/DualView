@@ -242,4 +242,10 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
         logger.LogDebug("Broadcasting single download gallery update to all clients");
         await hubContext.Clients.All.DownloadGalleryUpdated(id);
     }
+
+    public async Task NotifyUploadSectionActiveChanged(long? sectionId)
+    {
+        logger.LogDebug("Broadcasting active upload section update to all clients");
+        await hubContext.Clients.All.UploadSectionActiveChanged(sectionId);
+    }
 }

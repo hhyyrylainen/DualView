@@ -1338,10 +1338,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task SetUploadSectionActiveAsync(long? sectionId)
     {
         var sections = await dbContext.UploadSections.ToListAsync();
+        var previousActiveSectionId = sections.FirstOrDefault(section => section.Selected)?.Id;
         foreach (var section in sections)
             section.Selected = sectionId.HasValue && section.Id == sectionId.Value;
-        // TODO: signal R notices so that all GUIs (if there are multiple) can stay up to date
         await SaveAsync();
+
+        var activeSectionId = sections.FirstOrDefault(section => section.Selected)?.Id;
+        if (previousActiveSectionId != activeSectionId)
+            await updateNotifier.NotifyUploadSectionActiveChanged(activeSectionId);
     }
 
     public async Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)

@@ -66,4 +66,5 @@ public interface IDataHub
     public Task TagModifiersUpdated();
     public Task DownloadGalleriesUpdated();
     public Task DownloadGalleryUpdated(long id);
+    public Task UploadSectionActiveChanged(long? sectionId);
 }

@@ -49,6 +49,7 @@ public interface ISignalRService
     public event Action? OnDatasetsListUpdated;
     public event Action<long>? OnDatasetUpdated;
     public event Action<long>? OnDatasetContentsUpdated;
+    public event Action<long?>? OnUploadSectionActiveChanged;
 
     // True = Connected, False = Disconnected
     public event Action<bool>? OnConnectionStatusChanged;
