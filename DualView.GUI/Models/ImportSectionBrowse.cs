@@ -10,19 +10,14 @@ public sealed class ImportSectionBrowse(
     IClientDatabaseService databaseService,
     IServiceProvider serviceProvider) : ICollectionBrowse
 {
-    public async Task<int> GetCountAsync()
-    {
-        return (await databaseService.GetUploadSectionAsync(sectionId))?.Media.Count ?? 0;
-    }
-
-    public async Task<int?> GetIndexAsync(long mediaId)
+    public async Task<(int Count, int? Index)> GetBrowseInfoAsync(long? mediaId)
     {
         var media = (await databaseService.GetUploadSectionAsync(sectionId))?.Media;
         if (media == null)
-            return null;
+            return (0, null);
 
-        var index = media.FindIndex(item => item.Id == mediaId);
-        return index >= 0 ? index : null;
+        var index = mediaId.HasValue ? media.FindIndex(item => item.Id == mediaId.Value) : -1;
+        return (media.Count, index >= 0 ? index : null);
     }
 
     public async Task<IVisualMediaSource?> GetMediaAsync(int index)

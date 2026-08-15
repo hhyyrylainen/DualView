@@ -323,11 +323,11 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         await browseLock.WaitAsync();
         try
         {
-            var index = await collectionBrowse.GetIndexAsync(currentMedia.ServerId);
+            var browseInfo = await collectionBrowse.GetBrowseInfoAsync(currentMedia.ServerId);
 
             // If unknown, go back to the start
-            var targetIndex = index != null ? index.Value + offset : 0;
-            var count = await collectionBrowse.GetCountAsync();
+            var targetIndex = browseInfo.Index != null ? browseInfo.Index.Value + offset : 0;
+            var count = browseInfo.Count;
 
             // Wrapping around
             if (targetIndex < 0)
@@ -360,13 +360,11 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var indexTask = collectionBrowse.GetIndexAsync(serverMediaSource.ServerId);
-            var countTask = collectionBrowse.GetCountAsync();
-            await Task.WhenAll(indexTask, countTask);
-            if (displayVersion != mediaDisplayVersion || indexTask.Result == null)
+            var browseInfo = await collectionBrowse.GetBrowseInfoAsync(serverMediaSource.ServerId);
+            if (displayVersion != mediaDisplayVersion || browseInfo.Index == null)
                 return;
 
-            BrowsePosition = $"{indexTask.Result.Value + 1} / {countTask.Result}";
+            BrowsePosition = $"{browseInfo.Index.Value + 1} / {browseInfo.Count}";
             UpdateTitle(displayVersion);
         }
         catch (Exception e)
