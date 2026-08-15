@@ -4,7 +4,6 @@ using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using DualView.Shared.Utils;
-using DualView.Shared.Requests;
 using Backend.Database;
 using Backend.Models;
 using Backend.Utilities;
@@ -21,8 +20,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     private readonly IAppEvents appEvents;
     private readonly IDataFolderService dataFolderService;
     private readonly IMediaProcessingService mediaProcessingService;
-
-    private readonly TimeSpan oldChatThreshold = TimeSpan.FromHours(24);
 
     private bool disposed;
 
