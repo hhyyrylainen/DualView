@@ -18,7 +18,7 @@ namespace DualView.GUI.ViewModels;
 
 public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 {
-    private readonly IClientDatabaseService databaseService;
+    private readonly IClientDatabaseService? databaseService;
     private readonly ILogger? logger;
     private readonly IWindowService? windowService;
     private readonly IServiceProvider? serviceProvider;
@@ -90,11 +90,14 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         if (signalRService != null)
         {
             signalRService.OnUploadSectionActiveChanged += OnUploadSectionActiveChanged;
+            signalRService.OnUploadSectionUpdated += OnUploadSectionUpdated;
+            signalRService.OnUploadSectionContentsUpdated += OnUploadSectionContentsUpdated;
         }
     }
 
     public ObservableCollection<MediaViewerViewModel> Media { get; } = new();
     public FolderPickerViewModel FolderPicker { get; }
+    public long Id => id;
 
     public bool CollectionTabSelected
     {
@@ -189,7 +192,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     public async Task LoadTargetNameSuggestionsAsync(string search)
     {
         var searchVersion = ++targetNameSearchVersion;
-        if (search.Trim().Length <= 2)
+        if (search.Trim().Length <= 2 || databaseService == null)
         {
             TargetNameSuggestions = [];
             return;
@@ -236,6 +239,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     public async Task SetActiveAsync()
     {
+        if (databaseService == null)
+            return;
         await databaseService.SetUploadSectionActiveAsync(IsActive ? id : null);
     }
 
@@ -247,19 +252,20 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     public async Task ImportAsync()
     {
+        if (databaseService == null)
+            return;
+
         await SaveAsync();
 
         var selected = Media.Where(item => item.Selected)
             .Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList();
         await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
-
-        // TODO: we need a signal R message to update the UI
     }
 
     public async Task RemoveSelectedAsync()
     {
         var selected = Media.Where(item => item.Selected).ToList();
-        await databaseService.RemoveMediaFromUploadSectionAsync(id,
+        await databaseService!.RemoveMediaFromUploadSectionAsync(id,
             selected.Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList());
         foreach (var item in selected)
         {
@@ -270,6 +276,36 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
         OnPropertyChanged(nameof(ImageCount));
         OnPropertyChanged(nameof(SelectedCount));
+    }
+
+    public async Task RefreshDetailsAsync()
+    {
+        if (databaseService == null)
+            return;
+
+        var section = (await databaseService.GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == id);
+        if (section == null)
+            return;
+
+        await Dispatcher.UIThread.InvokeAsync(() => ApplySectionDetails(section));
+    }
+
+    public async Task RefreshContentsAsync()
+    {
+        if (databaseService == null)
+            return;
+
+        var section = (await databaseService.GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == id);
+        if (section == null)
+            return;
+
+        await Dispatcher.UIThread.InvokeAsync(() => ApplySectionContents(section));
+    }
+
+    public void UpdateFromServer(UploadSectionDTO section)
+    {
+        ApplySectionDetails(section);
+        ApplySectionContents(section);
     }
 
     public void Dispose()
@@ -285,6 +321,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         FolderPicker.Dispose();
         CancelNameSave();
         signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
+        signalRService?.OnUploadSectionUpdated -= OnUploadSectionUpdated;
+        signalRService?.OnUploadSectionContentsUpdated -= OnUploadSectionContentsUpdated;
     }
 
     private async Task InitializeFolderPathAsync(long folderId)
@@ -331,6 +369,99 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
                 isRefreshingActive = false;
             }
         });
+    }
+
+    private void OnUploadSectionUpdated(long sectionId)
+    {
+        if (sectionId == id)
+            _ = RefreshDetailsAsync();
+    }
+
+    private void OnUploadSectionContentsUpdated(long sectionId)
+    {
+        if (sectionId == id)
+            _ = RefreshContentsAsync();
+    }
+
+    private void ApplySectionDetails(UploadSectionDTO section)
+    {
+        isInitialized = false;
+        try
+        {
+            Name = section.Name;
+            KeepEvenWhenEmpty = section.KeepTarget;
+            RemoveAfterImport = section.RemoveAfterImport;
+            TargetFolderId = section.TargetFolderId;
+            IsActive = section.Selected;
+        }
+        finally
+        {
+            isInitialized = true;
+        }
+
+        _ = InitializeFolderPathAsync(section.TargetFolderId);
+    }
+
+    private void ApplySectionContents(UploadSectionDTO section)
+    {
+        var existingViewers = Media.ToDictionary(item => ((ServerMediaSource)item.MediaToShow!).ServerId);
+        var desiredViewers = new List<MediaViewerViewModel>();
+        foreach (var media in section.Media)
+        {
+            if (existingViewers.Remove(media.Id, out var viewer))
+            {
+                viewer.Name = media.OriginalFileName;
+            }
+            else
+            {
+                viewer = CreateMediaViewer(media);
+            }
+
+            desiredViewers.Add(viewer);
+        }
+
+        foreach (var removedViewer in existingViewers.Values)
+        {
+            removedViewer.OnSelectionChanged -= OnMediaSelectionChanged;
+            removedViewer.Dispose();
+        }
+
+        for (var index = 0; index < desiredViewers.Count; ++index)
+        {
+            if (index < Media.Count && ReferenceEquals(Media[index], desiredViewers[index]))
+                continue;
+
+            var currentIndex = Media.IndexOf(desiredViewers[index]);
+            if (currentIndex >= 0)
+            {
+                Media.Move(currentIndex, index);
+            }
+            else
+            {
+                Media.Insert(index, desiredViewers[index]);
+            }
+        }
+
+        while (Media.Count > desiredViewers.Count)
+            Media.RemoveAt(Media.Count - 1);
+
+        OnPropertyChanged(nameof(ImageCount));
+        OnPropertyChanged(nameof(SelectedCount));
+    }
+
+    private MediaViewerViewModel CreateMediaViewer(MediaFileDTO media)
+    {
+        var viewer = new MediaViewerViewModel(logger ?? NullLogger.Instance, windowService!)
+        {
+            Name = media.OriginalFileName,
+            MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(media),
+                serviceProvider ?? Program.ServiceProvider!),
+            ShowingThumbnail = true,
+            AllowSelection = true,
+            Selected = false,
+        };
+        viewer.OnSelectionChanged += OnMediaSelectionChanged;
+        return viewer;
     }
 
     private void SaveActiveImmediately()
