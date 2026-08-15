@@ -38,8 +38,11 @@
                 Delete FILES After Upload
             </CheckBox>
 
-            <TextBox Grid.Column="1" PlaceholderText="Upload section name (optional, blank means current section)"
-                     Text="{Binding UploadSectionName}" HorizontalAlignment="Stretch" />
+            <AutoCompleteBox Grid.Column="1"
+                             PlaceholderText="Upload section name (optional, blank means current section)"
+                             Text="{Binding UploadSectionName}"
+                             ItemsSource="{Binding TargetNameSuggestions}"
+                             MinimumPrefixLength="3" />
         </Grid>
 
 

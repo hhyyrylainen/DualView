@@ -19,7 +19,10 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
     private readonly ILogger<UploadWindowViewModel>? logger;
     private readonly IWindowService? windowService;
     private readonly IBackendAPI? backendAPI;
+    private readonly IClientDatabaseService? databaseService;
     private readonly IServiceProvider? serviceProvider;
+
+    private int targetNameSearchVersion;
 
     public UploadWindowViewModel()
     {
@@ -33,11 +36,12 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
     [ActivatorUtilitiesConstructor]
     public UploadWindowViewModel(ILogger<UploadWindowViewModel> logger,
         IWindowService windowService, IBackendAPI backendAPI, IBackendStatusService backendStatusService,
-        IServiceProvider serviceProvider)
+        IClientDatabaseService databaseService, IServiceProvider serviceProvider)
     {
         this.logger = logger;
         this.windowService = windowService;
         this.backendAPI = backendAPI;
+        this.databaseService = databaseService;
         this.serviceProvider = serviceProvider;
 
         Hamburger = new HamburgerMenuViewModel(backendStatusService);
@@ -69,8 +73,14 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
     public string UploadSectionName
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (SetProperty(ref field, value))
+                _ = LoadTargetNameSuggestionsAsync(value);
+        }
     } = "";
+
+    public ObservableCollection<string> TargetNameSuggestions { get; } = new();
 
     public double TotalProgress
     {
@@ -100,6 +110,37 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
         foreach (var path in mediaPaths)
         {
             FilesToUpload.Add(new UploadFileEntry(path, serviceProvider));
+        }
+    }
+
+    public async Task LoadTargetNameSuggestionsAsync(string search)
+    {
+        var searchVersion = ++targetNameSearchVersion;
+        if (databaseService == null || search.Trim().Length <= 2)
+        {
+            TargetNameSuggestions.Clear();
+            return;
+        }
+
+        try
+        {
+            var names = await databaseService.SearchUploadTargetNamesAsync(search);
+            if (searchVersion != targetNameSearchVersion)
+                return;
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (searchVersion != targetNameSearchVersion)
+                    return;
+
+                TargetNameSuggestions.Clear();
+                foreach (var name in names)
+                    TargetNameSuggestions.Add(name);
+            });
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Failed to load upload target name suggestions");
         }
     }
 
