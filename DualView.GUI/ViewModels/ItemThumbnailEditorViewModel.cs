@@ -90,7 +90,7 @@ public class ItemThumbnailEditorViewModel : ViewModelBase, IDisposable
         ThumbnailViewer.MediaToShow = new ServerMediaSource(currentlyShownThumbnail, serviceProvider!);
         ThumbnailViewer.MediaOpenResources =
             new ShowMediaInSeparateWindow(
-                windowService ?? throw new Exception("Window service not set"));
+                windowService ?? throw new Exception("Window service not set"), null);
         ThumbnailViewer.Name = currentlyShownThumbnail.Name;
     }
 

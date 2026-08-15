@@ -60,9 +60,7 @@ public interface IWindowService
     ///   Shows the given media source in a dedicated window
     /// </summary>
     /// <param name="mediaSource">Media to view</param>
-    public void ShowMediaViewer(IVisualMediaSource mediaSource);
-
-
+    public void ShowMediaViewer(IVisualMediaSource mediaSource, ICollectionBrowse? collectionBrowse);
 
     /// <summary>
     ///   Shows a window tracking the progress of a backend operation

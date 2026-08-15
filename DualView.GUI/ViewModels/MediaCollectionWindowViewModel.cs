@@ -40,6 +40,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     private CancellationTokenSource? visualSimilarityCancellation;
     private List<long>? visualSimilarityOrder;
     private CollectionMediaRemovalResult? latestRemoval;
+    private ICollectionBrowse? collectionBrowse;
 
     public MediaCollectionWindowViewModel()
     {
@@ -266,6 +267,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 
         Collection = await databaseService.GetCollectionAsync(id) ??
                      new CollectionDTO(fallbackName ?? "Collection") { Id = id };
+        collectionBrowse = new CollectionBrowse(id, databaseService, serviceProvider!);
         await RefreshItems();
     }
 
@@ -381,7 +383,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
                     {
                         Name = item.OriginalFileName,
                         MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(item), serviceProvider!),
-                        MediaOpenResources = new ShowMediaInSeparateWindow(windowService!),
+                        MediaOpenResources = new ShowMediaInSeparateWindow(windowService!, collectionBrowse),
                         ShowingThumbnail = true,
                         AllowSelection = true,
                     };

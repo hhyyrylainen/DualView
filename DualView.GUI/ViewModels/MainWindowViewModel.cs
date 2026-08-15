@@ -377,6 +377,9 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
             List<MediaViewerViewModel> newItems = new();
             int totalItemsCount;
+            ICollectionBrowse? collectionBrowse = currentCollectionId.HasValue
+                ? new CollectionBrowse(currentCollectionId.Value, databaseService, serviceProvider!)
+                : null;
 
             if (currentCollectionId != null)
             {
@@ -391,7 +394,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                     {
                         Name = item.OriginalFileName,
                         MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(item), serviceProvider!),
-                        MediaOpenResources = new ShowMediaInSeparateWindow(windowService),
+                        MediaOpenResources = new ShowMediaInSeparateWindow(windowService, collectionBrowse),
                         ShowingThumbnail = true,
                         AllowSelection = false,
                     });
@@ -649,7 +652,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 else
                 {
                     // For normal media, we want to open it in a viewer
-                    windowService.ShowMediaViewer(mediaSource.Clone());
+                    windowService.ShowMediaViewer(mediaSource.Clone(), CreateCollectionBrowse());
                 }
             }
         }
@@ -664,7 +667,16 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
         public void ShowThumbnail(IVisualMediaSource mediaSource)
         {
-            windowService.ShowMediaViewer(mediaSource.Clone());
+            windowService.ShowMediaViewer(mediaSource.Clone(), CreateCollectionBrowse());
+        }
+
+        private ICollectionBrowse? CreateCollectionBrowse()
+        {
+            if (viewModel.currentCollectionId == null || viewModel.databaseService == null)
+                return null;
+
+            return new CollectionBrowse(viewModel.currentCollectionId.Value, viewModel.databaseService,
+                viewModel.serviceProvider!);
         }
 
         public void StartEditAction(IVisualMediaSource mediaSource)

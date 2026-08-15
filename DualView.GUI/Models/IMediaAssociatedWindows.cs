@@ -53,10 +53,12 @@ public interface IMediaAssociatedWindows
 public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
 {
     private readonly IWindowService windowService;
+    private readonly ICollectionBrowse? collectionBrowse;
 
-    public ShowMediaInSeparateWindow(IWindowService windowService)
+    public ShowMediaInSeparateWindow(IWindowService windowService, ICollectionBrowse? collectionBrowse)
     {
         this.windowService = windowService;
+        this.collectionBrowse = collectionBrowse;
     }
 
     public IMediaAssociatedWindows.DoubleClickAction DefaultDoubleClickAction =>
@@ -83,7 +85,7 @@ public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
         }
 
         // Clone the media to not mess with the already loaded one
-        windowService.ShowMediaViewer(mediaSource.Clone());
+        windowService.ShowMediaViewer(mediaSource.Clone(), collectionBrowse);
     }
 
     public void Activate(IVisualMediaSource mediaSource)
@@ -125,221 +127,6 @@ public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
             return;
         }
 
-        throw new NotSupportedException();
-    }
-}
-
-public class OpenPromptWindow : IMediaAssociatedWindows
-{
-    private readonly IWindowService windowService;
-    private readonly long promptId;
-
-    public OpenPromptWindow(IWindowService windowService, long promptId, bool hasThumbnail)
-    {
-        this.windowService = windowService;
-        this.promptId = promptId;
-        HasThumbnailAction = hasThumbnail;
-    }
-
-    public IMediaAssociatedWindows.DoubleClickAction DefaultDoubleClickAction =>
-        IMediaAssociatedWindows.DoubleClickAction.OpenView;
-
-    public bool HasViewAction => true;
-    public bool HasThumbnailAction { get; }
-    public bool HasEditAction => false;
-
-    public bool HasMoveToFolderAction => MoveToFolder != null;
-    public bool HasAddToFolderAction => false;
-    public bool HasManageFoldersAction => false;
-
-    public Action? MoveToFolder { get; set; }
-
-    public void RefreshAvailableOptions(IVisualMediaSource? mediaSource)
-    {
-    }
-
-    public void ShowView(IVisualMediaSource? mediaSource)
-    {
-        // windowService.ShowPromptEditorWindow(promptId);
-    }
-
-    public void Activate(IVisualMediaSource mediaSource)
-    {
-        ShowView(mediaSource);
-    }
-
-    public void ShowThumbnail(IVisualMediaSource mediaSource)
-    {
-        windowService.ShowMediaViewer(mediaSource.Clone());
-    }
-
-    public void StartEditAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-
-    public void StartMoveAction(IVisualMediaSource mediaSource)
-    {
-        if (MoveToFolder != null)
-        {
-            MoveToFolder();
-            return;
-        }
-
-        throw new NotSupportedException();
-    }
-
-    public void StartAddToFolderAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-
-    public void StartManageFoldersAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-}
-
-public class OpenPromptPartWindow : IMediaAssociatedWindows
-{
-    private readonly IWindowService windowService;
-    private readonly long promptPartId;
-
-    public OpenPromptPartWindow(IWindowService windowService, long promptPartId, bool hasThumbnail)
-    {
-        this.windowService = windowService;
-        this.promptPartId = promptPartId;
-        HasThumbnailAction = hasThumbnail;
-    }
-
-    public IMediaAssociatedWindows.DoubleClickAction DefaultDoubleClickAction =>
-        IMediaAssociatedWindows.DoubleClickAction.OpenView;
-
-    public bool HasViewAction => true;
-    public bool HasThumbnailAction { get; }
-    public bool HasEditAction => false;
-
-    public bool HasMoveToFolderAction => MoveToFolder != null;
-    public bool HasAddToFolderAction => false;
-    public bool HasManageFoldersAction => false;
-
-    public Action? MoveToFolder { get; set; }
-
-    public void RefreshAvailableOptions(IVisualMediaSource? mediaSource)
-    {
-    }
-
-    public void ShowView(IVisualMediaSource? mediaSource)
-    {
-        // TODO: put something here
-        // windowService.ShowPromptPartEditorWindow(promptPartId);
-    }
-
-    public void Activate(IVisualMediaSource mediaSource)
-    {
-        ShowView(mediaSource);
-    }
-
-    public void ShowThumbnail(IVisualMediaSource mediaSource)
-    {
-        windowService.ShowMediaViewer(mediaSource.Clone());
-    }
-
-    public void StartEditAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-
-    public void StartMoveAction(IVisualMediaSource mediaSource)
-    {
-        if (MoveToFolder != null)
-        {
-            MoveToFolder();
-            return;
-        }
-
-        throw new NotSupportedException();
-    }
-
-    public void StartAddToFolderAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-
-    public void StartManageFoldersAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-}
-
-public class OpenRemoteModelWindow : IMediaAssociatedWindows
-{
-    private readonly IWindowService windowService;
-    private readonly long modelId;
-
-    public OpenRemoteModelWindow(IWindowService windowService, long modelId, bool hasThumbnail)
-    {
-        this.windowService = windowService;
-        this.modelId = modelId;
-        HasThumbnailAction = hasThumbnail;
-    }
-
-    public IMediaAssociatedWindows.DoubleClickAction DefaultDoubleClickAction =>
-        IMediaAssociatedWindows.DoubleClickAction.OpenView;
-
-    public bool HasViewAction => true;
-    public bool HasThumbnailAction { get; }
-    public bool HasEditAction => false;
-
-    public bool HasMoveToFolderAction => MoveToFolder != null;
-    public bool HasAddToFolderAction => false;
-    public bool HasManageFoldersAction => false;
-
-    public Action? MoveToFolder { get; set; }
-
-    public void RefreshAvailableOptions(IVisualMediaSource? mediaSource)
-    {
-    }
-
-    public void ShowView(IVisualMediaSource? mediaSource)
-    {
-        // TODO: hook up the right thing
-        // windowService.ShowRemoteModelEditorWindow(modelId);
-    }
-
-    public void Activate(IVisualMediaSource mediaSource)
-    {
-        ShowView(mediaSource);
-    }
-
-    public void ShowThumbnail(IVisualMediaSource mediaSource)
-    {
-        windowService.ShowMediaViewer(mediaSource.Clone());
-    }
-
-    public void StartEditAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-
-    public void StartMoveAction(IVisualMediaSource mediaSource)
-    {
-        if (MoveToFolder != null)
-        {
-            MoveToFolder();
-            return;
-        }
-
-        throw new NotSupportedException();
-    }
-
-    public void StartAddToFolderAction(IVisualMediaSource mediaSource)
-    {
-        throw new NotSupportedException();
-    }
-
-    public void StartManageFoldersAction(IVisualMediaSource mediaSource)
-    {
         throw new NotSupportedException();
     }
 }

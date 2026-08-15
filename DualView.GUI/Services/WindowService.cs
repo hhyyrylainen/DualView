@@ -222,7 +222,7 @@ public sealed class WindowService : IWindowService
         return await future.Task;
     }
 
-    public void ShowMediaViewer(IVisualMediaSource mediaSource)
+    public void ShowMediaViewer(IVisualMediaSource mediaSource, ICollectionBrowse? collectionBrowse)
     {
         var serviceScope = services.CreateScope();
         var editViewModel = new ImageViewerWindowViewModel(
@@ -233,7 +233,7 @@ public sealed class WindowService : IWindowService
             serviceScope.ServiceProvider.GetRequiredService<ISignalRService>(),
             serviceScope.ServiceProvider.GetRequiredService<IBackendAPI>());
 
-        editViewModel.ShowMedia(mediaSource, null);
+        editViewModel.ShowMedia(mediaSource, null, collectionBrowse);
 
         PerformInstanceWindowCreation(editViewModel, serviceScope);
     }

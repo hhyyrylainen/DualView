@@ -25,10 +25,12 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     private readonly ISignalRService? signalRService;
     private readonly long id;
     private readonly SemaphoreSlim saveLock = new(1, 1);
+    private readonly ICollectionBrowse? collectionBrowse;
 
     private CancellationTokenSource? nameSaveCancellation;
     private bool isInitialized;
     private bool isRefreshingActive;
+
     private int targetNameSearchVersion;
 
     // Preview constructor
@@ -56,6 +58,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         this.windowService = windowService;
         this.serviceProvider = serviceProvider;
         this.signalRService = signalRService;
+        collectionBrowse = new ImportSectionBrowse(section.Id, databaseService,
+            serviceProvider ?? Program.ServiceProvider!);
 
         id = section.Id;
         Name = section.Name;
@@ -78,7 +82,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
                 Name = media.OriginalFileName,
                 MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(media),
                     serviceProvider ?? Program.ServiceProvider!),
-                MediaOpenResources = new ShowMediaInSeparateWindow(windowService!),
+                MediaOpenResources = new ShowMediaInSeparateWindow(windowService!, collectionBrowse),
                 ShowingThumbnail = true,
                 AllowSelection = true,
                 Selected = false,
@@ -483,7 +487,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             Name = media.OriginalFileName,
             MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(media),
                 serviceProvider ?? Program.ServiceProvider!),
-            MediaOpenResources = new ShowMediaInSeparateWindow(windowService!),
+            MediaOpenResources = new ShowMediaInSeparateWindow(windowService!, collectionBrowse),
             ShowingThumbnail = true,
             AllowSelection = true,
             Selected = false,
