@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using DualView.GUI.ViewModels;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -14,6 +15,7 @@ public partial class ImageViewerWindow : Window
         InitializeComponent();
 
         CloseButton.Click += (_, _) => Close();
+        KeyDown += OnKeyDown;
 
         DataContextChanged += (s, e) =>
         {
@@ -24,6 +26,23 @@ public partial class ImageViewerWindow : Window
                 vm.OnMediaSaveRequested += AskForSaveFolder;
             }
         };
+    }
+
+    private void OnKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not ImageViewerWindowViewModel viewModel)
+            return;
+
+        if (e.Key == Key.Left)
+        {
+            viewModel.NavigateToAdjacentMedia(-1);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Right)
+        {
+            viewModel.NavigateToAdjacentMedia(1);
+            e.Handled = true;
+        }
     }
 
     private async Task<string?> AskForSaveFolder(string suggestedName)
