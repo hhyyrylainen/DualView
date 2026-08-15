@@ -932,7 +932,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var searchLower = search.Trim().ToLowerInvariant();
         limit = Math.Clamp(limit, 1, 200);
 
-        // TODO: investigate if this should build a complex SQL statement to filter with a prefix on the DB
         var sectionNames = dbContext.UploadSections
             .Where(section => section.NameLowercase.Contains(searchLower))
             .Select(section => section.Name);
@@ -940,6 +939,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Where(collection => collection.NameLowerCase.Contains(searchLower))
             .Select(collection => collection.Name);
 
+        // TODO: investigate if this builds a single DB query or not
         return await sectionNames.Concat(collectionNames)
             .Distinct()
             .OrderBy(name => name.ToLower().StartsWith(searchLower) ? 0 : 1)
