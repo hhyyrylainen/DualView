@@ -27,6 +27,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     private ICollectionBrowse? collectionBrowse;
     private string currentMediaName = string.Empty;
     private int mediaDisplayVersion;
+    private int? previousBrowseIndex;
 
     public delegate void ClipboardTextSetRequested(string text);
 
@@ -116,6 +117,9 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     {
         Media.MediaToShow = source;
         Media.MediaOpenResources = extraData;
+
+        if (!ReferenceEquals(collectionBrowse, browsingSupport))
+            previousBrowseIndex = null;
 
         collectionBrowse = browsingSupport;
         var displayVersion = ++mediaDisplayVersion;
@@ -324,10 +328,21 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var browseInfo = await collectionBrowse.GetBrowseInfoAsync(currentMedia.ServerId);
-
-            // If unknown, go back to the start
-            var targetIndex = browseInfo.Index != null ? browseInfo.Index.Value + offset : 0;
             var count = browseInfo.Count;
+            if (count == 0)
+                return;
+
+            int targetIndex;
+            if (browseInfo.Index is { } currentIndex)
+            {
+                previousBrowseIndex = currentIndex;
+                targetIndex = currentIndex + offset;
+            }
+            else
+            {
+                // Keep the viewer at the position where the removed image was shown.
+                targetIndex = previousBrowseIndex ?? 0;
+            }
 
             // Wrapping around
             if (targetIndex < 0)
@@ -364,6 +379,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             if (displayVersion != mediaDisplayVersion || browseInfo.Index == null)
                 return;
 
+            previousBrowseIndex = browseInfo.Index.Value;
             BrowsePosition = $"{browseInfo.Index.Value + 1} / {browseInfo.Count}";
             UpdateTitle(displayVersion);
         }
