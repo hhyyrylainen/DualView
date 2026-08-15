@@ -31,6 +31,7 @@ public interface IDatabaseCommonService
 
     public Task AddMediaToCollection(List<long> mediaIds, long collectionId, int firstSequenceNumber,
         List<int>? sequenceNumbers = null);
+
     public Task RemoveMediaFromCollection(long mediaId, long collectionId);
     public Task ReorderCollection(long collectionId, List<long> newImageOrderIds);
 
@@ -70,10 +71,14 @@ public interface IDatabaseCommonService
     public Task SetMediaTemporaryStatusAsync(long mediaId, bool isTemporary);
     public Task BumpUploadSectionLastImportedAsync(long sectionId);
 
+    public Task<List<string>> SearchUploadTargetNamesAsync(string search, int limit = 100);
+
     // Tags
     public Task<long> CreateTagAsync(string name, TagCategory category);
+
     public Task UpdateTagAsync(long id, string? name, string? description, TagCategory? category,
         long? exampleMediaId);
+
     public Task DeleteTagAsync(long id);
 
     public Task<long> CreateTagModifierAsync(string name);
@@ -92,15 +97,19 @@ public interface IDatabaseCommonService
     // Applied Tags
     public Task<long> AddAppliedTagToMediaAsync(long mediaId, long tagId, List<long>? modifierIds,
         long? combinedWithAppliedTagId, string? combineWord);
+
     public Task RemoveAppliedTagFromMediaAsync(long mediaId, long appliedTagId);
 
     public Task<long> AddAppliedTagToCollectionAsync(long collectionId, long tagId, List<long>? modifierIds,
         long? combinedWithAppliedTagId, string? combineWord);
+
     public Task RemoveAppliedTagFromCollectionAsync(long collectionId, long appliedTagId);
 
     // Download Galleries
     public Task<long> CreateDownloadGalleryAsync(string galleryUrl);
+
     public Task UpdateDownloadGalleryAsync(long id, string? targetPath, string? galleryName, bool? isDownloaded,
         string? tagsString);
+
     public Task DeleteDownloadGalleryAsync(long id);
 }

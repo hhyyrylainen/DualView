@@ -101,6 +101,13 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                throw new Exception("Failed to get collections");
     }
 
+    public async Task<List<string>> SearchUploadTargetNamesAsync(string search, int limit = 100)
+    {
+        return await HttpClient.GetFromJsonAsync<List<string>>(
+                   $"api/v1/uploadSection/targetNames?search={Uri.EscapeDataString(search)}&limit={limit}") ??
+               new List<string>();
+    }
+
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
         CollectionSortColumn sortColumn = CollectionSortColumn.CollectionOrder,
         SortDirection sortDirection = SortDirection.Ascending, string? search = null)

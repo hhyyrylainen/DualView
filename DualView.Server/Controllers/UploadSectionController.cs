@@ -36,6 +36,15 @@ public class UploadSectionController : Controller
         }).ToList();
     }
 
+    [HttpGet("targetNames")]
+    public async Task<ActionResult<List<string>>> GetTargetNames([FromQuery] string search, [FromQuery] int limit = 100)
+    {
+        if (search.Trim().Length <= 2)
+            return new List<string>();
+
+        return await databaseService.SearchUploadTargetNamesAsync(search, limit);
+    }
+
     [HttpPut("{sectionId:long}")]
     public async Task<ActionResult> Update(long sectionId, UploadSectionDTO request)
     {
