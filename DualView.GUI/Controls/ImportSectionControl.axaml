@@ -51,7 +51,7 @@
                 <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,*">
                     <TextBlock Grid.Row="0" Grid.Column="0" Margin="2" HorizontalAlignment="Center">Target folder:</TextBlock>
                     <controls:FolderPicker Grid.Row="1" Grid.Column="0" DataContext="{Binding FolderPicker}"
-                                           Height="240" />
+                                           Height="305" />
 
                     <TextBlock Grid.Row="0" Grid.Column="1" Margin="2" HorizontalAlignment="Center">Collection tags:</TextBlock>
                     <TextBlock Grid.Row="1" Grid.Column="1">TODO: add tag editor here</TextBlock>
@@ -63,7 +63,7 @@
                         <Button Command="{Binding RemoveSelectedAsync}">Remove selected</Button>
                         <CheckBox IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
                     </WrapPanel>
-                    <ScrollViewer Grid.Row="1" Height="180">
+                    <ScrollViewer Grid.Row="1" Height="330">
                         <ItemsControl ItemsSource="{Binding Media}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
