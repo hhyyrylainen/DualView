@@ -86,6 +86,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         await SaveAsync();
         await updateNotifier.NotifyAppSettingsUpdated();
+        logger.LogInformation("Updated application settings");
     }
 
     public async Task<long> CreateMediaFolder(string folderName, long parentId)
@@ -112,6 +113,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation(
+            "Created media folder '{FolderName}' ({FolderId}) with parent '{ParentName}' ({ParentId})",
+            folder.Name, folder.Id, parent.Name, parent.Id);
+
         return folder.Id;
     }
 
@@ -137,6 +142,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         folder.Name = trimmedName;
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation("Renamed media folder '{OldName}' ({OldFolderId}) to '{FolderName}' ({FolderId})",
+            oldName,
+            folderId, folder.Name, folder.Id);
     }
 
     public async Task<long> CreateCollection(string collectionName, long folderId)
@@ -163,6 +171,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.Collections.AddAsync(collection);
         await SaveAsync();
         await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
+        logger.LogInformation(
+            "Created collection '{CollectionName}' ({CollectionId}) in folder '{FolderName}' ({FolderId})",
+            collection.Name, collection.Id, folder.Name, folder.Id);
         return collection.Id;
     }
 
@@ -188,6 +199,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         collection.Name = trimmedName;
         await SaveAsync();
         await updateNotifier.NotifyCollectionUpdated(collectionId);
+        logger.LogInformation(
+            "Renamed collection '{OldName}' ({OldCollectionId}) to '{CollectionName}' ({CollectionId})",
+            oldName, collectionId, collection.Name, collection.Id);
     }
 
     public async Task AddCollectionToFolder(long collectionId, long folderId)
@@ -214,6 +228,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             {
                 await SaveAsync();
                 await updateNotifier.NotifyMediaFolderContentsUpdated(MediaFolder.RootFolderId);
+                logger.LogInformation("Moved collection '{CollectionName}' ({CollectionId}) out of the root folder",
+                    collection.Name, collection.Id);
             }
 
             return;
@@ -224,6 +240,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
         if (removedFromRoot)
             await updateNotifier.NotifyMediaFolderContentsUpdated(MediaFolder.RootFolderId);
+        logger.LogInformation(
+            "Added collection '{CollectionName}' ({CollectionId}) to folder {FolderName} ({FolderId})",
+            collection.Name, collection.Id, folder.Name, folder.Id);
     }
 
     public async Task AddFolderToFolder(long folderId, long parentFolderId)
@@ -246,6 +265,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         folder.Parents.Add(parent);
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation(
+            "Added folder '{FolderName}' ({FolderId}) to parent folder '{ParentFolderName}' ({ParentFolderId})",
+            folder.Name, folder.Id, parent.Name, parent.Id);
     }
 
     public async Task RemoveCollectionFromFolder(long collectionId, long folderId)
@@ -277,6 +299,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         if (addedToRoot && folderId != MediaFolder.RootFolderId)
             await updateNotifier.NotifyMediaFolderContentsUpdated(MediaFolder.RootFolderId);
+        logger.LogInformation(
+            "Removed collection '{CollectionName}' ({CollectionId}) from folder '{FolderName}' ({FolderId})",
+            collection.Name, collection.Id, folder.Name, folder.Id);
     }
 
     public async Task RemoveFolderFromFolder(long folderId, long parentFolderId)
@@ -301,6 +326,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation(
+            "Removed folder '{FolderName}' ({FolderId}) from parent folder '{ParentFolderName}' ({ParentFolderId})",
+            folder.Name, folder.Id, parent.Name, parent.Id);
     }
 
     public async Task AddMediaToCollection(List<long> mediaIds, long collectionId, int firstSequenceNumber,
@@ -386,6 +414,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             await updateNotifier.NotifyCollectionContentsUpdated(Collection.UncategorizedCollectionId);
         foreach (var mediaId in temporaryMediaIds)
             await updateNotifier.NotifyMediaUpdated(mediaId);
+        logger.LogInformation("Added {MediaCount} media items to collection '{CollectionName}' ({CollectionId})",
+            newMediaIds.Count, collection.Name, collection.Id);
     }
 
     public async Task SetCollectionImageGroupSizeAsync(long collectionId, int imageGroupSize)
@@ -407,6 +437,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         collection.ImageGroupSize = imageGroupSize;
         await SaveAsync();
         await updateNotifier.NotifyCollectionUpdated(collectionId);
+        logger.LogInformation("Set collection '{CollectionName}' ({CollectionId}) image group size to {ImageGroupSize}",
+            collection.Name, collection.Id, imageGroupSize);
     }
 
     public async Task ReorderCollection(long collectionId, List<long> newImageOrderIds)
@@ -440,6 +472,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         collection.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyCollectionUpdated(collectionId);
+        logger.LogInformation("Reordered {ItemCount} items in collection '{CollectionName}' ({CollectionId})",
+            newImageOrderIds.Count, collection.Name, collection.Id);
     }
 
     public async Task RemoveMediaFromCollection(long mediaId, long collectionId)
@@ -453,6 +487,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         dbContext.Set<CollectionItem>().Remove(item);
         await SaveAsync();
         await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
+        logger.LogInformation("Removed media {MediaId} from collection {CollectionId}", mediaId, collectionId);
     }
 
     public async Task<CollectionMediaRemovalPreview> PreviewCollectionMediaRemovalAsync(long collectionId,
@@ -479,7 +514,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId,
         List<long> mediaIds)
     {
-        _ = await dbContext.Collections.FindAsync(collectionId) ?? throw new ArgumentException("Collection not found");
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
         var selectedIds = mediaIds.Distinct().ToHashSet();
         var items = await dbContext.Set<CollectionItem>()
             .Where(item => item.CollectionId == collectionId && selectedIds.Contains(item.MediaFileId))
@@ -525,6 +561,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
         if (result.AddedToUncategorizedMediaIds.Count > 0)
             await updateNotifier.NotifyCollectionContentsUpdated(Collection.UncategorizedCollectionId);
+        logger.LogInformation("Removed {ItemCount} media items from collection '{CollectionName}' ({CollectionId})",
+            items.Count, collection.Name, collection.Id);
         return result;
     }
 
@@ -583,6 +621,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         if (uncategorizedItems.Count > 0)
             await updateNotifier.NotifyCollectionContentsUpdated(Collection.UncategorizedCollectionId);
+        logger.LogInformation("Restored {ItemCount} items in collection '{CollectionName}' ({CollectionId})",
+            itemsToRestore.Count, collection.Name, collection.Id);
     }
 
     public async Task<List<long>> GetMediaCollectionsAsync(long mediaId)
@@ -687,6 +727,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.MediaFolders.AddAsync(folder);
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation("Created media folder '{FolderName}' ({FolderId}) with parent folder ID {ParentFolderId}",
+            folder.Name, folder.Id, parentId);
         return folder;
     }
 
@@ -714,6 +756,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         media.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyMediaUpdated(mediaId);
+        logger.LogInformation("Deleted media file {MediaId}", mediaId);
     }
 
     public async Task RestoreMediaAsync(long mediaId)
@@ -777,6 +820,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         dbContext.MediaFiles.Remove(media);
         await SaveAsync();
         await updateNotifier.NotifyMediaUpdated(mediaId);
+        logger.LogInformation("Purged media file {MediaId}", mediaId);
     }
 
     public async Task<List<MediaFile>> GetDeletedMediaAsync(int limit)
@@ -869,6 +913,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         existing.UpdatedAt = DateTime.UtcNow;
 
         await SaveAsync();
+        logger.LogInformation("Updated media file {MediaId}", media.Id);
     }
 
     public async Task<List<MediaFolder>> GetMediaFoldersAsync(long? limitToParent)
@@ -1038,6 +1083,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         await SaveAsync();
         await updateNotifier.NotifyCollectionUpdated(collection.Id);
+        logger.LogInformation("Updated collection '{CollectionName}' ({CollectionId})", collection.Name,
+            collection.Id);
     }
 
     public async Task DeleteMediaFolderAsync(long folderId)
@@ -1048,6 +1095,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         folder.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation("Deleted media folder '{FolderName}' ({FolderId})", folder.Name, folder.Id);
     }
 
     public async Task RestoreMediaFolderAsync(long folderId)
@@ -1058,6 +1106,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         folder.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation("Restored media folder '{FolderName}' ({FolderId})", folder.Name, folder.Id);
     }
 
     public async Task PurgeMediaFolderAsync(long folderId)
@@ -1070,6 +1119,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         dbContext.MediaFolders.Remove(folder);
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
+        logger.LogInformation("Purged media folder '{FolderName}' ({FolderId})", folder.Name, folder.Id);
     }
 
     public async Task DeleteCollectionAsync(long collectionId)
@@ -1088,6 +1138,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         {
             await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
         }
+
+        logger.LogInformation("Deleted collection '{CollectionName}' ({CollectionId})", collection.Name,
+            collection.Id);
     }
 
     public async Task<int> GetCollectionOrphanedMediaCountAsync(long collectionId)
@@ -1137,6 +1190,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         foreach (var media in mediaFiles)
             await updateNotifier.NotifyMediaUpdated(media.Id);
 
+        logger.LogInformation("Deleted collection '{CollectionName}' ({CollectionId}) and {MediaCount} media files",
+            collection.Name, collection.Id, mediaFiles.Count);
+
         return new CollectionMediaRemovalResult
         {
             CollectionId = collectionId,
@@ -1168,6 +1224,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         {
             await updateNotifier.NotifyMediaFolderContentsUpdated(folder.Id);
         }
+
+        logger.LogInformation("Restored collection '{CollectionName}' ({CollectionId})", collection.Name,
+            collection.Id);
     }
 
     public async Task PurgeCollectionAsync(long collectionId)
@@ -1209,6 +1268,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         {
             await updateNotifier.NotifyMediaFolderContentsUpdated(folderId);
         }
+
+        logger.LogInformation(
+            "Purged collection '{CollectionName}' ({CollectionId}) and re-categorized {MediaCount} media files",
+            collection.Name, collection.Id, mediaToCategorize.Count);
     }
 
     public async Task<MediaFile?> GetMediaByHashAsync(string hash)
@@ -1263,6 +1326,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         await SaveAsync();
         await updateNotifier.NotifyMediaUpdated(mediaFile.Id);
+        logger.LogInformation("Updated media file {MediaId}", mediaFile.Id);
     }
 
     public async Task<UploadSection> GetOrCreateUploadSectionAsync(string? sectionName)
@@ -1297,6 +1361,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.UploadSections.AddAsync(newSection);
         await SaveAsync();
         await updateNotifier.NotifyUploadSectionsUpdated();
+        logger.LogInformation("Created upload section '{SectionName}' ({SectionId})", newSection.Name,
+            newSection.Id);
 
         return newSection;
     }
@@ -1328,6 +1394,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await SaveAsync();
         await updateNotifier.NotifyUploadSectionUpdated(section.Id);
+        logger.LogDebug("Updated upload section '{SectionName}' ({SectionId})", section.Name, section.Id);
     }
 
     public async Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds)
@@ -1339,6 +1406,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await SaveAsync();
         await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
+        logger.LogInformation("Removed {ItemCount} items from upload section {SectionId}", items.Count, sectionId);
     }
 
     public async Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds)
@@ -1359,19 +1427,26 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await SaveAsync();
         await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
+        logger.LogInformation("Reordered {ItemCount} items in upload section {SectionId}", items.Count, sectionId);
     }
 
     public async Task SetUploadSectionActiveAsync(long? sectionId)
     {
         var sections = await dbContext.UploadSections.ToListAsync();
-        var previousActiveSectionId = sections.FirstOrDefault(section => section.Selected)?.Id;
+        var previousActiveSection = sections.FirstOrDefault(section => section.Selected);
         foreach (var section in sections)
             section.Selected = sectionId.HasValue && section.Id == sectionId.Value;
         await SaveAsync();
 
-        var activeSectionId = sections.FirstOrDefault(section => section.Selected)?.Id;
-        if (previousActiveSectionId != activeSectionId)
-            await updateNotifier.NotifyUploadSectionActiveChanged(activeSectionId);
+        var activeSection = sections.FirstOrDefault(section => section.Selected);
+        if (previousActiveSection?.Id != activeSection?.Id)
+        {
+            await updateNotifier.NotifyUploadSectionActiveChanged(activeSection?.Id);
+            logger.LogInformation(
+                "Changed active upload section from '{PreviousSectionName}' ({PreviousSectionId}) to " +
+                "'{SectionName}' ({SectionId})", previousActiveSection?.Name ?? "<none>",
+                previousActiveSection?.Id, activeSection?.Name ?? "<none>", activeSection?.Id);
+        }
     }
 
     public async Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
@@ -1386,6 +1461,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToList();
         if (selectedIds.Count == 0)
             return;
+
+        logger.LogInformation("Importing {ItemCount} items from upload section '{SectionName}' ({SectionId})",
+            selectedIds.Count, section.Name, section.Id);
 
         var originalSectionName = section.Name;
         var targetCollectionName = section.Name.Trim();
@@ -1420,6 +1498,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             dbContext.UploadSections.Remove(section);
             await SaveAsync();
             await updateNotifier.NotifyUploadSectionsUpdated();
+            logger.LogInformation("Removed empty upload section '{SectionName}' ({SectionId}) after import",
+                section.Name, section.Id);
             return;
         }
 
@@ -1430,6 +1510,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             dbContext.UploadSectionItems.RemoveRange(items);
             await SaveAsync();
             await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
+            logger.LogInformation("Removed {ItemCount} imported items from upload section {SectionId}", items.Count,
+                sectionId);
         }
     }
 
@@ -1458,6 +1540,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await SaveAsync();
         await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
+        logger.LogInformation("Added media {MediaId} to upload section {SectionId}", mediaId, sectionId);
     }
 
     public async Task<int> GetNextUploadSectionIndexAsync(long sectionId)
@@ -1483,6 +1566,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         media.IsTemporary = isTemporary;
         await SaveAsync();
+        logger.LogInformation("Set media {MediaId} temporary status to {IsTemporary}", mediaId, isTemporary);
     }
 
     public async Task BumpUploadSectionLastImportedAsync(long sectionId)
@@ -1492,6 +1576,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         section.LastImported = DateTime.UtcNow;
         section.BumpUpdatedAtTime();
         await SaveAsync();
+
+        logger.LogInformation("Updated last imported time for upload section '{SectionName}' ({SectionId})",
+            section.Name, section.Id);
 
         // For now, this is not shown in the GUI, so we don't need to trigger an update event
         // await updateNotifier.NotifyUploadSectionUpdated(sectionId);
@@ -1517,6 +1604,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await AddMediaToCollection([mediaItem.Id], collectionId, sequenceNumber);
 
+        logger.LogInformation("Created media file {MediaId} in collection '{CollectionName}' ({CollectionId})",
+            mediaItem.Id, collection.Name, collection.Id);
+
         return mediaItem;
     }
 
@@ -1533,6 +1623,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var index = await GetNextUploadSectionIndexAsync(section.Id);
 
         await AddMediaToUploadSectionAsync(mediaItem.Id, section.Id, index);
+
+        logger.LogInformation("Created media file {MediaId} in upload section '{SectionName}' ({SectionId})",
+            mediaItem.Id, section.Name, section.Id);
 
         return mediaItem;
     }
@@ -1582,6 +1675,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         await dbContext.MaintenanceJobRecords.AddAsync(record);
         await SaveAsync();
+        logger.LogInformation("Created maintenance record '{RecordName}'", record.Name);
     }
 
     public Task SaveMaintenanceRecord(MaintenanceJobRecord record)
@@ -1592,6 +1686,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public Task DeleteMaintenanceRecord(MaintenanceJobRecord record)
     {
         dbContext.MaintenanceJobRecords.Remove(record);
+        logger.LogInformation("Deleted maintenance record '{RecordName}'", record.Name);
         return SaveAsync();
     }
 
@@ -1635,6 +1730,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.Tags.AddAsync(tag);
         await SaveAsync();
         await updateNotifier.NotifyTagsUpdated();
+        logger.LogInformation("Created tag {TagId} '{TagName}'", tag.Id, tag.Name);
         return tag.Id;
     }
 
@@ -1658,6 +1754,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await SaveAsync();
         await updateNotifier.NotifyTagUpdated(id);
         await updateNotifier.NotifyTagsUpdated();
+        logger.LogInformation("Updated tag {TagId}", id);
     }
 
     public async Task DeleteTagAsync(long id)
@@ -1667,6 +1764,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         tag.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyTagsUpdated();
+        logger.LogInformation("Deleted tag {TagId}", id);
     }
 
     public async Task<long> CreateTagModifierAsync(string name)
@@ -1675,6 +1773,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.TagModifiers.AddAsync(modifier);
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
+        logger.LogInformation("Created tag modifier {ModifierId} '{ModifierName}'", modifier.Id, modifier.Name);
         return modifier.Id;
     }
 
@@ -1691,6 +1790,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         modifier.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
+        logger.LogInformation("Updated tag modifier {ModifierId}", id);
     }
 
     public async Task DeleteTagModifierAsync(long id)
@@ -1700,6 +1800,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         modifier.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
+        logger.LogInformation("Deleted tag modifier {ModifierId}", id);
     }
 
     public async Task<List<string>> GetTagAliasesAsync(long tagId)
@@ -1724,6 +1825,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.TagAliases.AddAsync(tagAlias);
         await SaveAsync();
         await updateNotifier.NotifyTagUpdated(tagId);
+        logger.LogInformation("Added alias to tag {TagId}", tagId);
     }
 
     public async Task DeleteTagAliasAsync(long tagId, string alias)
@@ -1735,6 +1837,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             dbContext.TagAliases.Remove(tagAlias);
             await SaveAsync();
             await updateNotifier.NotifyTagUpdated(tagId);
+            logger.LogInformation("Removed alias from tag {TagId}", tagId);
         }
     }
 
@@ -1752,6 +1855,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.TagImplies.AddAsync(imply);
         await SaveAsync();
         await updateNotifier.NotifyTagUpdated(tagId);
+        logger.LogInformation("Added implication from tag {TagId} to tag {ImpliedTagId}", tagId, impliedTagId);
     }
 
     public async Task RemoveTagImplicationAsync(long tagId, long impliedTagId)
@@ -1763,6 +1867,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             dbContext.TagImplies.Remove(imply);
             await SaveAsync();
             await updateNotifier.NotifyTagUpdated(tagId);
+            logger.LogInformation("Removed implication from tag {TagId} to tag {ImpliedTagId}", tagId,
+                impliedTagId);
         }
     }
 
@@ -1791,6 +1897,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         media.AppliedTags.Add(appliedTag);
         await SaveAsync();
         await updateNotifier.NotifyMediaUpdated(mediaId);
+        logger.LogDebug("Added applied tag {AppliedTagId} to media {MediaId}", appliedTag.Id, mediaId);
         return appliedTag.Id;
     }
 
@@ -1805,6 +1912,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             media.AppliedTags.Remove(appliedTag);
             await SaveAsync();
             await updateNotifier.NotifyMediaUpdated(mediaId);
+            logger.LogDebug("Removed applied tag {AppliedTagId} from media {MediaId}", appliedTagId,
+                mediaId);
         }
     }
 
@@ -1833,6 +1942,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         collection.AppliedTags.Add(appliedTag);
         await SaveAsync();
         await updateNotifier.NotifyCollectionUpdated(collectionId);
+        logger.LogInformation("Added applied tag {AppliedTagId} to collection '{CollectionName}' ({CollectionId})",
+            appliedTag.Id, collection.Name, collection.Id);
         return appliedTag.Id;
     }
 
@@ -1848,6 +1959,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             collection.AppliedTags.Remove(appliedTag);
             await SaveAsync();
             await updateNotifier.NotifyCollectionUpdated(collectionId);
+            logger.LogInformation(
+                "Removed applied tag {AppliedTagId} from collection '{CollectionName}' ({CollectionId})",
+                appliedTagId, collection.Name, collection.Id);
         }
     }
 
@@ -1873,6 +1987,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.DownloadGalleries.AddAsync(gallery);
         await SaveAsync();
         await updateNotifier.NotifyDownloadGalleriesUpdated();
+        logger.LogInformation("Created download gallery {GalleryId}", gallery.Id);
         return gallery.Id;
     }
 
@@ -1897,6 +2012,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         gallery.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyDownloadGalleryUpdated(id);
+        logger.LogDebug("Updated download gallery {GalleryId}", id);
     }
 
     public async Task DeleteDownloadGalleryAsync(long id)
@@ -1907,6 +2023,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         gallery.UpdatedAt = DateTime.UtcNow;
         await SaveAsync();
         await updateNotifier.NotifyDownloadGalleriesUpdated();
+        logger.LogInformation("Deleted download gallery {GalleryId}", id);
     }
 
     // Server-only model variants
@@ -2157,6 +2274,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var ignored = new IgnoredDuplicate(first, second);
         await dbContext.IgnoredDuplicates.AddAsync(ignored);
         await SaveAsync();
+        logger.LogDebug("Added ignored duplicate pair {FirstMediaId}, {SecondMediaId}", first, second);
     }
 
     public async Task RemoveIgnoredDuplicateAsync(long mediaId1, long mediaId2)
@@ -2169,6 +2287,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         {
             dbContext.IgnoredDuplicates.Remove(ignored);
             await SaveAsync();
+            logger.LogInformation("Removed ignored duplicate pair {FirstMediaId}, {SecondMediaId}", first, second);
         }
     }
 
