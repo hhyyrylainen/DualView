@@ -2,7 +2,9 @@ using System;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using DualView.GUI.Models;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
@@ -19,12 +21,19 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     private readonly ILogger? logger;
     private readonly IWindowService? windowService;
     private readonly IServiceProvider? serviceProvider;
+    private readonly ISignalRService? signalRService;
     private readonly long id;
+    private readonly SemaphoreSlim saveLock = new(1, 1);
+
+    private CancellationTokenSource? nameSaveCancellation;
+    private bool isInitialized;
+    private bool isRefreshingActive;
 
     // Preview constructor
     public ImportSectionViewModel()
     {
         databaseService = null!;
+        signalRService = null;
         Name = "Test name";
 
         FolderPicker = new FolderPickerViewModel();
@@ -32,17 +41,19 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         id = -1;
         IsActive = true;
         TargetFolderId = 1;
+        isInitialized = true;
     }
 
     [ActivatorUtilitiesConstructor]
     public ImportSectionViewModel(UploadSectionDTO section, IClientDatabaseService databaseService,
         ILogger? logger, IWindowService? windowService, ILogger<FolderPickerViewModel>? folderPickerLogger,
-        IServiceProvider? serviceProvider)
+        IServiceProvider? serviceProvider, ISignalRService? signalRService)
     {
         this.databaseService = databaseService;
         this.logger = logger;
         this.windowService = windowService;
         this.serviceProvider = serviceProvider;
+        this.signalRService = signalRService;
 
         id = section.Id;
         Name = section.Name;
@@ -72,6 +83,12 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             Media.Add(viewer);
             viewer.OnSelectionChanged += OnMediaSelectionChanged;
         }
+
+        isInitialized = true;
+        if (signalRService != null)
+        {
+            signalRService.OnUploadSectionActiveChanged += OnUploadSectionActiveChanged;
+        }
     }
 
     public ObservableCollection<MediaViewerViewModel> Media { get; } = new();
@@ -98,27 +115,51 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     public string Name
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (SetProperty(ref field, value) && isInitialized)
+                ScheduleNameSave();
+        }
     }
 
-    public long TargetFolderId { get; set; }
+    public long TargetFolderId
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value) && isInitialized)
+                SaveImmediately();
+        }
+    }
 
     public bool KeepEvenWhenEmpty
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (SetProperty(ref field, value) && isInitialized)
+                SaveImmediately();
+        }
     }
 
     public bool RemoveAfterImport
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (SetProperty(ref field, value) && isInitialized)
+                SaveImmediately();
+        }
     }
 
     public bool IsActive
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (SetProperty(ref field, value) && isInitialized && !isRefreshingActive)
+                SaveActiveImmediately();
+        }
     }
 
     public int ImageCount => Media.Count;
@@ -150,19 +191,16 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         await databaseService.SetUploadSectionActiveAsync(IsActive ? id : null);
     }
 
-    // TODO: this should automatically save any changes after like a second (or if import is pressed immediately before doing the import)
-    // This is probably needed just for the name change text box
     public async Task SaveAsync()
     {
-        await databaseService.SaveUploadSectionAsync(new UploadSectionDTO
-        {
-            Id = id, Name = Name.Trim(), KeepTarget = KeepEvenWhenEmpty, RemoveAfterImport = RemoveAfterImport,
-            TargetFolderId = TargetFolderId,
-        });
+        CancelNameSave();
+        await SaveCurrentValuesAsync();
     }
 
     public async Task ImportAsync()
     {
+        await SaveAsync();
+
         var selected = Media.Where(item => item.Selected)
             .Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList();
         await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
@@ -188,6 +226,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        isInitialized = false;
         foreach (var media in Media)
         {
             media.OnSelectionChanged -= OnMediaSelectionChanged;
@@ -196,6 +235,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
         FolderPicker.PropertyChanged -= OnFolderPickerPropertyChanged;
         FolderPicker.Dispose();
+        CancelNameSave();
+        signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
     }
 
     private async Task InitializeFolderPathAsync(long folderId)
@@ -225,10 +266,109 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         if (folder != null)
         {
             TargetFolderId = folder.Id;
-            OnPropertyChanged(nameof(TargetFolderId));
-
-            // TODO: trigger backend save immediately
         }
+    }
+
+    private void OnUploadSectionActiveChanged(long? activeSectionId)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            isRefreshingActive = true;
+            try
+            {
+                IsActive = activeSectionId == id;
+            }
+            finally
+            {
+                isRefreshingActive = false;
+            }
+        });
+    }
+
+    private void SaveActiveImmediately()
+    {
+        _ = SaveActiveImmediatelyAsync();
+    }
+
+    private async Task SaveActiveImmediatelyAsync()
+    {
+        try
+        {
+            if (id >= 0)
+                await SetActiveAsync();
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Failed to update active import section");
+        }
+    }
+
+    private void ScheduleNameSave()
+    {
+        CancelNameSave();
+        nameSaveCancellation = new CancellationTokenSource();
+        _ = SaveNameAfterDelayAsync(nameSaveCancellation.Token);
+    }
+
+    private async Task SaveNameAfterDelayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await SaveCurrentValuesAsync();
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Failed to save import section name");
+        }
+    }
+
+    private void SaveImmediately()
+    {
+        CancelNameSave();
+        _ = SaveImmediatelyAsync();
+    }
+
+    private async Task SaveImmediatelyAsync()
+    {
+        try
+        {
+            await SaveCurrentValuesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Failed to save import section settings");
+        }
+    }
+
+    private async Task SaveCurrentValuesAsync()
+    {
+        if (id < 0)
+            return;
+
+        await saveLock.WaitAsync();
+        try
+        {
+            await databaseService.SaveUploadSectionAsync(new UploadSectionDTO
+            {
+                Id = id, Name = Name.Trim(), KeepTarget = KeepEvenWhenEmpty, RemoveAfterImport = RemoveAfterImport,
+                TargetFolderId = TargetFolderId,
+            });
+        }
+        finally
+        {
+            saveLock.Release();
+        }
+    }
+
+    private void CancelNameSave()
+    {
+        nameSaveCancellation?.Cancel();
+        nameSaveCancellation?.Dispose();
+        nameSaveCancellation = null;
     }
 
     private void OnMediaSelectionChanged(object? sender, EventArgs e)

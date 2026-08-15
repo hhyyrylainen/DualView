@@ -17,6 +17,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private readonly IWindowService? windowService;
     private readonly ILogger<FolderPickerViewModel>? folderPickerLogger;
     private readonly IServiceProvider? serviceProvider;
+    private readonly ISignalRService? signalRService;
 
     public ImportWindowViewModel()
     {
@@ -35,13 +36,15 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     [ActivatorUtilitiesConstructor]
     public ImportWindowViewModel(ILogger<ImportWindowViewModel> logger, IWindowService windowService,
         IClientDatabaseService databaseService, IBackendStatusService backendStatusService,
-        ILogger<FolderPickerViewModel> folderPickerLogger, IServiceProvider serviceProvider)
+        ILogger<FolderPickerViewModel> folderPickerLogger, IServiceProvider serviceProvider,
+        ISignalRService signalRService)
     {
         this.logger = logger;
         this.windowService = windowService;
         this.databaseService = databaseService;
         this.folderPickerLogger = folderPickerLogger;
         this.serviceProvider = serviceProvider;
+        this.signalRService = signalRService;
         Hamburger = new HamburgerMenuViewModel(backendStatusService);
 
         InitializeMenu();
@@ -170,7 +173,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
                 foreach (var section in sections)
                 {
                     Sections.Add(new ImportSectionViewModel(section, databaseService, logger, windowService,
-                        folderPickerLogger, serviceProvider));
+                        folderPickerLogger, serviceProvider, signalRService));
                     if (!string.IsNullOrWhiteSpace(section.Name) &&
                         RecentNames.All(item => !item.Name.Equals(section.Name, StringComparison.Ordinal)))
                     {

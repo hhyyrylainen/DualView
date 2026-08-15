@@ -14,8 +14,7 @@
     <Border BorderBrush="Gray" BorderThickness="1" Margin="4" Padding="4">
         <Grid RowDefinitions="Auto,*,Auto">
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Height="34">
-                <CheckBox Grid.Column="0" Margin="8,0" IsChecked="{Binding IsActive}"
-                          Command="{Binding SetActiveAsync}">
+                <CheckBox Grid.Column="0" Margin="8,0" IsChecked="{Binding IsActive}">
                     Active
                 </CheckBox>
                 <TextBox Grid.Column="1" Text="{Binding Name}" VerticalContentAlignment="Center" />
