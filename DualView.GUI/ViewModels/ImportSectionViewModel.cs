@@ -283,7 +283,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         if (databaseService == null)
             return;
 
-        var section = (await databaseService.GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == id);
+        var section = await databaseService.GetUploadSectionAsync(id);
         if (section == null)
             return;
 
@@ -295,7 +295,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         if (databaseService == null)
             return;
 
-        var section = (await databaseService.GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == id);
+        var section = await databaseService.GetUploadSectionAsync(id);
         if (section == null)
             return;
 

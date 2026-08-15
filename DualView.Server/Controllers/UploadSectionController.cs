@@ -27,13 +27,17 @@ public class UploadSectionController : Controller
     public async Task<ActionResult<List<UploadSectionDTO>>> GetAll()
     {
         var sections = await databaseService.GetUploadSectionsAsync();
-        return sections.Select(section => new UploadSectionDTO
-        {
-            Id = section.Id, Name = section.Name, KeepTarget = section.KeepTarget,
-            Selected = section.Selected, RemoveAfterImport = section.RemoveAfterImport,
-            TargetFolderId = section.TargetFolderId,
-            Media = section.Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
-        }).ToList();
+        return sections.Select(section => section.GetDTO()).ToList();
+    }
+
+    [HttpGet("{sectionId:long}")]
+    public async Task<ActionResult<UploadSectionDTO>> Get([FromRoute] long sectionId)
+    {
+        var section = await databaseService.GetUploadSectionAsync(sectionId);
+        if (section == null)
+            return NotFound();
+
+        return section.GetDTO();
     }
 
     [HttpGet("targetNames")]
@@ -48,7 +52,7 @@ public class UploadSectionController : Controller
     [HttpPut("{sectionId:long}")]
     public async Task<ActionResult> Update(long sectionId, UploadSectionDTO request)
     {
-        var section = (await databaseService.GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == sectionId);
+        var section = await databaseService.GetUploadSectionAsync(sectionId);
         if (section == null) return NotFound();
         section.Name = request.Name.Trim();
         section.KeepTarget = request.KeepTarget;

@@ -279,7 +279,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<CollectionMediaRemovalPreview> PreviewCollectionMediaRemovalAsync(long collectionId,
         List<long> mediaIds)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/previewRemoveMedia", mediaIds);
+        var response =
+            await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/previewRemoveMedia", mediaIds);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<CollectionMediaRemovalPreview>() ??
                throw new Exception("Failed to read collection removal preview");
@@ -288,7 +289,8 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId,
         List<long> mediaIds)
     {
-        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/removeSelectedMedia", mediaIds);
+        var response =
+            await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/removeSelectedMedia", mediaIds);
         response.EnsureSuccessStatusCode();
         return await response.Content.ReadFromJsonAsync<CollectionMediaRemovalResult>() ??
                throw new Exception("Failed to read collection removal result");
@@ -480,13 +482,18 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return await HttpClient.GetFromJsonAsync<List<UploadSectionDTO>>("api/v1/uploadSection") ?? new();
     }
 
+    public Task<UploadSectionDTO?> GetUploadSectionAsync(long sectionId)
+    {
+        return HttpClient.GetFromJsonAsync<UploadSectionDTO>($"api/v1/uploadSection/{sectionId}");
+    }
+
     public async Task<UploadSectionDTO> GetOrCreateUploadSectionAsync(string? name)
     {
         var response = await HttpClient.PostAsync(
             $"api/v1/uploadSection/getOrCreate?name={Uri.EscapeDataString(name ?? string.Empty)}", null);
         response.EnsureSuccessStatusCode();
         var id = await response.Content.ReadFromJsonAsync<long>();
-        return (await GetUploadSectionsAsync()).First(section => section.Id == id);
+        return (await GetUploadSectionAsync(id)) ?? throw new Exception("Couldn't get just created section");
     }
 
     public async Task SaveUploadSectionAsync(UploadSectionDTO section)

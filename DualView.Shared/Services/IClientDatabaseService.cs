@@ -65,6 +65,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     // Import & Galleries
     public Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId);
     public Task<List<UploadSectionDTO>> GetUploadSectionsAsync();
+    public Task<UploadSectionDTO?> GetUploadSectionAsync(long sectionId);
     public Task<UploadSectionDTO> GetOrCreateUploadSectionAsync(string? name);
     public Task SaveUploadSectionAsync(UploadSectionDTO section);
     public Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds);
