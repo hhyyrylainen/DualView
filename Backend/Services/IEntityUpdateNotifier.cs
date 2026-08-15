@@ -58,4 +58,7 @@ public interface IEntityUpdateNotifier
     public Task NotifyDownloadGalleriesUpdated();
     public Task NotifyDownloadGalleryUpdated(long id);
     public Task NotifyUploadSectionActiveChanged(long? sectionId);
+    public Task NotifyUploadSectionsUpdated();
+    public Task NotifyUploadSectionUpdated(long sectionId);
+    public Task NotifyUploadSectionContentsUpdated(long sectionId);
 }

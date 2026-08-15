@@ -248,4 +248,22 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
         logger.LogDebug("Broadcasting active upload section update to all clients");
         await hubContext.Clients.All.UploadSectionActiveChanged(sectionId);
     }
+
+    public async Task NotifyUploadSectionsUpdated()
+    {
+        logger.LogDebug("Broadcasting upload sections list update to all clients");
+        await hubContext.Clients.All.UploadSectionsUpdated();
+    }
+
+    public async Task NotifyUploadSectionUpdated(long sectionId)
+    {
+        logger.LogDebug("Broadcasting upload section update to all clients");
+        await hubContext.Clients.All.UploadSectionUpdated(sectionId);
+    }
+
+    public async Task NotifyUploadSectionContentsUpdated(long sectionId)
+    {
+        logger.LogDebug("Broadcasting upload section contents update to all clients");
+        await hubContext.Clients.All.UploadSectionContentsUpdated(sectionId);
+    }
 }

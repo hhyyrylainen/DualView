@@ -41,8 +41,10 @@ public class StubSignalRService : ISignalRService
     public event Action<long>? OnDatasetUpdated;
     public event Action<long>? OnDatasetContentsUpdated;
     public event Action<long?>? OnUploadSectionActiveChanged;
-    public event Action? OnFlowListUpdated;
-    public event Action<long>? OnFlowUpdated;
+    public event Action? OnUploadSectionsUpdated;
+    public event Action<long>? OnUploadSectionUpdated;
+    public event Action<long>? OnUploadSectionContentsUpdated;
+
     public event Action<bool>? OnConnectionStatusChanged;
 #pragma warning restore CS0067
 

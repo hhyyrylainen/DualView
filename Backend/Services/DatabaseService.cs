@@ -1299,8 +1299,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await dbContext.UploadSections.AddAsync(newSection);
         await SaveAsync();
-
-        // TODO: notice event about sections being added
+        await updateNotifier.NotifyUploadSectionsUpdated();
 
         return newSection;
     }
@@ -1322,8 +1321,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             section.Name = targetCollection.Name;
         section.UpdatedAt = DateTime.UtcNow;
 
-        // TODO: signal R notice about section details update
         await SaveAsync();
+        await updateNotifier.NotifyUploadSectionUpdated(section.Id);
     }
 
     public async Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds)
@@ -1333,8 +1332,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
         dbContext.UploadSectionItems.RemoveRange(items);
 
-        // TODO: signal R notice about section content update
         await SaveAsync();
+        await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
     }
 
     public async Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds)
@@ -1353,8 +1352,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         foreach (var item in itemsById.Values.OrderBy(item => item.Index))
             item.Index = nextIndex++;
 
-        // TODO: signal R notice about section content update
         await SaveAsync();
+        await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
     }
 
     public async Task SetUploadSectionActiveAsync(long? sectionId)
@@ -1383,6 +1382,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (selectedIds.Count == 0)
             return;
 
+        var originalSectionName = section.Name;
         var targetCollectionName = section.Name.Trim();
         var collection = await GetCollectionByNameAsync(targetCollectionName);
         if (collection == null)
@@ -1406,20 +1406,25 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
         await AddMediaToCollection(selectedIds, collection.Id, nextSequence);
 
-        if (section.RemoveAfterImport)
-        {
-            // TODO: signal R notice
-            var items = section.Items.Where(item => selectedIds.Contains(item.MediaFileId)).ToList();
-            dbContext.UploadSectionItems.RemoveRange(items);
-            await SaveAsync();
-        }
+        if (!string.Equals(originalSectionName, section.Name, StringComparison.Ordinal))
+            await updateNotifier.NotifyUploadSectionUpdated(sectionId);
 
         if (!section.KeepTarget &&
             !await dbContext.UploadSectionItems.AnyAsync(item => item.UploadSectionId == section.Id))
         {
-            // TODO: signal R notice
             dbContext.UploadSections.Remove(section);
             await SaveAsync();
+            await updateNotifier.NotifyUploadSectionsUpdated();
+            return;
+        }
+
+        // Only makes sense to remove items if the section was not removed itself
+        if (section.RemoveAfterImport)
+        {
+            var items = section.Items.Where(item => selectedIds.Contains(item.MediaFileId)).ToList();
+            dbContext.UploadSectionItems.RemoveRange(items);
+            await SaveAsync();
+            await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
         }
     }
 
@@ -1446,9 +1451,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await dbContext.UploadSectionItems.AddAsync(item);
 
-        // TODO: notice event about section items being changed
-
         await SaveAsync();
+        await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
     }
 
     public async Task<int> GetNextUploadSectionIndexAsync(long sectionId)
@@ -1483,6 +1487,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         section.LastImported = DateTime.UtcNow;
         section.BumpUpdatedAtTime();
         await SaveAsync();
+
+        // For now, this is not shown in the GUI, so we don't need to trigger an update event
+        // await updateNotifier.NotifyUploadSectionUpdated(sectionId);
     }
 
     public async Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, long collectionId)
