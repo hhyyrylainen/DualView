@@ -1313,6 +1313,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
+    public async Task<UploadSection?> GetUploadSectionAsync(long sectionId)
+    {
+        return await dbContext.UploadSections
+            .Include(section => section.Items)
+            .ThenInclude(item => item.MediaFile)
+            .FirstOrDefaultAsync(section => section.Id == sectionId);
+    }
+
     public async Task SaveUploadSectionAsync(UploadSection section)
     {
         section.Name = section.Name.Trim();
@@ -2079,27 +2087,27 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     async Task<List<UploadSectionDTO>> IClientDatabaseService.GetUploadSectionsAsync()
     {
-        return (await GetUploadSectionsAsync()).Select(section => new UploadSectionDTO
-        {
-            Id = section.Id,
-            Name = section.Name,
-            KeepTarget = section.KeepTarget,
-            Selected = section.Selected,
-            RemoveAfterImport = section.RemoveAfterImport,
-            TargetFolderId = section.TargetFolderId,
-            Media = section.Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
-        }).ToList();
+        return (await GetUploadSectionsAsync()).Select(section => section.GetDTO()).ToList();
+    }
+
+    async Task<UploadSectionDTO?> IClientDatabaseService.GetUploadSectionAsync(long sectionId)
+    {
+        var section = await GetUploadSectionAsync(sectionId);
+        if (section == null)
+            return null;
+
+        return section.GetDTO();
     }
 
     async Task<UploadSectionDTO> IClientDatabaseService.GetOrCreateUploadSectionAsync(string? name)
     {
         var section = await GetOrCreateUploadSectionAsync(name);
-        return (await ((IClientDatabaseService)this).GetUploadSectionsAsync()).First(item => item.Id == section.Id);
+        return (await ((IClientDatabaseService)this).GetUploadSectionAsync(section.Id))!;
     }
 
     async Task IClientDatabaseService.SaveUploadSectionAsync(UploadSectionDTO request)
     {
-        var section = (await GetUploadSectionsAsync()).FirstOrDefault(item => item.Id == request.Id)
+        var section = await GetUploadSectionAsync(request.Id)
                       ?? throw new ArgumentException("Section not found");
         section.Name = request.Name;
         section.KeepTarget = request.KeepTarget;

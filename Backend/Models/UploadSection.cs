@@ -1,12 +1,14 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
+using Backend.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
 
 [Index(nameof(NameLowercase))]
 [Index(nameof(DisplayIndex), IsUnique = true)]
-public class UploadSection : UpdateableModel
+public class UploadSection : UpdateableModel, IDTOProvider<UploadSectionDTO>
 {
     public UploadSection(string name)
     {
@@ -59,6 +61,20 @@ public class UploadSection : UpdateableModel
     public bool RemoveAfterImport { get; set; } = true;
 
     public ICollection<UploadSectionItem> Items { get; set; } = new List<UploadSectionItem>();
+
+    public UploadSectionDTO GetDTO()
+    {
+        return new UploadSectionDTO
+        {
+            Id = Id,
+            Name = Name,
+            KeepTarget = KeepTarget,
+            Selected = Selected,
+            RemoveAfterImport = RemoveAfterImport,
+            TargetFolderId = TargetFolderId,
+            Media = Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
+        };
+    }
 }
 
 [Index(nameof(UploadSectionId), nameof(Index), IsUnique = true)]
