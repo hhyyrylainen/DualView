@@ -49,6 +49,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
         InitializeMenu();
 
+        signalRService.OnUploadSectionsUpdated += OnUploadSectionsUpdated;
         _ = ReloadAsync();
     }
 
@@ -166,9 +167,40 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
             var sections = await databaseService.GetUploadSectionsAsync();
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                foreach (var oldSection in Sections)
-                    oldSection.Dispose();
-                Sections.Clear();
+                var existingSections = Sections.ToDictionary(section => section.Id);
+                var refreshedSections = sections.Select(section =>
+                    existingSections.TryGetValue(section.Id, out var existingSection)
+                        ? existingSection
+                        : new ImportSectionViewModel(section, databaseService, logger, windowService,
+                            folderPickerLogger, serviceProvider, signalRService)).ToList();
+
+                foreach (var removedSection in existingSections.Values.Where(oldSection =>
+                             refreshedSections.All(section => !ReferenceEquals(section, oldSection))))
+                {
+                    removedSection.Dispose();
+                }
+
+                for (var index = 0; index < refreshedSections.Count; ++index)
+                {
+                    var section = refreshedSections[index];
+                    if (index < Sections.Count && ReferenceEquals(Sections[index], section))
+                    {
+                        section.UpdateFromServer(sections[index]);
+                        continue;
+                    }
+
+                    var currentIndex = Sections.IndexOf(section);
+                    if (currentIndex >= 0)
+                        Sections.Move(currentIndex, index);
+                    else
+                        Sections.Insert(index, section);
+
+                    section.UpdateFromServer(sections[index]);
+                }
+
+                while (Sections.Count > refreshedSections.Count)
+                    Sections.RemoveAt(Sections.Count - 1);
+
                 RecentNames.Clear();
                 foreach (var section in sections)
                 {
@@ -191,6 +223,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        signalRService?.OnUploadSectionsUpdated -= OnUploadSectionsUpdated;
         foreach (var section in Sections)
             section.Dispose();
         Hamburger.Dispose();
@@ -201,6 +234,11 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         ImportTabSelected = tab == 0;
         ScanTabSelected = tab == 1;
         StatusTabSelected = tab == 2;
+    }
+
+    private void OnUploadSectionsUpdated()
+    {
+        _ = ReloadAsync();
     }
 
     private void InitializeMenu()
