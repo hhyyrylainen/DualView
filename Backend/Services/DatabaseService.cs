@@ -131,6 +131,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (folder == null)
             throw new Exception("Folder not found");
 
+        var oldName = folder.Name;
+
         var lowerName = trimmedName.ToLowerInvariant();
         if (folder.Parents.Any(parent => dbContext.MediaFolders.Any(other =>
                 other.Id != folderId && other.NameLowerCase == lowerName &&
@@ -140,6 +142,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
 
         folder.Name = trimmedName;
+        folder.NameLowerCase = lowerName;
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
         logger.LogInformation("Renamed media folder '{OldName}' ({OldFolderId}) to '{FolderName}' ({FolderId})",
@@ -196,7 +199,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             throw new InvalidOperationException("A collection with that name already exists");
         }
 
+        var oldName = collection.Name;
+
         collection.Name = trimmedName;
+        collection.NameLowerCase = lowerName;
         await SaveAsync();
         await updateNotifier.NotifyCollectionUpdated(collectionId);
         logger.LogInformation(
