@@ -157,6 +157,11 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public void OpenImportsWindow()
+    {
+        windowService?.ShowSingletonWindow<ImportWindowViewModel>();
+    }
+
     public async Task StartUpload()
     {
         if (IsUploading || FilesToUpload.Count == 0 || backendAPI == null) return;
@@ -251,6 +256,12 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
         {
             Title = "Upload",
             Command = new RelayCommand(() => _ = StartUpload()),
+        });
+
+        Hamburger.MenuItems.Add(new HamburgerMenuItem
+        {
+            Title = "Manage Imports...",
+            Command = new RelayCommand(OpenImportsWindow),
         });
 
         MainWindowViewModel.AddTrailingMenuItems(Hamburger, windowService);
