@@ -50,6 +50,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         InitializeMenu();
 
         signalRService.OnUploadSectionsUpdated += OnUploadSectionsUpdated;
+        signalRService.OnUploadSectionActiveChanged += OnUploadSectionActiveChanged;
         _ = ReloadAsync();
     }
 
@@ -222,6 +223,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     public void Dispose()
     {
         signalRService?.OnUploadSectionsUpdated -= OnUploadSectionsUpdated;
+        signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
         foreach (var section in Sections)
             section.Dispose();
         Hamburger.Dispose();
@@ -237,6 +239,12 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private void OnUploadSectionsUpdated()
     {
         _ = ReloadAsync();
+    }
+
+    private void OnUploadSectionActiveChanged(long? activeSectionId)
+    {
+        if (activeSectionId.HasValue)
+            Dispatcher.UIThread.Post(() => TargetNewSection = false);
     }
 
     private void InitializeMenu()
