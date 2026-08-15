@@ -927,6 +927,28 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return new Tuple<List<CollectionDTO>, int>(items, total);
     }
 
+    public async Task<List<string>> SearchUploadTargetNamesAsync(string search, int limit = 100)
+    {
+        var searchLower = search.Trim().ToLowerInvariant();
+        limit = Math.Clamp(limit, 1, 200);
+
+        // TODO: investigate if this should build a complex SQL statement to filter with a prefix on the DB
+        var sectionNames = dbContext.UploadSections
+            .Where(section => section.NameLowercase.Contains(searchLower))
+            .Select(section => section.Name);
+        var collectionNames = dbContext.Collections
+            .Where(collection => collection.NameLowerCase.Contains(searchLower))
+            .Select(collection => collection.Name);
+
+        return await sectionNames.Concat(collectionNames)
+            .Distinct()
+            .OrderBy(name => name.ToLower().StartsWith(searchLower) ? 0 : 1)
+            .ThenBy(name => name.ToLower().IndexOf(searchLower))
+            .ThenBy(name => name)
+            .Take(limit)
+            .ToListAsync();
+    }
+
     public async Task<Tuple<List<MediaFileDTO>, int>> GetCollectionContents(long collectionId, int page, int pageSize,
         CollectionSortColumn sortColumn = CollectionSortColumn.CollectionOrder,
         SortDirection sortDirection = SortDirection.Ascending, string? search = null)
