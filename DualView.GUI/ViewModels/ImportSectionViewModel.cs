@@ -262,6 +262,32 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
     }
 
+    public async Task DeleteAsync()
+    {
+        if (databaseService == null)
+            return;
+
+        if (Media.Count > 0)
+        {
+            var proceed = windowService == null || await windowService.ShowConfirmationWindow(
+                "DELETE import section?",
+                $"This import section contains {Media.Count} image(s). Delete it and abandon these images?",
+                true) == true;
+
+            if (!proceed)
+                return;
+        }
+
+        try
+        {
+            await databaseService.DeleteUploadSectionAsync(id);
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to delete import section", ex);
+        }
+    }
+
     public async Task RemoveSelectedAsync()
     {
         var selected = Media.Where(item => item.Selected).ToList();

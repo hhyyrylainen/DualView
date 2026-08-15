@@ -62,6 +62,16 @@ public class UploadSectionController : Controller
         return Ok();
     }
 
+    [HttpDelete("{sectionId:long}")]
+    public async Task<ActionResult> Delete(long sectionId)
+    {
+        if (await databaseService.GetUploadSectionAsync(sectionId) == null)
+            return NotFound();
+
+        await databaseService.DeleteUploadSectionAsync(sectionId);
+        return Ok();
+    }
+
     [HttpPost("active")]
     public async Task<ActionResult> SetActive([FromBody] long? sectionId)
     {

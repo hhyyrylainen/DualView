@@ -502,6 +502,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task DeleteUploadSectionAsync(long sectionId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/uploadSection/{sectionId}");
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/removeMedia",

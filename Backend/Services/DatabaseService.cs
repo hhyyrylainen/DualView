@@ -1385,6 +1385,21 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
+    public async Task DeleteUploadSectionAsync(long sectionId)
+    {
+        var section = await dbContext.UploadSections.FindAsync(sectionId)
+                      ?? throw new ArgumentException("Section not found");
+        var wasActive = section.Selected;
+
+        dbContext.UploadSections.Remove(section);
+        await SaveAsync();
+
+        if (wasActive)
+            await updateNotifier.NotifyUploadSectionActiveChanged(null);
+        await updateNotifier.NotifyUploadSectionsUpdated();
+        logger.LogInformation("Deleted upload section '{Name}' ({SectionId})", section.Name, sectionId);
+    }
+
     public async Task<UploadSection?> GetUploadSectionAsync(long sectionId)
     {
         return await dbContext.UploadSections
@@ -2246,6 +2261,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         section.TargetFolderId = request.TargetFolderId;
         await SaveUploadSectionAsync(section);
     }
+
+    Task IClientDatabaseService.DeleteUploadSectionAsync(long sectionId) => DeleteUploadSectionAsync(sectionId);
 
     Task IClientDatabaseService.RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds) =>
         RemoveMediaFromUploadSectionAsync(sectionId, mediaIds);

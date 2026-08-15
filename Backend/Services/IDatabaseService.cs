@@ -88,6 +88,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<UploadSection>> GetUploadSectionsAsync();
     public Task<UploadSection?> GetUploadSectionAsync(long sectionId);
     public Task SaveUploadSectionAsync(UploadSection section);
+    public Task DeleteUploadSectionAsync(long sectionId);
     public Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task SetUploadSectionActiveAsync(long? sectionId);
