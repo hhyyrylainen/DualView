@@ -17,7 +17,7 @@
             <Button Grid.Column="0" Content="UP" Command="{Binding NavigateUp}" Margin="0,0,4,0" />
             <Button Grid.Column="1" Content="Copy" Command="{Binding CopyPath}" Margin="0,0,4,0" />
             <Button Grid.Column="2" Content="Paste" Command="{Binding PastePath}" Margin="0,0,4,0" />
-            <TextBox Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="Search folders..." Margin="0,0,0,0"
+            <TextBox Grid.Column="3" Text="{Binding SearchText}" PlaceholderText="Search folders..." Margin="0 0 4 0"
                      VerticalAlignment="Stretch" />
             <Button Grid.Column="5" Content="New Folder" Command="{Binding CreateNewFolder}" />
         </Grid>
@@ -46,7 +46,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <controls:MediaViewer Width="80" Height="132" Margin="4" />
+                        <controls:MediaViewer Width="75" Height="100" Margin="4" />
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
