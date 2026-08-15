@@ -1323,9 +1323,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         return await dbContext.Set<CollectionItem>()
             .Where(ci => ci.CollectionId == collectionId)
+            .OrderByDescending(ci => ci.SequenceNumber)
             .Select(ci => ci.SequenceNumber)
-            .DefaultIfEmpty(0)
-            .MaxAsync() + 1;
+            .FirstOrDefaultAsync() + 1;
     }
 
     public async Task SaveMediaFileAsync(MediaFile mediaFile)
@@ -1354,7 +1354,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             return existing;
 
         // Insert at the start
-        var minIndex = await dbContext.UploadSections.Select(s => s.DisplayIndex).DefaultIfEmpty(0).MinAsync();
+        var minIndex = await dbContext.UploadSections
+            .OrderBy(s => s.DisplayIndex)
+            .Select(s => s.DisplayIndex)
+            .FirstOrDefaultAsync();
 
         var newSection = new UploadSection(sectionName)
         {
@@ -1553,9 +1556,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         return await dbContext.UploadSectionItems
             .Where(i => i.UploadSectionId == sectionId)
+            .OrderByDescending(i => i.Index)
             .Select(i => i.Index)
-            .DefaultIfEmpty(0)
-            .MaxAsync() + 1;
+            .FirstOrDefaultAsync() + 1;
     }
 
     public async Task SetMediaTemporaryStatusAsync(long mediaId, bool isTemporary)
