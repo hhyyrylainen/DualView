@@ -146,6 +146,20 @@ public class CollectionController : Controller
         return (await databaseService.GetCollectionContents(id)).ConvertToDTO<MediaFile, MediaFileDTO>();
     }
 
+    [HttpGet("{id:long}/browseInfo")]
+    public async Task<ActionResult<CollectionBrowseInfoDTO>> GetCollectionBrowseInfo([Required] long id,
+        long? mediaId = null)
+    {
+        return await databaseService.GetCollectionBrowseInfoAsync(id, mediaId);
+    }
+
+    [HttpGet("{id:long}/browse/{index:int}")]
+    public async Task<ActionResult<MediaFileDTO>> GetCollectionMediaAtIndex([Required] long id, int index)
+    {
+        var media = await databaseService.GetCollectionMediaAtIndexAsync(id, index);
+        return media == null ? NotFound() : media;
+    }
+
     [HttpPost("{id:long}/reorder")]
     public async Task<IActionResult> Reorder([Required] long id, [FromBody] List<long> newImageOrderIds)
     {

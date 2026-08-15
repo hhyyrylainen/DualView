@@ -130,6 +130,21 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                new List<MediaFileDTO>();
     }
 
+    public async Task<CollectionBrowseInfoDTO> GetCollectionBrowseInfoAsync(long collectionId, long? mediaId = null)
+    {
+        var url = $"api/v1/collection/{collectionId}/browseInfo";
+        if (mediaId.HasValue)
+            url += $"?mediaId={mediaId.Value}";
+
+        return await HttpClient.GetFromJsonAsync<CollectionBrowseInfoDTO>(url) ??
+               throw new Exception("Failed to get collection browse information");
+    }
+
+    public Task<MediaFileDTO?> GetCollectionMediaAtIndexAsync(long collectionId, int index)
+    {
+        return HttpClient.GetFromJsonAsync<MediaFileDTO>($"api/v1/collection/{collectionId}/browse/{index}");
+    }
+
     public async Task<MediaFileDTO?> GetMediaFileAsync(long mediaId)
     {
         return await HttpClient.GetFromJsonAsync<MediaFileDTO?>($"api/v1/media/{mediaId}");
