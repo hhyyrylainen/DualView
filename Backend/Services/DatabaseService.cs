@@ -1501,6 +1501,15 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (!string.Equals(originalSectionName, section.Name, StringComparison.Ordinal))
             await updateNotifier.NotifyUploadSectionUpdated(sectionId);
 
+        // Need to remove items first to detect when things become blank
+        var itemsRemoved = 0;
+        if (section.RemoveAfterImport)
+        {
+            var items = section.Items.Where(item => selectedIds.Contains(item.MediaFileId)).ToList();
+            itemsRemoved = items.Count;
+            dbContext.UploadSectionItems.RemoveRange(items);
+        }
+
         if (!section.KeepTarget &&
             !await dbContext.UploadSectionItems.AnyAsync(item => item.UploadSectionId == section.Id))
         {
@@ -1512,14 +1521,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             return;
         }
 
-        // Only makes sense to remove items if the section was not removed itself
         if (section.RemoveAfterImport)
         {
-            var items = section.Items.Where(item => selectedIds.Contains(item.MediaFileId)).ToList();
-            dbContext.UploadSectionItems.RemoveRange(items);
             await SaveAsync();
+
+            // Only notify if we still existed
             await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
-            logger.LogInformation("Removed {ItemCount} imported items from upload section {SectionId}", items.Count,
+            logger.LogInformation("Removed {ItemCount} imported items from upload section {SectionId}", itemsRemoved,
                 sectionId);
         }
     }
