@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 using DualView.GUI.Models;
 using DualView.GUI.Services;
@@ -18,9 +19,14 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     private readonly IClientDatabaseService? clientDatabaseService;
     private readonly IBackendAPI? backendAPI;
     private readonly ISignalRService? signalRService;
+    private readonly SemaphoreSlim browseLock = new(1, 1);
 
     private long currentConfiguredMediaId;
     private long currentMediaFileId;
+
+    private ICollectionBrowse? collectionBrowse;
+    private string currentMediaName = string.Empty;
+    private int mediaDisplayVersion;
 
     public delegate void ClipboardTextSetRequested(string text);
 
@@ -95,10 +101,26 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     } = "Loading...";
 
-    public void ShowMedia(IVisualMediaSource source, IMediaAssociatedWindows? extraData)
+    public string BrowsePosition
+    {
+        get;
+        private set
+        {
+            if (SetProperty(ref field, value))
+                OnPropertyChanged(nameof(ImageInfo));
+        }
+    } = string.Empty;
+
+    public void ShowMedia(IVisualMediaSource source, IMediaAssociatedWindows? extraData,
+        ICollectionBrowse? browsingSupport)
     {
         Media.MediaToShow = source;
         Media.MediaOpenResources = extraData;
+
+        collectionBrowse = browsingSupport;
+        var displayVersion = ++mediaDisplayVersion;
+        BrowsePosition = string.Empty;
+        OnPropertyChanged(nameof(ImageInfo));
 
         // Initialize extra data
         if (source is ServerMediaSource serverMediaSource)
@@ -119,13 +141,20 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             {
                 var name = await source.GetName();
 
-                Title = $"DualView - {name}";
+                currentMediaName = name;
+                UpdateTitle(displayVersion);
+                await UpdateBrowsePositionAsync(source, displayVersion);
             }
             catch (Exception e)
             {
                 windowService?.ShowErrorWindow("Failed to get media name", e);
             }
         });
+    }
+
+    public void NavigateToAdjacentMedia(int offset)
+    {
+        _ = NavigateToAdjacentMediaAsync(offset);
     }
 
     public void OpenMediaWindow()
@@ -202,6 +231,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     {
         Hamburger.Dispose();
         Media.Dispose();
+        browseLock.Dispose();
         Media.OnDisplayedFrameChanged -= CheckMediaDetails;
 
         if (signalRService != null)
@@ -225,7 +255,8 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
                 }
                 else
                 {
-                    ImageInfo = $"{frame.PixelSize.Width}x{frame.PixelSize.Height}";
+                    ImageInfo = $"{frame.PixelSize.Width}x{frame.PixelSize.Height}{
+                        (string.IsNullOrEmpty(BrowsePosition) ? string.Empty : $" ({BrowsePosition})")}";
                 }
             }
             catch (Exception)
@@ -281,6 +312,75 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         catch (Exception e)
         {
             windowService?.ShowErrorWindow("Failed to get media keep status", e);
+        }
+    }
+
+    private async Task NavigateToAdjacentMediaAsync(int offset)
+    {
+        if (collectionBrowse == null || Media.MediaToShow is not ServerMediaSource currentMedia)
+            return;
+
+        await browseLock.WaitAsync();
+        try
+        {
+            var index = await collectionBrowse.GetIndexAsync(currentMedia.ServerId);
+
+            // If unknown, go back to the start
+            var targetIndex = index != null ? index.Value + offset : 0;
+            var count = await collectionBrowse.GetCountAsync();
+
+            // Wrapping around
+            if (targetIndex < 0)
+                targetIndex = count -1;
+
+            if (targetIndex >= count)
+                targetIndex = 0;
+
+            var nextMedia = await collectionBrowse.GetMediaAsync(targetIndex);
+            if (nextMedia == null)
+                return;
+
+            Media.MediaToShow?.Dispose();
+            ShowMedia(nextMedia, Media.MediaOpenResources, collectionBrowse);
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to browse collection", e);
+        }
+        finally
+        {
+            browseLock.Release();
+        }
+    }
+
+    private async Task UpdateBrowsePositionAsync(IVisualMediaSource source, int displayVersion)
+    {
+        if (collectionBrowse == null || source is not ServerMediaSource serverMediaSource)
+            return;
+
+        try
+        {
+            var indexTask = collectionBrowse.GetIndexAsync(serverMediaSource.ServerId);
+            var countTask = collectionBrowse.GetCountAsync();
+            await Task.WhenAll(indexTask, countTask);
+            if (displayVersion != mediaDisplayVersion || indexTask.Result == null)
+                return;
+
+            BrowsePosition = $"{indexTask.Result.Value + 1} / {countTask.Result}";
+            UpdateTitle(displayVersion);
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to get collection position", e);
+        }
+    }
+
+    private void UpdateTitle(int displayVersion)
+    {
+        if (displayVersion == mediaDisplayVersion)
+        {
+            Title = $"DualView - {currentMediaName}{
+                (string.IsNullOrEmpty(BrowsePosition) ? string.Empty : $" ({BrowsePosition})")}";
         }
     }
 
