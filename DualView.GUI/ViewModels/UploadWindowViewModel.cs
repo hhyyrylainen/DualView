@@ -225,7 +225,10 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
     {
         if (IsUploading || FilesToUpload.Count == 0 || backendAPI == null) return;
 
-        var toUpload = FilesToUpload.Where(f => f.IsSelected && f.Status == "Pending").ToList();
+        var toUpload = FilesToUpload
+            .Where(f => f.IsSelected &&
+                        (f.Status == "Pending" || f.Status.StartsWith("Error:", StringComparison.Ordinal)))
+            .ToList();
 
         if (toUpload.Count == 0) return;
 
