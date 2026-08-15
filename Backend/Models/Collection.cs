@@ -21,6 +21,9 @@ public class Collection : UpdateableModel, IDTOProvider<CollectionDTO>, ISoftDel
 
         if (name.Contains('/'))
             throw new ArgumentException("Collection name cannot contain '/'");
+
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Collection name cannot be empty or whitespace");
     }
 
     [Key]

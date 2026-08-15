@@ -1544,11 +1544,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         var originalSectionName = section.Name;
         var targetCollectionName = section.Name.Trim();
+
+        // Disallow creating collections with no name
+        if (string.IsNullOrWhiteSpace(targetCollectionName))
+            throw new ArgumentException("Section name cannot be empty or whitespace");
+
         var collection = await GetCollectionByNameAsync(targetCollectionName);
         if (collection == null)
         {
-            collection =
-                new Collection(string.IsNullOrWhiteSpace(targetCollectionName) ? "Imported" : targetCollectionName);
+            // This will throw if the name is empty or whitespace
+            collection = new Collection(targetCollectionName);
             await dbContext.Collections.AddAsync(collection);
             await SaveAsync();
             await AddCollectionToFolder(collection.Id, section.TargetFolderId);
