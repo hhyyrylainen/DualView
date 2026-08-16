@@ -316,6 +316,12 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectedCount));
     }
 
+    public void DeselectAll()
+    {
+        foreach (var item in Media)
+            item.Selected = false;
+    }
+
     public async Task ReverseImagesAsync()
     {
         if (databaseService == null || Media.Count < 2)
