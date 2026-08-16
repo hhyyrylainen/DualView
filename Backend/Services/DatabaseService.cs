@@ -1538,6 +1538,15 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Where(item => item.UploadSectionId == sectionId)
             .ToListAsync();
         var itemsById = items.ToDictionary(item => item.MediaFileId);
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+        // Move every item to a temporary range first so the unique index constraint cannot collide
+        // while the final order is being applied. Keep the original relative order for leftovers.
+        foreach (var item in items)
+            item.Index += items.Count;
+        await SaveAsync();
+
         var nextIndex = 0;
         foreach (var mediaId in mediaIds.Distinct())
         {
@@ -1549,6 +1558,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             item.Index = nextIndex++;
 
         await SaveAsync();
+        await transaction.CommitAsync();
         await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
         logger.LogInformation("Reordered {ItemCount} items in upload section {SectionId}", items.Count, sectionId);
     }
