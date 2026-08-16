@@ -36,6 +36,10 @@
                           IsEnabled="{Binding CanDeleteCollection}" />
             </MenuItem>
             <MenuItem Header="View">
+                <MenuItem Header="Go to first page" Command="{Binding GoToFirstPage}"
+                          IsEnabled="{Binding CanNavigateBackwards}" />
+                <MenuItem Header="Go to last page" Command="{Binding GoToLastPage}"
+                          IsEnabled="{Binding CanNavigateForwards}" />
                 <MenuItem Header="Sort by visual similarity" Command="{Binding StartVisualSimilaritySort}"
                           IsEnabled="{Binding !IsVisualSimilarityMode}" />
             </MenuItem>
