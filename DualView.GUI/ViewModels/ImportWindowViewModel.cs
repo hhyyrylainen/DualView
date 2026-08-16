@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using DualView.GUI.Services;
+using DualView.Shared.Models.DTO;
 using DualView.Shared.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,6 +20,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private readonly ILogger<FolderPickerViewModel>? folderPickerLogger;
     private readonly IServiceProvider? serviceProvider;
     private readonly ISignalRService? signalRService;
+    private List<RecentImportSectionDTO> loadedRecentSections = new();
 
     public ImportWindowViewModel()
     {
@@ -61,7 +64,11 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     public string SearchText
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (SetProperty(ref field, value))
+                RefreshRecentNames();
+        }
     } = string.Empty;
 
     public bool SidePanelOpen
@@ -165,9 +172,14 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var sections = await databaseService.GetUploadSectionsAsync();
+            var sectionsTask = databaseService.GetUploadSectionsAsync();
+            var recentSectionsTask = databaseService.GetRecentImportSectionsAsync();
+            await Task.WhenAll(sectionsTask, recentSectionsTask);
+            var sections = await sectionsTask;
+            var recentSections = await recentSectionsTask;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                loadedRecentSections = recentSections;
                 var existingSections = Sections.ToDictionary(section => section.Id);
                 var refreshedSections = sections.Select(section =>
                     existingSections.TryGetValue(section.Id, out var existingSection)
@@ -202,16 +214,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
                 while (Sections.Count > refreshedSections.Count)
                     Sections.RemoveAt(Sections.Count - 1);
 
-                RecentNames.Clear();
-                foreach (var section in sections)
-                {
-                    if (!string.IsNullOrWhiteSpace(section.Name) &&
-                        RecentNames.All(item => !item.Name.Equals(section.Name, StringComparison.Ordinal)))
-                    {
-                        RecentNames.Add(new RecentImportSectionViewModel(section.Name,
-                            name => _ = ActivateOrCreateAsync(name)));
-                    }
-                }
+                RefreshRecentNames();
             });
         }
         catch (Exception ex)
@@ -245,6 +248,23 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     {
         if (activeSectionId.HasValue)
             Dispatcher.UIThread.Post(() => TargetNewSection = false);
+    }
+
+    private void RefreshRecentNames()
+    {
+        var searchText = SearchText.Trim();
+        var names = loadedRecentSections
+            .Where(section => searchText.Length == 0 ||
+                              section.Name.Contains(searchText, StringComparison.CurrentCultureIgnoreCase))
+            .Select(section => section.Name)
+            .ToList();
+
+        RecentNames.Clear();
+        foreach (var name in names)
+        {
+            RecentNames.Add(new RecentImportSectionViewModel(name,
+                selectedName => _ = ActivateOrCreateAsync(selectedName)));
+        }
     }
 
     private void InitializeMenu()

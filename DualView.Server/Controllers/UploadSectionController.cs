@@ -33,12 +33,7 @@ public class UploadSectionController : Controller
     [HttpGet("recent")]
     public async Task<ActionResult<List<RecentImportSectionDTO>>> GetRecent()
     {
-        var sections = await databaseService.GetRecentImportSectionsAsync();
-        return sections.Select(section => new RecentImportSectionDTO
-        {
-            Name = section.Name,
-            LastUsed = section.LastUsed,
-        }).ToList();
+        return await databaseService.GetRecentImportSectionsAsync();
     }
 
     [HttpGet("{sectionId:long}")]

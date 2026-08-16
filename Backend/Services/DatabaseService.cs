@@ -1438,11 +1438,43 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
-    public async Task<List<RecentImportSection>> GetRecentImportSectionsAsync()
+    public async Task<List<RecentImportSectionDTO>> GetRecentImportSectionsAsync()
     {
-        return await dbContext.RecentImportSections
+        var activeNames = await dbContext.UploadSections
+            .OrderBy(section => section.DisplayIndex)
+            .Select(section => section.Name)
+            .ToListAsync();
+        var historicalSections = await dbContext.RecentImportSections
             .OrderByDescending(section => section.LastUsed)
             .ToListAsync();
+
+        var result = new List<RecentImportSectionDTO>(activeNames.Count + historicalSections.Count);
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var name in activeNames)
+        {
+            if (string.IsNullOrWhiteSpace(name) || !names.Add(name))
+                continue;
+
+            result.Add(new RecentImportSectionDTO
+            {
+                Name = name,
+                IsActive = true,
+            });
+        }
+
+        foreach (var section in historicalSections)
+        {
+            if (!names.Add(section.Name))
+                continue;
+
+            result.Add(new RecentImportSectionDTO
+            {
+                Name = section.Name,
+                LastUsed = section.LastUsed,
+            });
+        }
+
+        return result;
     }
 
     public async Task DeleteUploadSectionAsync(long sectionId)
@@ -2341,11 +2373,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     async Task<List<RecentImportSectionDTO>> IClientDatabaseService.GetRecentImportSectionsAsync()
     {
-        return (await GetRecentImportSectionsAsync()).Select(section => new RecentImportSectionDTO
-        {
-            Name = section.Name,
-            LastUsed = section.LastUsed,
-        }).ToList();
+        return await GetRecentImportSectionsAsync();
     }
 
     async Task<UploadSectionDTO?> IClientDatabaseService.GetUploadSectionAsync(long sectionId)
