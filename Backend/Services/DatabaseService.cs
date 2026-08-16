@@ -490,6 +490,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (item == null)
             return;
 
+        await ValidateCollectionRemovalAsync(collectionId, [mediaId]);
         dbContext.Set<CollectionItem>().Remove(item);
         await SaveAsync();
         await updateNotifier.NotifyCollectionContentsUpdated(collectionId);
@@ -540,6 +541,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (items.Count == 0)
             return result;
 
+        await ValidateCollectionRemovalAsync(collectionId, selectedIds);
         dbContext.Set<CollectionItem>().RemoveRange(items);
         var removedMediaIds = items.Select(item => item.MediaFileId).ToList();
         var nonOrphanedMediaIds = await dbContext.Set<CollectionItem>()
@@ -2689,6 +2691,29 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             }
 
             disposed = true;
+        }
+    }
+
+    private async Task ValidateCollectionRemovalAsync(long collectionId, IReadOnlyCollection<long> mediaIds)
+    {
+        var collection = await dbContext.Collections.FindAsync(collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        if (collection.ImageGroupSize <= 1)
+            return;
+
+        var activeItemCount = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId && !item.MediaFile.IsDeleted)
+            .CountAsync();
+        var removedActiveItemCount = await dbContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == collectionId && mediaIds.Contains(item.MediaFileId) &&
+                           !item.MediaFile.IsDeleted)
+            .CountAsync();
+        var remainingItemCount = activeItemCount - removedActiveItemCount;
+        if (remainingItemCount % collection.ImageGroupSize != 0)
+        {
+            throw new InvalidOperationException(
+                $"The collection requires images to remain in groups of {collection.ImageGroupSize}. " +
+                $"Removing these images would leave {remainingItemCount} images.");
         }
     }
 
