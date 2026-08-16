@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
     public DbSet<Collection> Collections { get; set; }
     public DbSet<UploadSection> UploadSections { get; set; }
     public DbSet<UploadSectionItem> UploadSectionItems { get; set; }
+    public DbSet<RecentImportSection> RecentImportSections { get; set; }
     public DbSet<MediaFile> MediaFiles { get; set; }
 
     public DbSet<Tag> Tags { get; set; }

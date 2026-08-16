@@ -1438,6 +1438,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
+    public async Task<List<RecentImportSection>> GetRecentImportSectionsAsync()
+    {
+        return await dbContext.RecentImportSections
+            .OrderByDescending(section => section.LastUsed)
+            .ToListAsync();
+    }
+
     public async Task DeleteUploadSectionAsync(long sectionId)
     {
         var section = await dbContext.UploadSections.FindAsync(sectionId)
@@ -1567,6 +1574,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             if (section.TargetFolderId != MediaFolder.RootFolderId)
                 await AddCollectionToFolder(collection.Id, section.TargetFolderId);
         }
+
+        await AddRecentImportSectionAsync(section.Name);
 
         var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
         await AddMediaToCollection(selectedIds, collection.Id, nextSequence);
@@ -2330,6 +2339,15 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return (await GetUploadSectionsAsync()).Select(section => section.GetDTO()).ToList();
     }
 
+    async Task<List<RecentImportSectionDTO>> IClientDatabaseService.GetRecentImportSectionsAsync()
+    {
+        return (await GetRecentImportSectionsAsync()).Select(section => new RecentImportSectionDTO
+        {
+            Name = section.Name,
+            LastUsed = section.LastUsed,
+        }).ToList();
+    }
+
     async Task<UploadSectionDTO?> IClientDatabaseService.GetUploadSectionAsync(long sectionId)
     {
         var section = await GetUploadSectionAsync(sectionId);
@@ -2637,5 +2655,33 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
             disposed = true;
         }
+    }
+
+    private async Task AddRecentImportSectionAsync(string name)
+    {
+        var lowercaseName = name.ToLowerInvariant();
+        var recentSection = await dbContext.RecentImportSections
+            .FirstOrDefaultAsync(section => section.NameLowercase == lowercaseName);
+
+        if (recentSection == null)
+        {
+            recentSection = new RecentImportSection(name);
+            await dbContext.RecentImportSections.AddAsync(recentSection);
+        }
+
+        recentSection.LastUsed = DateTime.UtcNow;
+
+        var oldSections = await dbContext.RecentImportSections
+            .OrderByDescending(section => section.LastUsed)
+            .ThenByDescending(section => section.Id)
+            .Skip(100)
+            .ToListAsync();
+        if (oldSections.Count > 0)
+        {
+            dbContext.RecentImportSections.RemoveRange(oldSections);
+        }
+
+        // Saving just once here at the end to save on some DB writes
+        await SaveAsync();
     }
 }

@@ -509,6 +509,11 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return await HttpClient.GetFromJsonAsync<List<UploadSectionDTO>>("api/v1/uploadSection") ?? new();
     }
 
+    public async Task<List<RecentImportSectionDTO>> GetRecentImportSectionsAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<RecentImportSectionDTO>>("api/v1/uploadSection/recent") ?? new();
+    }
+
     public Task<UploadSectionDTO?> GetUploadSectionAsync(long sectionId)
     {
         return HttpClient.GetFromJsonAsync<UploadSectionDTO>($"api/v1/uploadSection/{sectionId}");
