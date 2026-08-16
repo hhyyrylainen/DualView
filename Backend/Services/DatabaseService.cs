@@ -1472,6 +1472,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ThenInclude(tag => tag.CombinedWith)
             .ThenInclude(tag => tag!.Tag)
             .OrderBy(section => section.DisplayIndex)
+            .AsSplitQuery()
             .ToListAsync();
     }
 
@@ -1541,6 +1542,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(section => section.AppliedTags)
             .ThenInclude(tag => tag.CombinedWith)
             .ThenInclude(tag => tag!.Tag)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(section => section.Id == sectionId);
     }
 
@@ -1630,6 +1632,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(item => item.AppliedTags)
             .ThenInclude(tag => tag.CombinedWith)
             .ThenInclude(tag => tag!.Tag)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(item => item.Id == sectionId) ?? throw new ArgumentException("Section not found");
         var selectedIds = section.Items.OrderBy(item => item.Index)
             .Select(item => item.MediaFileId)
@@ -2308,6 +2311,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(t => t.CombinedWith)
             .ThenInclude(t => t!.Modifiers)
             .Where(t => t.MediaFiles.Any(m => m.Id == mediaId))
+            .AsSplitQuery()
             .ToListAsync();
     }
 
@@ -2321,6 +2325,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(t => t.CombinedWith)
             .ThenInclude(t => t!.Modifiers)
             .Where(t => t.Collections.Any(c => c.Id == collectionId))
+            .AsSplitQuery()
             .ToListAsync();
     }
 
@@ -2334,6 +2339,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(t => t.CombinedWith)
             .ThenInclude(t => t!.Modifiers)
             .Where(t => t.UploadSections.Any(s => s.Id == sectionId))
+            .AsSplitQuery()
             .ToListAsync();
     }
 
