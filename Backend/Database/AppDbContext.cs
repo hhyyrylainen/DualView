@@ -4,6 +4,7 @@ using Backend.Models;
 namespace Backend.Database;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 public class AppDbContext : DbContext
 {
@@ -63,7 +64,8 @@ public class AppDbContext : DbContext
         }
 
         var collection =
-            await dbContext.Collections.FirstOrDefaultAsync(c => c.Id == Collection.UncategorizedCollectionId, cancellation);
+            await dbContext.Collections.FirstOrDefaultAsync(c => c.Id == Collection.UncategorizedCollectionId,
+                cancellation);
 
         if (collection == null)
         {
@@ -163,10 +165,7 @@ public class AppDbContext : DbContext
                 .UsingEntity(j => j.ToTable("AppliedTagModifiers"));
         });
 
-        modelBuilder.Entity<TagModifier>(builder =>
-        {
-            builder.HasQueryFilter(m => !m.IsDeleted);
-        });
+        modelBuilder.Entity<TagModifier>(builder => { builder.HasQueryFilter(m => !m.IsDeleted); });
 
         modelBuilder.Entity<TagBreakRule>(builder =>
         {
@@ -202,10 +201,7 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
-        modelBuilder.Entity<DownloadGallery>(builder =>
-        {
-            builder.HasQueryFilter(m => !m.IsDeleted);
-        });
+        modelBuilder.Entity<DownloadGallery>(builder => { builder.HasQueryFilter(m => !m.IsDeleted); });
 
         modelBuilder.Entity<ScannedCollection>(builder =>
         {
@@ -230,10 +226,17 @@ public class AppDbContext : DbContext
                 .WithMany(appliedTag => appliedTag.FoundMedia)
                 .UsingEntity(j => j.ToTable("FoundMediaAppliedTags"));
 
+            var unparsedTagsComparer = new ValueComparer<List<string>>(
+                (left, right) => left == null ? right == null : right != null && left.SequenceEqual(right),
+                tags => tags.Aggregate(0, (hash, tag) => HashCode.Combine(hash, tag == null! ? 0 : tag.GetHashCode())),
+                tags => tags.ToList());
+
             builder.Property(foundMedia => foundMedia.UnparsedTags)
                 .HasConversion(
-                    tags => System.Text.Json.JsonSerializer.Serialize(tags, (System.Text.Json.JsonSerializerOptions?)null),
-                    tags => System.Text.Json.JsonSerializer.Deserialize<List<string>>(tags) ?? new());
+                    tags => System.Text.Json.JsonSerializer.Serialize(tags,
+                        (System.Text.Json.JsonSerializerOptions?)null),
+                    tags => System.Text.Json.JsonSerializer.Deserialize<List<string>>(tags) ?? new())
+                .Metadata.SetValueComparer(unparsedTagsComparer);
         });
 
         modelBuilder.Entity<UploadSection>(builder =>
@@ -250,7 +253,6 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(s => s.TargetFolderId)
                 .OnDelete(DeleteBehavior.Restrict);
-
         });
 
         modelBuilder.Entity<UploadSectionItem>(builder =>
@@ -283,9 +285,6 @@ public class AppDbContext : DbContext
                 .HasForeignKey(ci => ci.MediaFileId);
         });
 
-        modelBuilder.Entity<TagAlias>(builder =>
-        {
-            builder.HasQueryFilter(ta => !ta.Tag.IsDeleted);
-        });
+        modelBuilder.Entity<TagAlias>(builder => { builder.HasQueryFilter(ta => !ta.Tag.IsDeleted); });
     }
 }
