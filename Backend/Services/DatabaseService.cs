@@ -1623,6 +1623,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         var originalSectionName = section.Name;
         var targetCollectionName = section.Name.Trim();
+        var targetFolderApplied = section.TargetFolderId != MediaFolder.RootFolderId;
 
         // Disallow creating collections with no name
         if (string.IsNullOrWhiteSpace(targetCollectionName))
@@ -1652,9 +1653,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
         await AddMediaToCollection(selectedIds, collection.Id, nextSequence);
 
-        if (!string.Equals(originalSectionName, section.Name, StringComparison.Ordinal))
-            await updateNotifier.NotifyUploadSectionUpdated(sectionId);
-
         // Need to remove items first to detect when things become blank
         var itemsRemoved = 0;
         if (section.RemoveAfterImport)
@@ -1677,14 +1675,28 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             return;
         }
 
+        if (targetFolderApplied)
+            section.TargetFolderId = MediaFolder.RootFolderId;
+
+        var sectionUpdated = targetFolderApplied ||
+                             !string.Equals(originalSectionName, section.Name, StringComparison.Ordinal);
+
         if (section.RemoveAfterImport)
         {
             await SaveAsync();
+
+            if (sectionUpdated)
+                await updateNotifier.NotifyUploadSectionUpdated(sectionId);
 
             // Only notify if we still existed
             await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
             logger.LogInformation("Removed {ItemCount} imported items from upload section {SectionId}", itemsRemoved,
                 sectionId);
+        }
+        else if (sectionUpdated)
+        {
+            await SaveAsync();
+            await updateNotifier.NotifyUploadSectionUpdated(sectionId);
         }
     }
 
