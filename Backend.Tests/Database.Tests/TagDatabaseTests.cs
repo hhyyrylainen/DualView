@@ -1,6 +1,8 @@
 using Backend.Database;
+using Backend.Models;
 using Backend.Services;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Utils;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -94,5 +96,60 @@ public class TagDatabaseTests
         var alias = await context.TagAliases.FirstOrDefaultAsync(a => a.TagId == tagId);
         Assert.NotNull(alias);
         Assert.Equal("aliasname", alias.Name);
+    }
+
+    [Fact]
+    public async Task ParsedAppliedTags_AreSharedAndRenderCompleteText()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var manTagId = await service.CreateTagAsync("man", TagCategory.DescribeCharacterObject);
+        var tableTagId = await service.CreateTagAsync("table", TagCategory.DescribeCharacterObject);
+        var youngModifierId = await service.CreateTagModifierAsync("young");
+        var parser = new TagParser(service);
+
+        var sharedTag = await parser.ParseTag("man");
+        var modifiedTag = await parser.ParseTag("young man");
+        var combinedTag = await parser.ParseTag("man on table");
+
+        Assert.NotNull(sharedTag);
+        Assert.NotNull(modifiedTag);
+        Assert.NotNull(combinedTag);
+        Assert.Equal(manTagId, sharedTag.TagId);
+        Assert.Contains(modifiedTag.Modifiers, modifier => modifier.Id == youngModifierId);
+        Assert.Equal(manTagId, combinedTag.TagId);
+        Assert.NotNull(combinedTag.CombinedWith);
+        Assert.Equal(tableTagId, combinedTag.CombinedWith.TagId);
+        Assert.Equal("on", combinedTag.CombineWord);
+
+        var collectionId = await service.CreateCollection("Tag sharing collection", MediaFolder.RootFolderId);
+        var section = await service.GetOrCreateUploadSectionAsync("Tag import section");
+
+        await service.AddParsedAppliedTagToCollectionAsync(collectionId, sharedTag.GetDTO());
+        await service.AddParsedAppliedTagToUploadSectionAsync(section.Id, sharedTag.GetDTO());
+        await service.AddParsedAppliedTagToCollectionAsync(collectionId, modifiedTag.GetDTO());
+        await service.AddParsedAppliedTagToUploadSectionAsync(section.Id, combinedTag.GetDTO());
+
+        var collectionTags = (await service.GetCollectionAppliedTagsAsync(collectionId))
+            .Select(tag => tag.GetDTO()).ToList();
+        var sectionTags = (await service.GetUploadSectionAppliedTagsAsync(section.Id))
+            .Select(tag => tag.GetDTO()).ToList();
+        var sharedCollectionTag = Assert.Single(collectionTags, tag => tag.TagId == manTagId &&
+                                                                       tag.Modifiers.Count == 0 &&
+                                                                       tag.CombinedWith == null);
+        var sharedSectionTag = Assert.Single(sectionTags, tag => tag.TagId == manTagId &&
+                                                                 tag.Modifiers.Count == 0 && tag.CombinedWith == null);
+
+        Assert.Equal(sharedCollectionTag.Id, sharedSectionTag.Id);
+        Assert.Contains(collectionTags, tag => AppliedTagText.ToText(tag) == "young man");
+        Assert.Contains(sectionTags, tag => AppliedTagText.ToText(tag) == "man on table");
+
+        await service.RemoveAppliedTagFromCollectionAsync(collectionId, sharedCollectionTag.Id);
+
+        Assert.DoesNotContain(await service.GetCollectionAppliedTagsAsync(collectionId),
+            tag => tag.Id == sharedCollectionTag.Id);
+        Assert.Contains(await service.GetUploadSectionAppliedTagsAsync(section.Id),
+            tag => tag.Id == sharedSectionTag.Id);
+        Assert.NotNull(await service.GetAppliedTagAsync(sharedCollectionTag.Id));
     }
 }
