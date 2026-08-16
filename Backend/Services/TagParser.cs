@@ -21,7 +21,12 @@ public class TagParser : ITagParser
         // 1. Exact match (Tags/Aliases)
         var existingTag = await databaseService.GetTagByNameOrAliasAsync(str);
         if (existingTag != null)
-            return new AppliedTag(existingTag.Id);
+        {
+            return new AppliedTag(existingTag.Id)
+            {
+                Tag = existingTag,
+            };
+        }
 
         // 2. Super aliases
         var expanded = await databaseService.GetTagSuperAliasAsync(str);
@@ -49,11 +54,15 @@ public class TagParser : ITagParser
         var breakRule = await databaseService.GetTagBreakRuleByStrAsync(str);
         if (breakRule != null)
         {
-            var applied = new AppliedTag(breakRule.ActualTagId);
+            var applied = new AppliedTag(breakRule.ActualTagId)
+            {
+                Tag = await databaseService.GetTagAsync(breakRule.ActualTagId) ?? null!,
+            };
             foreach (var mod in breakRule.Modifiers)
             {
                 applied.Modifiers.Add(mod);
             }
+
             return applied;
         }
 
@@ -246,12 +255,16 @@ public class TagParser : ITagParser
                         allModifiersValid = false;
                         break;
                     }
+
                     modifiers.Add(modifier);
                 }
 
                 if (allModifiersValid)
                 {
-                    var applied = new AppliedTag(tag.Id);
+                    var applied = new AppliedTag(tag.Id)
+                    {
+                        Tag = tag,
+                    };
                     foreach (var mod in modifiers)
                         applied.Modifiers.Add(mod);
                     return applied;
@@ -275,12 +288,16 @@ public class TagParser : ITagParser
                         allModifiersValid = false;
                         break;
                     }
+
                     modifiers.Add(modifier);
                 }
 
                 if (allModifiersValid)
                 {
-                    var applied = new AppliedTag(tag.Id);
+                    var applied = new AppliedTag(tag.Id)
+                    {
+                        Tag = tag,
+                    };
                     foreach (var mod in modifiers)
                         applied.Modifiers.Add(mod);
                     return applied;
@@ -310,20 +327,17 @@ public class TagParser : ITagParser
             if (right == null) continue;
 
             // Combine
-            left.CombinedWithId = right.Id; // This is not quite right, AppliedTag usually combines with another AppliedTag ID
+            left.CombinedWith = right;
             // but we might need to save 'right' first or handle it differently.
             // In C++: parsedleft->SetCombineWith(middle, parsedright);
-            
+
             // Wait, AppliedTag in C# has CombinedWithId and CombineWord.
             // But we don't have the ID for 'right' yet as it's not saved.
-            
+
             // For now, let's just return left and hope the caller handles saving.
             // Actually, we might need a way to return a composite object that isn't fully saved.
-            
+
             left.CombineWord = middle;
-            // left.CombinedWith = right; // If we had this property
-            
-            // TODO: properly handle composite tags in C#
             return left;
         }
 
