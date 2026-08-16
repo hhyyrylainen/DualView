@@ -3,6 +3,7 @@ using System;
 using Backend.Database;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260816081127_AddScannedCollections")]
+    partial class AddScannedCollections
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
@@ -90,21 +93,6 @@ namespace Backend.Migrations
                     b.HasIndex("ModifiersId");
 
                     b.ToTable("AppliedTagModifiers", (string)null);
-                });
-
-            modelBuilder.Entity("AppliedTagUploadSection", b =>
-                {
-                    b.Property<long>("AppliedTagsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<long>("UploadSectionsId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("AppliedTagsId", "UploadSectionsId");
-
-                    b.HasIndex("UploadSectionsId");
-
-                    b.ToTable("UploadSectionAppliedTags", (string)null);
                 });
 
             modelBuilder.Entity("Backend.Models.AppliedTag", b =>
@@ -512,7 +500,6 @@ namespace Backend.Migrations
 
                     b.Property<string>("ScannerState")
                         .IsRequired()
-                        .HasMaxLength(1000000)
                         .HasColumnType("TEXT");
 
                     b.Property<long>("TargetFolderId")
@@ -922,21 +909,6 @@ namespace Backend.Migrations
                     b.HasOne("Backend.Models.TagModifier", null)
                         .WithMany()
                         .HasForeignKey("ModifiersId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("AppliedTagUploadSection", b =>
-                {
-                    b.HasOne("Backend.Models.AppliedTag", null)
-                        .WithMany()
-                        .HasForeignKey("AppliedTagsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Backend.Models.UploadSection", null)
-                        .WithMany()
-                        .HasForeignKey("UploadSectionsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

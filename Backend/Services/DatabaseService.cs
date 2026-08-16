@@ -1351,7 +1351,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<List<long>> GetOrphanedMediaFilesAsync()
     {
         return await dbContext.MediaFiles
-            .Where(m => !m.InCollections.Any())
+            .Where(m => !m.InCollections.Any() && !m.InUploadSections.Any())
             .Select(m => m.Id)
             .ToListAsync();
     }
@@ -2091,7 +2091,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var orphanedAppliedTags = await dbContext.AppliedTags
             .IgnoreQueryFilters()
-            .Where(appliedTag => !appliedTag.MediaFiles.Any() && !appliedTag.Collections.Any())
+            .Where(appliedTag => !appliedTag.MediaFiles.Any() &&
+                                 !appliedTag.Collections.Any() &&
+                                 !appliedTag.UploadSections.Any() &&
+                                 !appliedTag.ScannedCollections.Any() &&
+                                 !appliedTag.FoundMedia.Any())
             .ToListAsync();
 
         if (orphanedAppliedTags.Count == 0)

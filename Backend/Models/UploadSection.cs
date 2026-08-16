@@ -62,6 +62,8 @@ public class UploadSection : UpdateableModel, IDTOProvider<UploadSectionDTO>
 
     public ICollection<UploadSectionItem> Items { get; set; } = new List<UploadSectionItem>();
 
+    public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
+
     public UploadSectionDTO GetDTO()
     {
         return new UploadSectionDTO

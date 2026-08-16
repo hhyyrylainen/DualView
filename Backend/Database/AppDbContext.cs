@@ -32,6 +32,8 @@ public class AppDbContext : DbContext
     public DbSet<MediaImportInfo> MediaImportInfos { get; set; }
     public DbSet<IgnoredDuplicate> IgnoredDuplicates { get; set; }
     public DbSet<DownloadGallery> DownloadGalleries { get; set; }
+    public DbSet<ScannedCollection> ScannedCollections { get; set; }
+    public DbSet<FoundMedia> FoundMedia { get; set; }
 
     // MediaRating, ImageRegion, ActionHistory, and DownloadFile were removed/merged in the new version of DualView
 
@@ -205,11 +207,44 @@ public class AppDbContext : DbContext
             builder.HasQueryFilter(m => !m.IsDeleted);
         });
 
+        modelBuilder.Entity<ScannedCollection>(builder =>
+        {
+            builder.HasOne<MediaFolder>()
+                .WithMany()
+                .HasForeignKey(scannedCollection => scannedCollection.TargetFolderId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            builder.HasMany(scannedCollection => scannedCollection.AppliedTags)
+                .WithMany(appliedTag => appliedTag.ScannedCollections)
+                .UsingEntity(j => j.ToTable("ScannedCollectionAppliedTags"));
+        });
+
+        modelBuilder.Entity<FoundMedia>(builder =>
+        {
+            builder.HasOne(foundMedia => foundMedia.ScannedCollection)
+                .WithMany(scannedCollection => scannedCollection.FoundMedia)
+                .HasForeignKey(foundMedia => foundMedia.ScannedCollectionId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(foundMedia => foundMedia.AppliedTags)
+                .WithMany(appliedTag => appliedTag.FoundMedia)
+                .UsingEntity(j => j.ToTable("FoundMediaAppliedTags"));
+
+            builder.Property(foundMedia => foundMedia.UnparsedTags)
+                .HasConversion(
+                    tags => System.Text.Json.JsonSerializer.Serialize(tags, (System.Text.Json.JsonSerializerOptions?)null),
+                    tags => System.Text.Json.JsonSerializer.Deserialize<List<string>>(tags) ?? new());
+        });
+
         modelBuilder.Entity<UploadSection>(builder =>
         {
             builder.HasIndex(s => s.Selected)
                 .IsUnique()
                 .HasFilter("[Selected] = 1");
+
+            builder.HasMany(section => section.AppliedTags)
+                .WithMany(appliedTag => appliedTag.UploadSections)
+                .UsingEntity(j => j.ToTable("UploadSectionAppliedTags"));
 
             builder.HasOne<MediaFolder>()
                 .WithMany()
