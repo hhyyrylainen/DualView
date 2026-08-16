@@ -1686,7 +1686,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                 continue;
 
             collection.AppliedTags.Add(storedTag);
-            logger.LogInformation("Applying new tag on import to collection {CollectionId}", collection.Id);
+
+            // A bit of expensive call, but we want a full record of the applied tags
+            logger.LogInformation("Applying new tag ({Name}) on import to collection '{CollectionName}'",
+                AppliedTagText.ToText(storedTag.GetDTO()), collection.Name);
         }
 
         // Clear these to let the user keep importing stuff without accidentally putting tags all over
@@ -2419,6 +2422,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             await SaveAsync();
             await updateNotifier.NotifyUploadSectionUpdated(sectionId);
         }
+
         return storedTag.Id;
     }
 
