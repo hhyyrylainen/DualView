@@ -268,6 +268,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (folder.Parents.Any(p => p.Id == parentFolderId))
             return;
 
+        if (await dbContext.MediaFolders.AnyAsync(existing =>
+                existing.Id != folderId &&
+                existing.NameLowerCase == folder.NameLowerCase &&
+                existing.Parents.Any(existingParent => existingParent.Id == parentFolderId)))
+        {
+            throw new InvalidOperationException("A folder with that name already exists in the parent folder");
+        }
+
         folder.Parents.Add(parent);
         await SaveAsync();
         await updateNotifier.NotifyMediaFoldersUpdated();
@@ -770,6 +778,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task RestoreMediaAsync(long mediaId)
     {
         var media = await dbContext.MediaFiles
+                        .IgnoreQueryFilters()
                         .FirstOrDefaultAsync(m => m.Id == mediaId) ??
                     throw new ArgumentException("Media file not found");
 
@@ -834,6 +843,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<List<MediaFile>> GetDeletedMediaAsync(int limit)
     {
         return await dbContext.MediaFiles
+            .IgnoreQueryFilters()
             .Where(m => m.IsDeleted)
             .OrderByDescending(m => m.UpdatedAt)
             .Take(limit)
@@ -843,6 +853,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<List<MediaFolder>> GetDeletedMediaFoldersAsync(int limit)
     {
         return await dbContext.MediaFolders
+            .IgnoreQueryFilters()
             .Where(f => f.IsDeleted)
             .OrderByDescending(f => f.UpdatedAt)
             .Take(limit)
@@ -852,6 +863,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<List<Collection>> GetDeletedCollectionsAsync(int limit)
     {
         return await dbContext.Collections
+            .IgnoreQueryFilters()
             .Where(c => c.IsDeleted)
             .OrderByDescending(c => c.UpdatedAt)
             .Take(limit)
