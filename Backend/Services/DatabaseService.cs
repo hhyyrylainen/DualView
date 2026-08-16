@@ -1585,7 +1585,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (selectedIds.Count == 0)
             return;
 
-        logger.LogInformation("Importing {ItemCount} items from upload section '{SectionName}' ({SectionId})",
+        logger.LogInformation("Trying to import {ItemCount} items from upload section '{SectionName}' ({SectionId})",
             selectedIds.Count, section.Name, section.Id);
 
         var originalSectionName = section.Name;
