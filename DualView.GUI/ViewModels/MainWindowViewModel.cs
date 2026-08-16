@@ -403,7 +403,8 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             else
             {
                 var (content, totalItems) = await databaseService.GetMediaFolderContents(currentFolderId!.Value,
-                    currentPage - 1, pageSize, FolderSortColumn.Name, SortDirection.Ascending, searchText);
+                    currentPage - 1, pageSize, FolderSortColumn.Name, SortDirection.Ascending, searchText,
+                    IsRecursiveSearch);
 
                 totalItemsCount = totalItems;
 

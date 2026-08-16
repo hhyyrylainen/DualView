@@ -70,7 +70,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<string> GetMediaFolderPath(long folderId);
 
     public Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage, int pageSize,
-        FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null);
+        FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null, bool recursive = false);
 
     /// <summary>
     ///   Creates a new media file and adds it to a collection

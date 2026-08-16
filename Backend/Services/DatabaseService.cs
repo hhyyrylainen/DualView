@@ -2461,14 +2461,48 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     }
 
     public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
-        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null)
+        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null,
+        bool recursive = false)
     {
+        // Recursive mode works weirdly if the search is not provided
+        recursive = recursive && !string.IsNullOrWhiteSpace(searchText);
+
         // Fetch subfolders and collections
         var subfolderQuery = dbContext.MediaFolders
             .Where(f => f.Parents.Any(p => p.Id == folderId) && !f.IsDeleted);
 
         var collectionQuery = dbContext.Collections
             .Where(c => c.Folders.Any(f => f.Id == folderId) && !c.IsDeleted);
+
+        if (recursive)
+        {
+            var folders = await dbContext.MediaFolders
+                .Where(f => !f.IsDeleted)
+                .Include(f => f.Parents)
+                .ToListAsync();
+            var folderIds = new HashSet<long>
+            {
+                folderId,
+            };
+            bool foundNewFolder;
+
+            do
+            {
+                foundNewFolder = false;
+                foreach (var folder in folders)
+                {
+                    if (folder.Parents.Any(parent => folderIds.Contains(parent.Id)) && folderIds.Add(folder.Id))
+                    {
+                        foundNewFolder = true;
+                    }
+                }
+            } while (foundNewFolder);
+
+            subfolderQuery = dbContext.MediaFolders
+                .Where(f => folderIds.Contains(f.Id) && f.Id != folderId && !f.IsDeleted);
+            collectionQuery = dbContext.Collections
+                .Where(c => c.Folders.Any(f => folderIds.Contains(f.Id)) && !c.IsDeleted);
+        }
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {

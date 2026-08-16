@@ -44,7 +44,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<MediaConfigFolderInfo> GetConfiguredMediaFoldersAsync(long mediaConfigId);
     public Task<List<ConfiguredMediaDTO>> GetConfiguredMediaSiblingsAsync(long mediaConfigId);
     public Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage, int pageSize,
-        FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null);
+        FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null, bool recursive = false);
     public Task AddMediaToFolder(long mediaConfigurationId, string folderPath, bool canCreateRootFolder = false);
     public Task RemoveMediaFromFolder(long mediaConfigurationId, string folderPath);
     public Task<ConfiguredMediaDTO> CreateConfiguredMediaAsync(long mediaId, string configName, List<string> folders);

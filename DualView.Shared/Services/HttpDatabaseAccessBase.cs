@@ -420,11 +420,17 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     }
 
     public async Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage,
-        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null)
+        int pageSize, FolderSortColumn sortColumn, SortDirection sortDirection, string? searchText = null,
+        bool recursive = false)
     {
         var url =
             $"api/v1/mediaFolder/{folderId}/contents?page={itemPage}&pageSize={pageSize}&sortColumn={sortColumn}&" +
             $"sortDirection={sortDirection}";
+
+        if (recursive)
+        {
+            url += "&recursive=true";
+        }
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {

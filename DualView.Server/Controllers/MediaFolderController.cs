@@ -170,9 +170,9 @@ public class MediaFolderController : Controller
     [HttpGet("{folderId:long}/contents")]
     public async Task<ActionResult<Tuple<List<ConfiguredMediaInfo>, int>>> GetMediaFolderContents([Required] long folderId,
         [Required] int page, int pageSize = 100, FolderSortColumn sortColumn = FolderSortColumn.Name,
-        SortDirection sortDirection = SortDirection.Ascending, string? searchText = null)
+        SortDirection sortDirection = SortDirection.Ascending, string? searchText = null, bool recursive = false)
     {
         return await databaseService.GetMediaFolderContents(folderId, page, pageSize, sortColumn, sortDirection,
-            searchText);
+            searchText, recursive);
     }
 }
