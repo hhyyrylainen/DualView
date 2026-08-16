@@ -316,6 +316,48 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectedCount));
     }
 
+    public async Task ReverseImagesAsync()
+    {
+        if (databaseService == null || Media.Count < 2)
+            return;
+
+        var selectedItems = Media.Where(item => item.Selected).ToList();
+        if (selectedItems.Count == 1)
+            return;
+
+        var desiredOrder = Media.ToList();
+        if (selectedItems.Count == 0)
+        {
+            desiredOrder.Reverse();
+        }
+        else
+        {
+            var selectedIndices = Media
+                .Select((item, index) => item.Selected ? index : -1)
+                .Where(index => index >= 0)
+                .ToList();
+            for (var index = 0; index < selectedIndices.Count; ++index)
+                desiredOrder[selectedIndices[index]] = selectedItems[selectedItems.Count - 1 - index];
+        }
+
+        try
+        {
+            await databaseService.ReorderUploadSectionAsync(id,
+                desiredOrder.Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList());
+
+            for (var index = 0; index < desiredOrder.Count; ++index)
+            {
+                var currentIndex = Media.IndexOf(desiredOrder[index]);
+                if (currentIndex != index)
+                    Media.Move(currentIndex, index);
+            }
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to reverse images", ex);
+        }
+    }
+
     public async Task RefreshDetailsAsync()
     {
         if (databaseService == null)
