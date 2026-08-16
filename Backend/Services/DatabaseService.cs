@@ -2304,6 +2304,52 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
+    public async Task<List<AppliedTag>> GetUploadSectionAppliedTagsAsync(long sectionId)
+    {
+        return await dbContext.AppliedTags
+            .Include(t => t.Tag)
+            .Include(t => t.Modifiers)
+            .Where(t => t.UploadSections.Any(s => s.Id == sectionId))
+            .ToListAsync();
+    }
+
+    public async Task<long> AddAppliedTagToUploadSectionAsync(long sectionId, long tagId, List<long>? modifierIds,
+        long? combinedWithAppliedTagId, string? combineWord)
+    {
+        var section = await dbContext.UploadSections.Include(s => s.AppliedTags)
+            .FirstOrDefaultAsync(s => s.Id == sectionId) ?? throw new ArgumentException("Upload section not found");
+
+        // TODO: should first look if an existing applied tag exists with this combination of settings, if it does reuse it and only if it doesn't then create a new applied tag instance
+        var appliedTag = new AppliedTag(tagId)
+        {
+            CombinedWithId = combinedWithAppliedTagId,
+            CombineWord = combineWord,
+        };
+        if (modifierIds != null)
+        {
+            var modifiers = await dbContext.TagModifiers.Where(m => modifierIds.Contains(m.Id)).ToListAsync();
+            foreach (var modifier in modifiers)
+                appliedTag.Modifiers.Add(modifier);
+        }
+        section.AppliedTags.Add(appliedTag);
+        await SaveAsync();
+        return appliedTag.Id;
+    }
+
+    public async Task RemoveAppliedTagFromUploadSectionAsync(long sectionId, long appliedTagId)
+    {
+        var section = await dbContext.UploadSections.Include(s => s.AppliedTags)
+            .FirstOrDefaultAsync(s => s.Id == sectionId) ?? throw new ArgumentException("Upload section not found");
+
+        // TODO: this is totally wrong, applied tags can be shared accross many things so this should just unlink the tag from the section. There's a separate cleanup job to delete any applied tags that are unused periodically.
+        var appliedTag = section.AppliedTags.FirstOrDefault(t => t.Id == appliedTagId);
+        if (appliedTag != null)
+        {
+            section.AppliedTags.Remove(appliedTag);
+            await SaveAsync();
+        }
+    }
+
     public async Task<AppliedTag?> GetAppliedTagAsync(long id)
     {
         return await dbContext.AppliedTags
