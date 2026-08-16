@@ -260,11 +260,18 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         if (databaseService == null)
             return;
 
-        await SaveAsync();
+        try
+        {
+            await SaveAsync();
 
-        var selected = Media.Where(item => item.Selected)
-            .Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList();
-        await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
+            var selected = Media.Where(item => item.Selected)
+                .Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList();
+            await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to import section", ex);
+        }
     }
 
     public async Task DeleteAsync()

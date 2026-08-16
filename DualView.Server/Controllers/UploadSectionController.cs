@@ -109,8 +109,19 @@ public class UploadSectionController : Controller
     [HttpPost("{sectionId:long}/import")]
     public async Task<ActionResult> Import(long sectionId, [FromBody] List<long>? mediaIds)
     {
-        await databaseService.ImportUploadSectionAsync(sectionId, mediaIds);
-        return Ok();
+        try
+        {
+            await databaseService.ImportUploadSectionAsync(sectionId, mediaIds);
+            return Ok();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("{sectionId:long}/addMedia")]

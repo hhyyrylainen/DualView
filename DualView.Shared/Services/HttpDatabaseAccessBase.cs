@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Encodings.Web;
+using System.Text.Json;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
@@ -288,7 +289,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         var response = await HttpClient.PostAsync(
             $"api/v1/collection/{collectionId}/removeMedia?mediaId={mediaId}",
             null);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessStatusCodeWithDescriptionAsync(response);
     }
 
     public async Task<CollectionMediaRemovalPreview> PreviewCollectionMediaRemovalAsync(long collectionId,
@@ -306,7 +307,7 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     {
         var response =
             await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/removeSelectedMedia", mediaIds);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessStatusCodeWithDescriptionAsync(response);
         return await response.Content.ReadFromJsonAsync<CollectionMediaRemovalResult>() ??
                throw new Exception("Failed to read collection removal result");
     }
@@ -563,7 +564,11 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/import", mediaIds);
-        response.EnsureSuccessStatusCode();
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var description = await ReadErrorDescriptionAsync(response);
+        throw new HttpRequestException(description, null, response.StatusCode);
     }
 
     // Tags
@@ -768,5 +773,41 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id)
     {
         return await HttpClient.GetFromJsonAsync<DownloadGalleryDTO?>($"api/v1/downloadGallery/{id}");
+    }
+
+    private static async Task<string> ReadErrorDescriptionAsync(HttpResponseMessage response)
+    {
+        var responseBody = await response.Content.ReadAsStringAsync();
+        if (string.IsNullOrWhiteSpace(responseBody))
+            return $"Server returned {(int)response.StatusCode} {response.ReasonPhrase}.";
+
+        try
+        {
+            using var document = JsonDocument.Parse(responseBody);
+            var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.String)
+                return root.GetString() ?? responseBody;
+
+            if (root.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+                return detail.GetString() ?? responseBody;
+
+            if (root.TryGetProperty("title", out var title) && title.ValueKind == JsonValueKind.String)
+                return title.GetString() ?? responseBody;
+        }
+        catch (JsonException)
+        {
+            // The response may be plain text or an HTML error page.
+        }
+
+        return responseBody;
+    }
+
+    private static async Task EnsureSuccessStatusCodeWithDescriptionAsync(HttpResponseMessage response)
+    {
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var description = await ReadErrorDescriptionAsync(response);
+        throw new HttpRequestException(description, null, response.StatusCode);
     }
 }
