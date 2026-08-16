@@ -18,6 +18,12 @@ namespace DualView.GUI.ViewModels;
 
 public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 {
+    private const double NormalPreviewImageWidth = 110;
+    private const double NormalPreviewImageHeight = 145;
+    private const double PreviewImageBigScale = 2.5;
+    private const double NormalPreviewScrollViewerHeight = 300;
+    private const double PreviewScrollViewerBigHeightScale = 3;
+
     private readonly IClientDatabaseService? databaseService;
     private readonly ILogger? logger;
     private readonly IWindowService? windowService;
@@ -89,6 +95,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
                 ShowingThumbnail = true,
                 AllowSelection = true,
                 Selected = false,
+                CustomWidth = NormalPreviewImageWidth,
+                CustomHeight = NormalPreviewImageHeight,
             };
             Media.Add(viewer);
             viewer.OnSelectionChanged += OnMediaSelectionChanged;
@@ -182,6 +190,37 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref field, value) && isInitialized)
                 SaveImmediately();
         }
+    }
+
+    public bool BigPreviewImages
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+            {
+                var width = GetPreviewImageWidth();
+                var height = GetPreviewImageHeight();
+                foreach (var viewer in Media)
+                {
+                    viewer.CustomWidth = width;
+                    viewer.CustomHeight = height;
+                }
+
+                OnPropertyChanged(nameof(PreviewScrollViewerHeight));
+            }
+        }
+    }
+
+    public double PreviewScrollViewerHeight => BigPreviewImages
+        ? NormalPreviewScrollViewerHeight * PreviewScrollViewerBigHeightScale
+        : NormalPreviewScrollViewerHeight;
+
+    // TODO: implement this (once tag editor works)
+    public bool ShowImageTagEditor
+    {
+        get;
+        set => SetProperty(ref field, value);
     }
 
     public bool IsActive
@@ -565,6 +604,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             ShowingThumbnail = true,
             AllowSelection = true,
             Selected = false,
+            CustomWidth = GetPreviewImageWidth(),
+            CustomHeight = GetPreviewImageHeight(),
         };
         viewer.OnSelectionChanged += OnMediaSelectionChanged;
         return viewer;
@@ -660,4 +701,12 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(SelectedCount));
     }
+
+    private double GetPreviewImageWidth() => BigPreviewImages
+        ? NormalPreviewImageWidth * PreviewImageBigScale
+        : NormalPreviewImageWidth;
+
+    private double GetPreviewImageHeight() => BigPreviewImages
+        ? NormalPreviewImageHeight * PreviewImageBigScale
+        : NormalPreviewImageHeight;
 }

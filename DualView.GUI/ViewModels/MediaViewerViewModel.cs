@@ -76,6 +76,20 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     } = "Unknown item";
 
+    // NOTE: these don't apply immediately. Any XAML file that includes this needs to do stuff like:
+    // `<controls:MediaViewer Width="{Binding CustomWidth}" Height="{Binding CustomHeight}" Margin="2" />`
+    public double CustomWidth
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = double.NaN;
+
+    public double CustomHeight
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = double.NaN;
+
     public IBrush? BackgroundBrush
     {
         get;

@@ -58,15 +58,22 @@
                 </Grid>
             </StackPanel>
             <Grid Grid.Row="1" IsVisible="{Binding ImagesTabSelected}">
-                <Grid RowDefinitions="Auto,*">
+                <Grid RowDefinitions="Auto,Auto,*">
                     <WrapPanel ItemSpacing="5">
                         <Button Command="{Binding RemoveSelectedAsync}">Remove Selected</Button>
                         <Button Command="{Binding ReverseImagesAsync}">Reverse Images</Button>
                         <Button Command="{Binding DeselectAll}">Deselect All</Button>
-                        <CheckBox IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
                         <Button Command="{Binding SortByVisualSimilarityAsync}">Sort by visual similarity</Button>
+
                     </WrapPanel>
-                    <ScrollViewer Grid.Row="1" Height="330">
+                    <WrapPanel Grid.Row="1" ItemSpacing="5">
+                        <CheckBox IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
+                        <CheckBox IsChecked="{Binding BigPreviewImages}">Big Previews</CheckBox>
+                        <CheckBox IsChecked="{Binding ShowImageTagEditor}" IsEnabled="False">
+                            Edit Image Tags
+                        </CheckBox>
+                    </WrapPanel>
+                    <ScrollViewer Grid.Row="2" Height="{Binding PreviewScrollViewerHeight}">
                         <ItemsControl ItemsSource="{Binding Media}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -75,7 +82,9 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <controls:MediaViewer Width="110" Height="145" Margin="2" />
+                                    <controls:MediaViewer Width="{Binding CustomWidth}"
+                                                          Height="{Binding CustomHeight}"
+                                                          Margin="2" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
