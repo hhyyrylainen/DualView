@@ -465,6 +465,17 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             throw new ArgumentException("Collection not found");
 
         var itemsByMediaId = collection.Items.ToDictionary(ci => ci.MediaFileId);
+
+        // SQLite enforces the unique (collection, sequence) index during each update,
+        // so clear the old positions before assigning the new order.
+        var temporarySequence = -1;
+        foreach (var item in collection.Items)
+        {
+            item.SequenceNumber = temporarySequence--;
+        }
+
+        await SaveAsync();
+
         int nextSequence = 0;
 
         // Assign sequence numbers to items in the new order
