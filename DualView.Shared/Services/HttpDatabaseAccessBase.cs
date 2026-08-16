@@ -617,6 +617,19 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return await HttpClient.GetFromJsonAsync<TagDTO?>($"api/v1/tag/byName?name={Uri.EscapeDataString(name)}");
     }
 
+    public async Task<AppliedTagDTO?> ParseTagAsync(string tag)
+    {
+        return await HttpClient.GetFromJsonAsync<AppliedTagDTO?>(
+            $"api/v1/tag/parse?tag={Uri.EscapeDataString(tag)}");
+    }
+
+    public async Task<List<string>> GetTagSuggestionsAsync(string search, int maxCount = 100)
+    {
+        return await HttpClient.GetFromJsonAsync<List<string>>(
+                   $"api/v1/tag/suggestions?search={Uri.EscapeDataString(search)}&maxCount={maxCount}") ??
+               new List<string>();
+    }
+
     public async Task<long> CreateTagModifierAsync(string name)
     {
         var response =

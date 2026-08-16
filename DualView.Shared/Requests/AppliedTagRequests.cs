@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using DualView.Shared.Models.DTO;
 
 namespace DualView.Shared.Requests;
 
@@ -9,4 +10,10 @@ public class AddAppliedTagRequest
     public List<long>? ModifierIds { get; set; }
     public long? CombinedWithAppliedTagId { get; set; }
     public string? CombineWord { get; set; }
+
+    /// <summary>
+    ///   Note: when set this is the information that takes precedence. So client should usually parse first and
+    ///   then send the parsed tag.
+    /// </summary>
+    public AppliedTagDTO? ParsedTag { get; set; }
 }

@@ -108,6 +108,9 @@ public interface IDatabaseCommonService
     public Task<long> AddAppliedTagToUploadSectionAsync(long sectionId, long tagId, List<long>? modifierIds,
         long? combinedWithAppliedTagId, string? combineWord);
     public Task RemoveAppliedTagFromUploadSectionAsync(long sectionId, long appliedTagId);
+    public Task<long> AddParsedAppliedTagToMediaAsync(long mediaId, AppliedTagDTO appliedTag);
+    public Task<long> AddParsedAppliedTagToCollectionAsync(long collectionId, AppliedTagDTO appliedTag);
+    public Task<long> AddParsedAppliedTagToUploadSectionAsync(long sectionId, AppliedTagDTO appliedTag);
 
     // Download Galleries
     public Task<long> CreateDownloadGalleryAsync(string galleryUrl);

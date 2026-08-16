@@ -38,6 +38,7 @@ public class AppliedTag : IDTOProvider<AppliedTagDTO>
             Modifiers = Modifiers.Select(m => m.GetDTO()).ToList(),
             CombinedWithId = CombinedWithId,
             CombineWord = CombineWord,
+            CombinedWith = CombinedWith?.GetDTO(),
         };
     }
 }

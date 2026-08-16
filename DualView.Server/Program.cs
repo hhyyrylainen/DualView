@@ -132,6 +132,7 @@ builder.Services.AddSingleton<IServerConfigurationService>(serverConfig);
 builder.Services.AddSingleton<IAppEvents, AppEvents>();
 builder.Services.AddSingleton<IBackgroundJobs, BackgroundJobs>();
 builder.Services.AddScoped<IDatabaseService, DatabaseService>();
+builder.Services.AddScoped<ITagParser, TagParser>();
 builder.Services.AddSingleton<ICachedIPResolver, CachedIPResolver>();
 builder.Services.AddScoped<IEntityUpdateNotifier, EntityUpdateNotifier>();
 builder.Services.AddScoped<IRealTimeDataHub, RealTimeUpdateNotifier>();

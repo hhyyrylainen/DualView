@@ -13,10 +13,12 @@ namespace DualView.Server.Controllers;
 public class TagController : Controller
 {
     private readonly IDatabaseService databaseService;
+    private readonly ITagParser tagParser;
 
-    public TagController(IDatabaseService databaseService)
+    public TagController(IDatabaseService databaseService, ITagParser tagParser)
     {
         this.databaseService = databaseService;
+        this.tagParser = tagParser;
     }
 
     [HttpGet]
@@ -43,6 +45,13 @@ public class TagController : Controller
         return (await databaseService.GetTagByNameAsync(name))?.GetDTO();
     }
 
+    [HttpGet("suggestions")]
+    public async Task<ActionResult<List<string>>> Suggestions([Required] [FromQuery] string search,
+        [FromQuery] int maxCount = 100)
+    {
+        return await tagParser.GetSuggestions(search, maxCount);
+    }
+
     [HttpPost]
     public async Task<ActionResult<long>> Create([FromBody] CreateTagRequest request)
     {
@@ -53,7 +62,8 @@ public class TagController : Controller
     [HttpPut("{id:long}")]
     public async Task<IActionResult> Update([Required] long id, [FromBody] UpdateTagRequest request)
     {
-        await databaseService.UpdateTagAsync(id, request.Name, request.Description, request.Category, request.ExampleMediaId);
+        await databaseService.UpdateTagAsync(id, request.Name, request.Description, request.Category,
+            request.ExampleMediaId);
         return Ok();
     }
 

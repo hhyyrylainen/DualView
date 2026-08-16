@@ -60,6 +60,8 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<List<AppliedTagDTO>> GetMediaAppliedTagsAsync(long mediaId);
     public Task<List<AppliedTagDTO>> GetCollectionAppliedTagsAsync(long collectionId);
     public Task<List<AppliedTagDTO>> GetUploadSectionAppliedTagsAsync(long sectionId);
+    public Task<AppliedTagDTO?> ParseTagAsync(string tag);
+    public Task<List<string>> GetTagSuggestionsAsync(string search, int maxCount = 100);
 
     // Tag search
     public Task<List<TagDTO>> SearchTagsWildcardAsync(string search);
