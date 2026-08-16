@@ -9,4 +9,5 @@ public class UploadSectionDTO
     public bool RemoveAfterImport { get; set; }
     public long TargetFolderId { get; set; }
     public List<MediaFileDTO> Media { get; set; } = new();
+    public List<AppliedTagDTO> AppliedTags { get; set; } = new();
 }

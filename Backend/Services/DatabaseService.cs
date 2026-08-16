@@ -1464,6 +1464,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.UploadSections
             .Include(section => section.Items)
             .ThenInclude(item => item.MediaFile)
+            .Include(section => section.AppliedTags)
+            .ThenInclude(tag => tag.Tag)
             .OrderBy(section => section.DisplayIndex)
             .ToListAsync();
     }
@@ -1527,6 +1529,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.UploadSections
             .Include(section => section.Items)
             .ThenInclude(item => item.MediaFile)
+            .Include(section => section.AppliedTags)
+            .ThenInclude(tag => tag.Tag)
             .FirstOrDefaultAsync(section => section.Id == sectionId);
     }
 
@@ -1609,6 +1613,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var section = await dbContext.UploadSections
             .Include(item => item.Items)
+            .Include(item => item.AppliedTags)
+            .ThenInclude(tag => tag.Modifiers)
             .FirstOrDefaultAsync(item => item.Id == sectionId) ?? throw new ArgumentException("Section not found");
         var selectedIds = section.Items.OrderBy(item => item.Index)
             .Select(item => item.MediaFileId)

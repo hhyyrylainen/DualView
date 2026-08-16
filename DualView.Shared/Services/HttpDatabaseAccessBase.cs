@@ -737,6 +737,28 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                new List<AppliedTagDTO>();
     }
 
+    public async Task<List<AppliedTagDTO>> GetUploadSectionAppliedTagsAsync(long sectionId)
+    {
+        return await HttpClient.GetFromJsonAsync<List<AppliedTagDTO>>($"api/v1/uploadSection/{sectionId}/appliedTag") ??
+               new List<AppliedTagDTO>();
+    }
+
+    public async Task<long> AddAppliedTagToUploadSectionAsync(long sectionId, long tagId, List<long>? modifierIds,
+        long? combinedWithAppliedTagId, string? combineWord)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/appliedTag",
+            new AddAppliedTagRequest { TagId = tagId, ModifierIds = modifierIds,
+                CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task RemoveAppliedTagFromUploadSectionAsync(long sectionId, long appliedTagId)
+    {
+        var response = await HttpClient.DeleteAsync($"api/v1/uploadSection/{sectionId}/appliedTag/{appliedTagId}");
+        response.EnsureSuccessStatusCode();
+    }
+
     // Import & Galleries
     public async Task<MediaImportInfoDTO?> GetMediaImportInfoAsync(long mediaId)
     {

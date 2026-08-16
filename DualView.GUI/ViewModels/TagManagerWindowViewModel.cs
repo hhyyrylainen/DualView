@@ -174,6 +174,13 @@ public class TagManagerWindowViewModel : ViewModelBase
         }
     }
 
+    public void BeginNewTag(string name)
+    {
+        NewTagName = name.Trim();
+        if (!string.IsNullOrWhiteSpace(NewTagName))
+            SearchString = NewTagName.ToLowerInvariant();
+    }
+
     public async Task CreateNewTag()
     {
         if (databaseService == null) return;

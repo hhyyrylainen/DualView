@@ -49,6 +49,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         Name = "Test name";
 
         FolderPicker = new FolderPickerViewModel();
+        TagEditor = new TagEditorViewModel();
         RemoveAfterImport = true;
         id = -1;
         IsActive = true;
@@ -113,6 +114,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     public ObservableCollection<MediaViewerViewModel> Media { get; } = new();
     public FolderPickerViewModel FolderPicker { get; }
+    public TagEditorViewModel TagEditor { get; }
+
     public long Id => id;
 
     public bool CollectionTabSelected

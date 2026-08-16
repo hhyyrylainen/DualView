@@ -75,6 +75,7 @@ public class UploadSection : UpdateableModel, IDTOProvider<UploadSectionDTO>
             RemoveAfterImport = RemoveAfterImport,
             TargetFolderId = TargetFolderId,
             Media = Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
+            AppliedTags = AppliedTags.Select(tag => tag.GetDTO()).ToList(),
         };
     }
 }

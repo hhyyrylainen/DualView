@@ -49,6 +49,27 @@ public class UploadSectionController : Controller
         return section.GetDTO();
     }
 
+    [HttpGet("{sectionId:long}/appliedTag")]
+    public async Task<ActionResult<List<AppliedTagDTO>>> GetAppliedTags(long sectionId)
+    {
+        return (await databaseService.GetUploadSectionAppliedTagsAsync(sectionId))
+            .Select(tag => tag.GetDTO()).ToList();
+    }
+
+    [HttpPost("{sectionId:long}/appliedTag")]
+    public async Task<ActionResult<long>> AddAppliedTag(long sectionId, AddAppliedTagRequest request)
+    {
+        return await databaseService.AddAppliedTagToUploadSectionAsync(sectionId, request.TagId, request.ModifierIds,
+            request.CombinedWithAppliedTagId, request.CombineWord);
+    }
+
+    [HttpDelete("{sectionId:long}/appliedTag/{appliedTagId:long}")]
+    public async Task<IActionResult> RemoveAppliedTag(long sectionId, long appliedTagId)
+    {
+        await databaseService.RemoveAppliedTagFromUploadSectionAsync(sectionId, appliedTagId);
+        return Ok();
+    }
+
     [HttpPost("{sectionId:long}/sortByVisualSimilarity")]
     public async Task<ActionResult<long>> SortByVisualSimilarity([Required] long sectionId)
     {

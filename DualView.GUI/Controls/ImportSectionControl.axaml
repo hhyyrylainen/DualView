@@ -54,7 +54,7 @@
                                            Height="305" />
 
                     <TextBlock Grid.Row="0" Grid.Column="1" Margin="2" HorizontalAlignment="Center">Collection tags:</TextBlock>
-                    <TextBlock Grid.Row="1" Grid.Column="1">TODO: add tag editor here</TextBlock>
+                    <controls:TagEditor Grid.Row="1" Grid.Column="1" DataContext="{Binding TagEditor}" />
                 </Grid>
             </StackPanel>
             <Grid Grid.Row="1" IsVisible="{Binding ImagesTabSelected}">
