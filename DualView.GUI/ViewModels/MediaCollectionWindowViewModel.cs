@@ -281,6 +281,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public void RemoveSelected() => _ = RemoveSelectedAsync();
     public void UndoRemove() => _ = UndoRemoveAsync();
     public void DeleteSelected() => _ = DeleteSelectedAsync();
+    public void SendSelectedToImport() => _ = SendSelectedToImportAsync();
     public void DeleteCollection() => _ = DeleteCollectionAsync();
     public void DeleteCollectionAndImages() => _ = DeleteCollectionAndImagesAsync();
     public void Export() => Placeholder("Export");
@@ -477,6 +478,25 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             windowService?.ShowErrorWindow("Failed to remove selected media", ex);
+        }
+    }
+
+    private async Task SendSelectedToImportAsync()
+    {
+        if (databaseService == null)
+            return;
+
+        var mediaIds = GetSelectedMediaIds();
+        if (mediaIds.Count == 0)
+            return;
+
+        try
+        {
+            await databaseService.AddMediaToActiveUploadSectionAsync(mediaIds);
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to send selected media to import", ex);
         }
     }
 

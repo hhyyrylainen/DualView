@@ -27,6 +27,7 @@
                 <MenuItem Header="Select All" Command="{Binding SelectAll}" />
                 <MenuItem Header="Deselect All" Command="{Binding DeselectAll}" />
                 <MenuItem Header="Remove Selected" Command="{Binding RemoveSelected}" />
+                <MenuItem Header="Send selected to import" Command="{Binding SendSelectedToImport}" />
                 <MenuItem Header="DELETE selected" Command="{Binding DeleteSelected}" />
                 <Separator />
                 <MenuItem Header="{Binding DeleteCollectionHeader}" Command="{Binding DeleteCollection}"

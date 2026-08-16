@@ -66,6 +66,7 @@ public interface IDatabaseCommonService
     public Task<bool> SetMediaRatingAsync(long mediaId, bool isFavorited, int stars);
 
     // Upload Sections
+    public Task AddMediaToActiveUploadSectionAsync(List<long> mediaIds);
     public Task AddMediaToUploadSectionAsync(long mediaId, long sectionId, int index);
     public Task<int> GetNextUploadSectionIndexAsync(long sectionId);
     public Task SetMediaTemporaryStatusAsync(long mediaId, bool isTemporary);

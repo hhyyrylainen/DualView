@@ -480,6 +480,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task AddMediaToActiveUploadSectionAsync(List<long> mediaIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/uploadSection/active/addMedia", mediaIds);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<int> GetNextUploadSectionIndexAsync(long sectionId)
     {
         return await HttpClient.GetFromJsonAsync<int>($"api/v1/uploadSection/{sectionId}/nextIndex");

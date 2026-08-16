@@ -79,6 +79,13 @@ public class UploadSectionController : Controller
         return Ok();
     }
 
+    [HttpPost("active/addMedia")]
+    public async Task<ActionResult> AddMediaToActive([FromBody] List<long> mediaIds)
+    {
+        await databaseService.AddMediaToActiveUploadSectionAsync(mediaIds);
+        return Ok();
+    }
+
     [HttpPost("{sectionId:long}/removeMedia")]
     public async Task<ActionResult> RemoveMedia(long sectionId, UploadSectionMediaRequest request)
     {

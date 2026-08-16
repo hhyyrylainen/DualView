@@ -1633,6 +1633,38 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         logger.LogInformation("Added media {MediaId} to upload section {SectionId}", mediaId, sectionId);
     }
 
+    public async Task AddMediaToActiveUploadSectionAsync(List<long> mediaIds)
+    {
+        var selectedMediaIds = mediaIds.Distinct().ToList();
+        if (selectedMediaIds.Count == 0)
+            return;
+
+        var section = await GetOrCreateUploadSectionAsync(null);
+        var existingMediaIds = await dbContext.UploadSectionItems
+            .Where(item => item.UploadSectionId == section.Id && selectedMediaIds.Contains(item.MediaFileId))
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        var mediaIdsToAdd = selectedMediaIds.Except(existingMediaIds).ToList();
+        if (mediaIdsToAdd.Count == 0)
+            return;
+
+        var nextIndex = await GetNextUploadSectionIndexAsync(section.Id);
+        foreach (var mediaId in mediaIdsToAdd)
+        {
+            await dbContext.UploadSectionItems.AddAsync(new UploadSectionItem
+            {
+                UploadSectionId = section.Id,
+                MediaFileId = mediaId,
+                Index = nextIndex++,
+            });
+        }
+
+        await SaveAsync();
+        await updateNotifier.NotifyUploadSectionContentsUpdated(section.Id);
+        logger.LogInformation("Added {MediaCount} media items to active upload section {SectionId}",
+            mediaIdsToAdd.Count, section.Id);
+    }
+
     public async Task<int> GetNextUploadSectionIndexAsync(long sectionId)
     {
         return await dbContext.UploadSectionItems
