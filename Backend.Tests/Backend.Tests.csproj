@@ -13,6 +13,7 @@
             <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
         <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="10.0.10"/>
+        <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1"/>
         <PackageReference Include="NSubstitute" Version="6.0.0"/>
         <PackageReference Include="xunit" Version="2.9.3"/>
@@ -27,8 +28,12 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Backend\Backend.csproj"/>
-        <ProjectReference Include="..\DualView.Shared\DualView.Shared.csproj"/>
+      <ProjectReference Include="..\Backend\Backend.csproj"/>
+      <ProjectReference Include="..\DualView.Shared\DualView.Shared.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="TestData\**" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>

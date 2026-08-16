@@ -17,10 +17,7 @@ public class TagDatabaseTests
 
     private AppDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseInMemoryDatabase(Guid.NewGuid().ToString())
-            .Options;
-        return new AppDbContext(options);
+        return SqliteTestHelpers.CreateContext();
     }
 
     [Fact]
