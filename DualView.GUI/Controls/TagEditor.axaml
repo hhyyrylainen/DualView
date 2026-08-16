@@ -11,7 +11,7 @@
     <Grid RowDefinitions="Auto,*,Auto" MinHeight="180">
         <TextBlock Grid.Row="0" Text="Tags" FontWeight="Bold" Margin="2" HorizontalAlignment="Center" />
         <ListBox Grid.Row="1" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}"
-                 IsEnabled="{Binding IsEnabled}" Margin="2">
+                 IsEnabled="{Binding IsEnabled}" Margin="2" KeyDown="OnListKeyDown">
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TagEditorRowViewModel">
                     <Grid ColumnDefinitions="*,Auto" Margin="2">

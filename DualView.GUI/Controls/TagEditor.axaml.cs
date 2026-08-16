@@ -22,4 +22,13 @@ public partial class TagEditor : UserControl
             e.Handled = true;
         }
     }
+
+    private void OnListKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Delete && DataContext is TagEditorViewModel viewModel)
+        {
+            viewModel.DeleteSelected();
+            e.Handled = true;
+        }
+    }
 }
