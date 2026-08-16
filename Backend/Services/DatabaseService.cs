@@ -1396,15 +1396,20 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             if (selected != null)
                 return selected;
 
+            // An empty section name means "the active section". If there is no active section,
+            // always create a new section so media sent after unselecting an import cannot be
+            // mixed into an older unnamed section.
             sectionName = "";
         }
+        else
+        {
+            sectionName = sectionName.Trim();
+            var lowercase = sectionName.ToLowerInvariant();
+            var existing = await dbContext.UploadSections.FirstOrDefaultAsync(s => s.NameLowercase == lowercase);
 
-        sectionName = sectionName.Trim();
-        var lowercase = sectionName.ToLowerInvariant();
-        var existing = await dbContext.UploadSections.FirstOrDefaultAsync(s => s.NameLowercase == lowercase);
-
-        if (existing != null)
-            return existing;
+            if (existing != null)
+                return existing;
+        }
 
         // Insert at the start
         var minIndex = await dbContext.UploadSections
