@@ -64,6 +64,7 @@
                         <Button Command="{Binding ReverseImagesAsync}">Reverse Images</Button>
                         <Button Command="{Binding DeselectAll}">Deselect All</Button>
                         <CheckBox IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
+                        <Button Command="{Binding SortByVisualSimilarityAsync}">Sort by visual similarity</Button>
                     </WrapPanel>
                     <ScrollViewer Grid.Row="1" Height="330">
                         <ItemsControl ItemsSource="{Binding Media}">

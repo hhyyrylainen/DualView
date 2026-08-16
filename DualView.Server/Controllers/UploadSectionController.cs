@@ -11,10 +11,13 @@ namespace DualView.Server.Controllers;
 public class UploadSectionController : Controller
 {
     private readonly IDatabaseService databaseService;
+    private readonly IImportSectionSimilarityService importSectionSimilarityService;
 
-    public UploadSectionController(IDatabaseService databaseService)
+    public UploadSectionController(IDatabaseService databaseService,
+        IImportSectionSimilarityService importSectionSimilarityService)
     {
         this.databaseService = databaseService;
+        this.importSectionSimilarityService = importSectionSimilarityService;
     }
 
     [HttpPost("getOrCreate")]
@@ -44,6 +47,12 @@ public class UploadSectionController : Controller
             return NotFound();
 
         return section.GetDTO();
+    }
+
+    [HttpPost("{sectionId:long}/sortByVisualSimilarity")]
+    public async Task<ActionResult<long>> SortByVisualSimilarity([Required] long sectionId)
+    {
+        return await importSectionSimilarityService.StartSortByVisualSimilarity(sectionId);
     }
 
     [HttpGet("targetNames")]

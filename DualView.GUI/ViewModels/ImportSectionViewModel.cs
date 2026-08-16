@@ -23,6 +23,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     private readonly IWindowService? windowService;
     private readonly IServiceProvider? serviceProvider;
     private readonly ISignalRService? signalRService;
+    private readonly IBackendAPI? backendAPI;
     private readonly long id;
     private readonly SemaphoreSlim saveLock = new(1, 1);
     private readonly ICollectionBrowse? collectionBrowse;
@@ -37,6 +38,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     public ImportSectionViewModel()
     {
         databaseService = null!;
+        backendAPI = null;
         signalRService = null;
         Name = "Test name";
 
@@ -51,13 +53,14 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     [ActivatorUtilitiesConstructor]
     public ImportSectionViewModel(UploadSectionDTO section, IClientDatabaseService databaseService,
         ILogger? logger, IWindowService? windowService, ILogger<FolderPickerViewModel>? folderPickerLogger,
-        IServiceProvider? serviceProvider, ISignalRService? signalRService)
+        IServiceProvider? serviceProvider, ISignalRService? signalRService, IBackendAPI? backendAPI)
     {
         this.databaseService = databaseService;
         this.logger = logger;
         this.windowService = windowService;
         this.serviceProvider = serviceProvider;
         this.signalRService = signalRService;
+        this.backendAPI = backendAPI;
         collectionBrowse = new ImportSectionBrowse(section.Id, databaseService,
             serviceProvider ?? Program.ServiceProvider!);
 
@@ -361,6 +364,22 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             windowService?.ShowErrorWindow("Failed to reverse images", ex);
+        }
+    }
+
+    public async Task SortByVisualSimilarityAsync()
+    {
+        if (backendAPI == null || windowService == null || Media.Count < 2)
+            return;
+
+        try
+        {
+            var operationId = await backendAPI.StartImportSectionVisualSimilaritySort(id);
+            windowService.ShowOperationStatus(operationId);
+        }
+        catch (Exception ex)
+        {
+            windowService.ShowErrorWindow("Failed to sort import section", ex);
         }
     }
 

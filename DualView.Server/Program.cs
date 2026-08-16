@@ -137,6 +137,7 @@ builder.Services.AddScoped<IEntityUpdateNotifier, EntityUpdateNotifier>();
 builder.Services.AddScoped<IRealTimeDataHub, RealTimeUpdateNotifier>();
 builder.Services.AddSingleton<IMaintenanceService, MaintenanceService>();
 builder.Services.AddSingleton<ICollectionSimilarityService, CollectionSimilarityService>();
+builder.Services.AddSingleton<IImportSectionSimilarityService, ImportSectionSimilarityService>();
 builder.Services.AddSingleton<ISystemCheck, SystemCheck>();
 builder.Services.AddScoped<IMediaImportHandler, MediaImportHandler>();
 builder.Services.AddScoped<IMediaProcessingService, MediaProcessingService>();

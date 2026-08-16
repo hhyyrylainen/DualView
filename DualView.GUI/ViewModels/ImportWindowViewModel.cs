@@ -20,6 +20,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private readonly ILogger<FolderPickerViewModel>? folderPickerLogger;
     private readonly IServiceProvider? serviceProvider;
     private readonly ISignalRService? signalRService;
+    private readonly IBackendAPI? backendAPI;
     private List<RecentImportSectionDTO> loadedRecentSections = new();
 
     public ImportWindowViewModel()
@@ -40,7 +41,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     public ImportWindowViewModel(ILogger<ImportWindowViewModel> logger, IWindowService windowService,
         IClientDatabaseService databaseService, IBackendStatusService backendStatusService,
         ILogger<FolderPickerViewModel> folderPickerLogger, IServiceProvider serviceProvider,
-        ISignalRService signalRService)
+        ISignalRService signalRService, IBackendAPI backendAPI)
     {
         this.logger = logger;
         this.windowService = windowService;
@@ -48,6 +49,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         this.folderPickerLogger = folderPickerLogger;
         this.serviceProvider = serviceProvider;
         this.signalRService = signalRService;
+        this.backendAPI = backendAPI;
         Hamburger = new HamburgerMenuViewModel(backendStatusService);
 
         InitializeMenu();
@@ -185,7 +187,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
                     existingSections.TryGetValue(section.Id, out var existingSection)
                         ? existingSection
                         : new ImportSectionViewModel(section, databaseService, logger, windowService,
-                            folderPickerLogger, serviceProvider, signalRService)).ToList();
+                            folderPickerLogger, serviceProvider, signalRService, backendAPI)).ToList();
 
                 foreach (var removedSection in existingSections.Values.Where(oldSection =>
                              refreshedSections.All(section => !ReferenceEquals(section, oldSection))))
