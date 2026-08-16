@@ -2130,25 +2130,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var media = await dbContext.MediaFiles.Include(m => m.AppliedTags).FirstOrDefaultAsync(m => m.Id == mediaId) ??
                     throw new ArgumentException("Media not found");
 
-        var appliedTag = new AppliedTag(tagId)
-        {
-            CombinedWithId = combinedWithAppliedTagId,
-            CombineWord = combineWord
-        };
+        var appliedTag = await GetOrCreateAppliedTagAsync(tagId, modifierIds, combinedWithAppliedTagId, combineWord);
 
-        if (modifierIds != null && modifierIds.Count > 0)
+        if (media.AppliedTags.All(tag => tag.Id != appliedTag.Id))
         {
-            var modifiers = await dbContext.TagModifiers.Where(m => modifierIds.Contains(m.Id)).ToListAsync();
-            foreach (var modifier in modifiers)
-            {
-                appliedTag.Modifiers.Add(modifier);
-            }
+            media.AppliedTags.Add(appliedTag);
+            await SaveAsync();
+            await updateNotifier.NotifyMediaUpdated(mediaId);
+            logger.LogDebug("Added applied tag {AppliedTagId} to media {MediaId}", appliedTag.Id, mediaId);
         }
 
-        media.AppliedTags.Add(appliedTag);
-        await SaveAsync();
-        await updateNotifier.NotifyMediaUpdated(mediaId);
-        logger.LogDebug("Added applied tag {AppliedTagId} to media {MediaId}", appliedTag.Id, mediaId);
         return appliedTag.Id;
     }
 
@@ -2175,26 +2166,17 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                              .FirstOrDefaultAsync(c => c.Id == collectionId) ??
                          throw new ArgumentException("Collection not found");
 
-        var appliedTag = new AppliedTag(tagId)
-        {
-            CombinedWithId = combinedWithAppliedTagId,
-            CombineWord = combineWord
-        };
+        var appliedTag = await GetOrCreateAppliedTagAsync(tagId, modifierIds, combinedWithAppliedTagId, combineWord);
 
-        if (modifierIds != null && modifierIds.Count > 0)
+        if (collection.AppliedTags.All(tag => tag.Id != appliedTag.Id))
         {
-            var modifiers = await dbContext.TagModifiers.Where(m => modifierIds.Contains(m.Id)).ToListAsync();
-            foreach (var modifier in modifiers)
-            {
-                appliedTag.Modifiers.Add(modifier);
-            }
+            collection.AppliedTags.Add(appliedTag);
+            await SaveAsync();
+            await updateNotifier.NotifyCollectionUpdated(collectionId);
+            logger.LogInformation("Added applied tag {AppliedTagId} to collection '{CollectionName}' ({CollectionId})",
+                appliedTag.Id, collection.Name, collection.Id);
         }
 
-        collection.AppliedTags.Add(appliedTag);
-        await SaveAsync();
-        await updateNotifier.NotifyCollectionUpdated(collectionId);
-        logger.LogInformation("Added applied tag {AppliedTagId} to collection '{CollectionName}' ({CollectionId})",
-            appliedTag.Id, collection.Name, collection.Id);
         return appliedTag.Id;
     }
 
@@ -2359,20 +2341,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var section = await dbContext.UploadSections.Include(s => s.AppliedTags)
             .FirstOrDefaultAsync(s => s.Id == sectionId) ?? throw new ArgumentException("Upload section not found");
 
-        // TODO: should first look if an existing applied tag exists with this combination of settings, if it does reuse it and only if it doesn't then create a new applied tag instance
-        var appliedTag = new AppliedTag(tagId)
+        var appliedTag = await GetOrCreateAppliedTagAsync(tagId, modifierIds, combinedWithAppliedTagId, combineWord);
+        if (section.AppliedTags.All(tag => tag.Id != appliedTag.Id))
         {
-            CombinedWithId = combinedWithAppliedTagId,
-            CombineWord = combineWord,
-        };
-        if (modifierIds != null)
-        {
-            var modifiers = await dbContext.TagModifiers.Where(m => modifierIds.Contains(m.Id)).ToListAsync();
-            foreach (var modifier in modifiers)
-                appliedTag.Modifiers.Add(modifier);
+            section.AppliedTags.Add(appliedTag);
+            await SaveAsync();
+            await updateNotifier.NotifyUploadSectionUpdated(sectionId);
         }
-        section.AppliedTags.Add(appliedTag);
-        await SaveAsync();
+
         return appliedTag.Id;
     }
 
@@ -2381,13 +2357,61 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var section = await dbContext.UploadSections.Include(s => s.AppliedTags)
             .FirstOrDefaultAsync(s => s.Id == sectionId) ?? throw new ArgumentException("Upload section not found");
 
-        // TODO: this is totally wrong, applied tags can be shared accross many things so this should just unlink the tag from the section. There's a separate cleanup job to delete any applied tags that are unused periodically.
         var appliedTag = section.AppliedTags.FirstOrDefault(t => t.Id == appliedTagId);
         if (appliedTag != null)
         {
             section.AppliedTags.Remove(appliedTag);
             await SaveAsync();
+            await updateNotifier.NotifyUploadSectionUpdated(sectionId);
         }
+    }
+
+    public async Task<long> AddParsedAppliedTagToMediaAsync(long mediaId, AppliedTagDTO appliedTag)
+    {
+        var media = await dbContext.MediaFiles.Include(item => item.AppliedTags)
+            .FirstOrDefaultAsync(item => item.Id == mediaId) ?? throw new ArgumentException("Media not found");
+        var storedTag = await GetOrCreateAppliedTagAsync(appliedTag);
+        if (media.AppliedTags.All(tag => tag.Id != storedTag.Id))
+        {
+            media.AppliedTags.Add(storedTag);
+            await SaveAsync();
+
+            // TODO: notify image data updated
+        }
+
+        return storedTag.Id;
+    }
+
+    public async Task<long> AddParsedAppliedTagToCollectionAsync(long collectionId, AppliedTagDTO appliedTag)
+    {
+        var collection = await dbContext.Collections.Include(item => item.AppliedTags)
+                             .FirstOrDefaultAsync(item => item.Id == collectionId) ??
+                         throw new ArgumentException("Collection not found");
+        var storedTag = await GetOrCreateAppliedTagAsync(appliedTag);
+        if (collection.AppliedTags.All(tag => tag.Id != storedTag.Id))
+        {
+            collection.AppliedTags.Add(storedTag);
+            await SaveAsync();
+
+            // TODO: notify collection updated
+        }
+
+        return storedTag.Id;
+    }
+
+    public async Task<long> AddParsedAppliedTagToUploadSectionAsync(long sectionId, AppliedTagDTO appliedTag)
+    {
+        var section = await dbContext.UploadSections.Include(item => item.AppliedTags)
+                          .FirstOrDefaultAsync(item => item.Id == sectionId) ??
+                      throw new ArgumentException("Upload section not found");
+        var storedTag = await GetOrCreateAppliedTagAsync(appliedTag);
+        if (section.AppliedTags.All(tag => tag.Id != storedTag.Id))
+        {
+            section.AppliedTags.Add(storedTag);
+            await SaveAsync();
+            await updateNotifier.NotifyUploadSectionUpdated(sectionId);
+        }
+        return storedTag.Id;
     }
 
     public async Task<AppliedTag?> GetAppliedTagAsync(long id)
@@ -2895,5 +2919,52 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         // Saving just once here at the end to save on some DB writes
         await SaveAsync();
+    }
+
+    private async Task<AppliedTag> GetOrCreateAppliedTagAsync(long tagId, List<long>? modifierIds,
+        long? combinedWithAppliedTagId, string? combineWord)
+    {
+        var requestedModifierIds = modifierIds?.Distinct().OrderBy(id => id).ToList() ?? [];
+        var candidates = await dbContext.AppliedTags.Include(tag => tag.Modifiers)
+            .Where(tag => tag.TagId == tagId && tag.CombinedWithId == combinedWithAppliedTagId &&
+                          tag.CombineWord == combineWord)
+            .ToListAsync();
+        var existing = candidates.FirstOrDefault(tag => tag.Modifiers.Select(modifier => modifier.Id)
+            .OrderBy(id => id).SequenceEqual(requestedModifierIds));
+        if (existing != null)
+            return existing;
+
+        var appliedTag = new AppliedTag(tagId)
+        {
+            CombinedWithId = combinedWithAppliedTagId,
+            CombineWord = combineWord,
+        };
+        if (requestedModifierIds.Count > 0)
+        {
+            var modifiers = await dbContext.TagModifiers.Where(modifier => requestedModifierIds.Contains(modifier.Id))
+                .ToListAsync();
+            foreach (var modifier in modifiers)
+                appliedTag.Modifiers.Add(modifier);
+        }
+
+        dbContext.AppliedTags.Add(appliedTag);
+        return appliedTag;
+    }
+
+    private async Task<AppliedTag> GetOrCreateAppliedTagAsync(AppliedTagDTO dto)
+    {
+        var combinedWithId = dto.CombinedWith == null
+            ? dto.CombinedWithId
+            : await GetOrCreateAppliedTagIdAsync(dto.CombinedWith);
+        return await GetOrCreateAppliedTagAsync(dto.TagId, dto.Modifiers.Select(modifier => modifier.Id).ToList(),
+            combinedWithId, dto.CombineWord);
+    }
+
+    private async Task<long> GetOrCreateAppliedTagIdAsync(AppliedTagDTO dto)
+    {
+        var tag = await GetOrCreateAppliedTagAsync(dto);
+        if (tag.Id == 0)
+            await SaveAsync();
+        return tag.Id;
     }
 }
