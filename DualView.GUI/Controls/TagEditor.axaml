@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DualView.GUI.ViewModels"
+             x:Class="DualView.GUI.Controls.TagEditor"
+             x:DataType="vm:TagEditorViewModel">
+
+    <Design.DataContext>
+        <vm:TagEditorViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*,Auto" MinHeight="180">
+        <TextBlock Grid.Row="0" Text="Tags" FontWeight="Bold" Margin="2" HorizontalAlignment="Center" />
+        <ListBox Grid.Row="1" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}"
+                 IsEnabled="{Binding IsEnabled}" Margin="2">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:TagEditorRowViewModel">
+                    <Grid ColumnDefinitions="*,Auto" Margin="2">
+                        <TextBlock Text="{Binding Name}" />
+                        <TextBlock Grid.Column="1" Text="{Binding Count}" Margin="12,0,2,0" />
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <Grid Grid.Row="2" RowDefinitions="Auto,Auto" Margin="2">
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button Content="Delete selected" Command="{Binding DeleteSelected}" />
+                <Button Content="Tag manager" Command="{Binding OpenTagManager}" />
+            </StackPanel>
+            <AutoCompleteBox Grid.Row="1" Text="{Binding TagText}" Margin="0 2"
+                             ItemsSource="{Binding Suggestions}" FilterMode="None"
+                             MinimumPrefixLength="1" TextChanged="OnTextChanged"
+                             KeyDown="OnKeyDown" Background="{Binding EntryBackground}"
+                             PlaceholderText="Type a tag and press Enter" />
+        </Grid>
+    </Grid>
+</UserControl>
