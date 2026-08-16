@@ -1629,8 +1629,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             dbContext.UploadSectionItems.RemoveRange(items);
         }
 
-        if (!section.KeepTarget &&
-            !await dbContext.UploadSectionItems.AnyAsync(item => item.UploadSectionId == section.Id))
+        // The removed items are still present in the database until SaveAsync is called, so checking
+        // the database here would incorrectly keep a section that just had its last items imported.
+        var hasRemainingItems = section.Items.Any(item => !selectedIds.Contains(item.MediaFileId));
+        if (!section.KeepTarget && section.RemoveAfterImport && !hasRemainingItems)
         {
             dbContext.UploadSections.Remove(section);
             await SaveAsync();
