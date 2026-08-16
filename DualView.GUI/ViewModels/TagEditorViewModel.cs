@@ -8,25 +8,33 @@ using Avalonia.Threading;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Services;
+using DualView.Shared.Utils;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DualView.GUI.ViewModels;
 
 public sealed class TagEditorViewModel : ViewModelBase
 {
+    public delegate Task<List<AppliedTagDTO>> LoadTagsDelegate(long targetId);
+
+    public delegate Task AddTagDelegate(long targetId, AppliedTagDTO tag);
+
+    public delegate Task RemoveTagDelegate(long targetId, long appliedTagId);
+
     private readonly IClientDatabaseService? databaseService;
     private readonly IWindowService? windowService;
     private readonly List<long> targetIds = new();
-    private Func<long, Task<List<AppliedTagDTO>>>? loadTags;
-    private Func<long, long, Task>? addTag;
-    private Func<long, long, Task>? removeTag;
+
+    private LoadTagsDelegate? loadTags;
+    private AddTagDelegate? addTag;
+    private RemoveTagDelegate? removeTag;
+
     private int suggestionVersion;
 
     // Design-time constructor
     public TagEditorViewModel()
     {
-        Suggestions.Add("Test tag");
-        Suggestions.Add("example");
+        Suggestions = ["Test tag", "example"];
 
         // Add some example tags to show
         Tags.Add(new TagEditorRowViewModel("Test tag", 1, -1));
@@ -43,7 +51,12 @@ public sealed class TagEditorViewModel : ViewModelBase
     }
 
     public ObservableCollection<TagEditorRowViewModel> Tags { get; } = new();
-    public ObservableCollection<string> Suggestions { get; } = new();
+
+    public List<string> Suggestions
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = new();
 
     public string TagText
     {
@@ -75,8 +88,7 @@ public sealed class TagEditorViewModel : ViewModelBase
         }
     }
 
-    public void Configure(IEnumerable<long> ids, Func<long, Task<List<AppliedTagDTO>>> load,
-        Func<long, long, Task> add, Func<long, long, Task> remove)
+    public void Configure(IEnumerable<long> ids, LoadTagsDelegate load, AddTagDelegate add, RemoveTagDelegate remove)
     {
         targetIds.Clear();
         targetIds.AddRange(ids.Distinct());
@@ -92,9 +104,7 @@ public sealed class TagEditorViewModel : ViewModelBase
         if (databaseService == null)
             return;
 
-        Configure(ids, databaseService.GetCollectionAppliedTagsAsync,
-            async (targetId, tagId) => await databaseService.AddAppliedTagToCollectionAsync(
-                targetId, tagId, null, null, null),
+        Configure(ids, databaseService.GetCollectionAppliedTagsAsync, AddCollectionTagAsync,
             databaseService.RemoveAppliedTagFromCollectionAsync);
     }
 
@@ -103,10 +113,17 @@ public sealed class TagEditorViewModel : ViewModelBase
         if (databaseService == null)
             return;
 
-        Configure(ids, databaseService.GetMediaAppliedTagsAsync,
-            async (targetId, tagId) => await databaseService.AddAppliedTagToMediaAsync(
-                targetId, tagId, null, null, null),
+        Configure(ids, databaseService.GetMediaAppliedTagsAsync, AddMediaTagAsync,
             databaseService.RemoveAppliedTagFromMediaAsync);
+    }
+
+    public void ConfigureUploadSections(IEnumerable<long> ids)
+    {
+        if (databaseService == null)
+            return;
+
+        Configure(ids, databaseService.GetUploadSectionAppliedTagsAsync, AddUploadSectionTagAsync,
+            databaseService.RemoveAppliedTagFromUploadSectionAsync);
     }
 
     public async Task RefreshAsync()
@@ -116,30 +133,28 @@ public sealed class TagEditorViewModel : ViewModelBase
         if (!IsEnabled || loadTags == null)
             return;
 
-        var allTags = new List<(AppliedTagDTO Tag, int Count)>();
+        var allTags = new List<(AppliedTagDTO Tag, string Text, int Count)>();
         foreach (var targetId in targetIds)
         {
             foreach (var tag in await loadTags(targetId))
             {
-                var index = allTags.FindIndex(item => item.Tag.TagId == tag.TagId &&
-                                                      string.Equals(item.Tag.Tag?.Name, tag.Tag?.Name,
-                                                          StringComparison.OrdinalIgnoreCase));
+                var text = AppliedTagText.ToText(tag);
+                var index = allTags.FindIndex(item => string.Equals(item.Text, text,
+                    StringComparison.OrdinalIgnoreCase));
                 if (index < 0)
                 {
-                    allTags.Add((tag, 1));
+                    allTags.Add((tag, text, 1));
                 }
                 else
                 {
-                    allTags[index] = (allTags[index].Tag, allTags[index].Count + 1);
+                    allTags[index] = (allTags[index].Tag, allTags[index].Text, allTags[index].Count + 1);
                 }
             }
         }
 
-        // TODO: need to convert tags to actual text representations!
-        foreach (var item in allTags.OrderBy(item => item.Tag.Tag?.Name ?? string.Empty))
+        foreach (var item in allTags.OrderBy(item => item.Text, StringComparer.OrdinalIgnoreCase))
         {
-            Tags.Add(new TagEditorRowViewModel(item.Tag.Tag?.Name ?? $"Tag {item.Tag.TagId}",
-                item.Count, item.Tag.TagId));
+            Tags.Add(new TagEditorRowViewModel(item.Text, item.Count, item.Tag.Id));
         }
     }
 
@@ -148,21 +163,15 @@ public sealed class TagEditorViewModel : ViewModelBase
         var version = ++suggestionVersion;
         if (databaseService == null || search.Trim().Length == 0)
         {
-            Suggestions.Clear();
+            Suggestions = [];
             return;
         }
 
-        // TODO: this is wrong, use TagParser
-        var found = await databaseService.SearchTagsWildcardAsync(search);
+        var found = await databaseService.GetTagSuggestionsAsync(search, 100);
         if (version != suggestionVersion)
             return;
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
-        {
-            Suggestions.Clear();
-            foreach (var tag in found.Take(50))
-                Suggestions.Add(tag.Name);
-        });
+        await Dispatcher.UIThread.InvokeAsync(() => { Suggestions = found; });
     }
 
     public void AddTag()
@@ -175,19 +184,34 @@ public sealed class TagEditorViewModel : ViewModelBase
         if (databaseService == null || addTag == null || string.IsNullOrWhiteSpace(text))
             return;
 
-        // TODO: this is wrong, use TagParser
-        var tag = await databaseService.GetTagByNameAsync(text.Trim());
-        if (tag == null)
+        AppliedTagDTO? appliedTag;
+        try
         {
+            appliedTag = await databaseService.ParseTagAsync(text.Trim());
+            if (appliedTag == null)
+            {
+                await FlashInvalidAsync();
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            // Assume server returned an error / can't parse state
             await FlashInvalidAsync();
             return;
         }
 
+        var appliedText = AppliedTagText.ToText(appliedTag);
+
         foreach (var targetId in targetIds)
         {
+            // TODO: this might be too slow to reload all tags for everything
             var existingTags = loadTags == null ? [] : await loadTags(targetId);
-            if (existingTags.All(existingTag => existingTag.TagId != tag.Id))
-                await addTag(targetId, tag.Id);
+            if (existingTags.All(existingTag => !string.Equals(AppliedTagText.ToText(existingTag),
+                    appliedText, StringComparison.OrdinalIgnoreCase)))
+            {
+                await addTag(targetId, appliedTag);
+            }
         }
 
         TagText = string.Empty;
@@ -204,8 +228,11 @@ public sealed class TagEditorViewModel : ViewModelBase
         foreach (var targetId in targetIds)
         {
             var tags = loadTags == null ? [] : await loadTags(targetId);
-            foreach (var tag in tags.Where(tag => tag.TagId == SelectedTag.AppliedTagId))
+            foreach (var tag in tags.Where(tag => string.Equals(AppliedTagText.ToText(tag), SelectedTag.Name,
+                         StringComparison.OrdinalIgnoreCase)))
+            {
                 await removeTag(targetId, tag.Id);
+            }
         }
 
         await RefreshAsync();
@@ -223,6 +250,21 @@ public sealed class TagEditorViewModel : ViewModelBase
         IsInvalid = true;
         await Task.Delay(450);
         IsInvalid = false;
+    }
+
+    private Task AddCollectionTagAsync(long targetId, AppliedTagDTO tag)
+    {
+        return databaseService!.AddParsedAppliedTagToCollectionAsync(targetId, tag);
+    }
+
+    private Task AddMediaTagAsync(long targetId, AppliedTagDTO tag)
+    {
+        return databaseService!.AddParsedAppliedTagToMediaAsync(targetId, tag);
+    }
+
+    private Task AddUploadSectionTagAsync(long targetId, AppliedTagDTO tag)
+    {
+        return databaseService!.AddParsedAppliedTagToUploadSectionAsync(targetId, tag);
     }
 }
 
