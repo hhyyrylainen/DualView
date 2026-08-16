@@ -230,6 +230,9 @@ public class CollectionController : Controller
     [HttpPost("{id:long}/appliedTag")]
     public async Task<ActionResult<long>> AddAppliedTag([Required] long id, [FromBody] AddAppliedTagRequest request)
     {
+        if (request.ParsedTag != null)
+            return Ok(await databaseService.AddParsedAppliedTagToCollectionAsync(id, request.ParsedTag));
+
         var appliedTagId = await databaseService.AddAppliedTagToCollectionAsync(id, request.TagId, request.ModifierIds,
             request.CombinedWithAppliedTagId, request.CombineWord);
         return Ok(appliedTagId);

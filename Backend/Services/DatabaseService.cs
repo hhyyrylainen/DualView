@@ -1466,6 +1466,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ThenInclude(item => item.MediaFile)
             .Include(section => section.AppliedTags)
             .ThenInclude(tag => tag.Tag)
+            .Include(section => section.AppliedTags)
+            .ThenInclude(tag => tag.Modifiers)
+            .Include(section => section.AppliedTags)
+            .ThenInclude(tag => tag.CombinedWith)
+            .ThenInclude(tag => tag!.Tag)
             .OrderBy(section => section.DisplayIndex)
             .ToListAsync();
     }
@@ -1531,6 +1536,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ThenInclude(item => item.MediaFile)
             .Include(section => section.AppliedTags)
             .ThenInclude(tag => tag.Tag)
+            .Include(section => section.AppliedTags)
+            .ThenInclude(tag => tag.Modifiers)
+            .Include(section => section.AppliedTags)
+            .ThenInclude(tag => tag.CombinedWith)
+            .ThenInclude(tag => tag!.Tag)
             .FirstOrDefaultAsync(section => section.Id == sectionId);
     }
 
@@ -1615,6 +1625,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(item => item.Items)
             .Include(item => item.AppliedTags)
             .ThenInclude(tag => tag.Modifiers)
+            .Include(item => item.AppliedTags)
+            .ThenInclude(tag => tag.Tag)
+            .Include(item => item.AppliedTags)
+            .ThenInclude(tag => tag.CombinedWith)
+            .ThenInclude(tag => tag!.Tag)
             .FirstOrDefaultAsync(item => item.Id == sectionId) ?? throw new ArgumentException("Section not found");
         var selectedIds = section.Items.OrderBy(item => item.Index)
             .Select(item => item.MediaFileId)
@@ -1659,6 +1674,19 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
         await AddMediaToCollection(selectedIds, collection.Id, nextSequence);
 
+        await dbContext.Entry(collection).Collection(item => item.AppliedTags).LoadAsync();
+        var hadSectionTags = section.AppliedTags.Count > 0;
+        foreach (var sectionTag in section.AppliedTags)
+        {
+            var storedTag = await GetOrCreateAppliedTagAsync(sectionTag.GetDTO());
+            if (collection.AppliedTags.Any(collectionTag => collectionTag.Id == storedTag.Id))
+                continue;
+
+            collection.AppliedTags.Add(storedTag);
+        }
+
+        section.AppliedTags.Clear();
+
         // Need to remove items first to detect when things become blank
         var itemsRemoved = 0;
         if (section.RemoveAfterImport)
@@ -1684,7 +1712,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (targetFolderApplied)
             section.TargetFolderId = MediaFolder.RootFolderId;
 
-        var sectionUpdated = targetFolderApplied ||
+        var sectionUpdated = hadSectionTags || targetFolderApplied ||
                              !string.Equals(originalSectionName, section.Name, StringComparison.Ordinal);
 
         if (section.RemoveAfterImport)
@@ -2291,6 +2319,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.AppliedTags
             .Include(t => t.Tag)
             .Include(t => t.Modifiers)
+            .Include(t => t.CombinedWith)
+            .ThenInclude(t => t!.Tag)
+            .Include(t => t.CombinedWith)
+            .ThenInclude(t => t!.Modifiers)
             .Where(t => t.MediaFiles.Any(m => m.Id == mediaId))
             .ToListAsync();
     }
@@ -2300,6 +2332,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.AppliedTags
             .Include(t => t.Tag)
             .Include(t => t.Modifiers)
+            .Include(t => t.CombinedWith)
+            .ThenInclude(t => t!.Tag)
+            .Include(t => t.CombinedWith)
+            .ThenInclude(t => t!.Modifiers)
             .Where(t => t.Collections.Any(c => c.Id == collectionId))
             .ToListAsync();
     }
@@ -2309,6 +2345,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.AppliedTags
             .Include(t => t.Tag)
             .Include(t => t.Modifiers)
+            .Include(t => t.CombinedWith)
+            .ThenInclude(t => t!.Tag)
+            .Include(t => t.CombinedWith)
+            .ThenInclude(t => t!.Modifiers)
             .Where(t => t.UploadSections.Any(s => s.Id == sectionId))
             .ToListAsync();
     }
@@ -2590,6 +2630,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return (await GetTagAsync(id))?.GetDTO();
     }
 
+    async Task<AppliedTagDTO?> IClientDatabaseService.ParseTagAsync(string tag)
+    {
+        return (await new TagParser(this).ParseTag(tag))?.GetDTO();
+    }
+
+    async Task<List<string>> IClientDatabaseService.GetTagSuggestionsAsync(string search, int maxCount)
+    {
+        return await new TagParser(this).GetSuggestions(search, maxCount);
+    }
+
     async Task<List<TagModifierDTO>> IClientDatabaseService.GetAllTagModifiersAsync()
     {
         return (await GetTagModifiersAsync()).Select(m => m.GetDTO()).ToList();
@@ -2608,6 +2658,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     async Task<List<AppliedTagDTO>> IClientDatabaseService.GetCollectionAppliedTagsAsync(long collectionId)
     {
         return (await GetCollectionAppliedTagsAsync(collectionId)).Select(t => t.GetDTO()).ToList();
+    }
+
+    async Task<List<AppliedTagDTO>> IClientDatabaseService.GetUploadSectionAppliedTagsAsync(long sectionId)
+    {
+        return (await GetUploadSectionAppliedTagsAsync(sectionId)).Select(t => t.GetDTO()).ToList();
     }
 
     async Task<MediaImportInfoDTO?> IClientDatabaseService.GetMediaImportInfoAsync(long mediaId)

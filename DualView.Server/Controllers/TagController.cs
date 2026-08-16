@@ -45,6 +45,13 @@ public class TagController : Controller
         return (await databaseService.GetTagByNameAsync(name))?.GetDTO();
     }
 
+    [HttpGet("parse")]
+    public async Task<ActionResult<AppliedTagDTO?>> Parse([Required] [FromQuery] string tag)
+    {
+        var parsed = await tagParser.ParseTag(tag);
+        return parsed == null ? Json(null) : await CreateDTO(parsed);
+    }
+
     [HttpGet("suggestions")]
     public async Task<ActionResult<List<string>>> Suggestions([Required] [FromQuery] string search,
         [FromQuery] int maxCount = 100)
@@ -112,5 +119,16 @@ public class TagController : Controller
     {
         await databaseService.RemoveTagImplicationAsync(id, impliedTagId);
         return Ok();
+    }
+
+    private async Task<AppliedTagDTO> CreateDTO(AppliedTag appliedTag)
+    {
+        var result = appliedTag.GetDTO();
+
+        // TODO: check if this is necessary (i.e. TagParser doesn't resolve this)
+        result.Tag = (await databaseService.GetTagAsync(appliedTag.TagId))?.GetDTO();
+        if (appliedTag.CombinedWith != null)
+            result.CombinedWith = await CreateDTO(appliedTag.CombinedWith);
+        return result;
     }
 }

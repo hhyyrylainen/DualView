@@ -7,8 +7,6 @@ namespace Backend.Services;
 /// </summary>
 public interface ITagParser
 {
-    // NOTE: the old C++ parsing code has a bug in multi word tags so when porting it to C# try to avoid copying the bug
-
     /// <summary>
     ///   Parses a tag string into an AppliedTag.
     /// </summary>

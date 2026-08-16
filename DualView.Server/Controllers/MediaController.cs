@@ -189,6 +189,9 @@ public class MediaController : Controller
     [HttpPost("{mediaId:long}/appliedTag")]
     public async Task<ActionResult<long>> AddAppliedTag([Required] long mediaId, [FromBody] AddAppliedTagRequest request)
     {
+        if (request.ParsedTag != null)
+            return Ok(await databaseService.AddParsedAppliedTagToMediaAsync(mediaId, request.ParsedTag));
+
         var id = await databaseService.AddAppliedTagToMediaAsync(mediaId, request.TagId, request.ModifierIds,
             request.CombinedWithAppliedTagId, request.CombineWord);
         return Ok(id);

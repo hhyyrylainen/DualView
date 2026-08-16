@@ -27,7 +27,7 @@ public class TagParser : ITagParser
         var expanded = await databaseService.GetTagSuperAliasAsync(str);
         if (!string.IsNullOrEmpty(expanded))
         {
-            // Note: C++ recursive call. In C# we should probably handle multiple tags if super alias expands to multiple
+            // Note: C++ recursive call. In C# we should probably handle multiple tags if super alias expands to multiple,
             // but AppliedTag is a single tag with modifiers.
             // Wait, C++ ParseTagFromString returns std::shared_ptr<AppliedTag>.
             // If it expands to multiple, how does it handle it?

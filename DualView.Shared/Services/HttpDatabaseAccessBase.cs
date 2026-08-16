@@ -713,6 +713,14 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
 
+    public async Task<long> AddParsedAppliedTagToMediaAsync(long mediaId, AppliedTagDTO appliedTag)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/media/{mediaId}/appliedTag",
+            new AddAppliedTagRequest { ParsedTag = appliedTag });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
     public async Task RemoveAppliedTagFromMediaAsync(long mediaId, long appliedTagId)
     {
         var response = await HttpClient.DeleteAsync($"api/v1/media/{mediaId}/appliedTag/{appliedTagId}");
@@ -728,6 +736,14 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
                 TagId = tagId, ModifierIds = modifierIds, CombinedWithAppliedTagId = combinedWithAppliedTagId,
                 CombineWord = combineWord
             });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task<long> AddParsedAppliedTagToCollectionAsync(long collectionId, AppliedTagDTO appliedTag)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/appliedTag",
+            new AddAppliedTagRequest { ParsedTag = appliedTag });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
@@ -762,6 +778,14 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/appliedTag",
             new AddAppliedTagRequest { TagId = tagId, ModifierIds = modifierIds,
                 CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord });
+        response.EnsureSuccessStatusCode();
+        return long.Parse(await response.Content.ReadAsStringAsync());
+    }
+
+    public async Task<long> AddParsedAppliedTagToUploadSectionAsync(long sectionId, AppliedTagDTO appliedTag)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/appliedTag",
+            new AddAppliedTagRequest { ParsedTag = appliedTag });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }

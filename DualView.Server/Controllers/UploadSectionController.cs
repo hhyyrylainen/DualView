@@ -59,6 +59,9 @@ public class UploadSectionController : Controller
     [HttpPost("{sectionId:long}/appliedTag")]
     public async Task<ActionResult<long>> AddAppliedTag(long sectionId, AddAppliedTagRequest request)
     {
+        if (request.ParsedTag != null)
+            return Ok(await databaseService.AddParsedAppliedTagToUploadSectionAsync(sectionId, request.ParsedTag));
+
         return await databaseService.AddAppliedTagToUploadSectionAsync(sectionId, request.TagId, request.ModifierIds,
             request.CombinedWithAppliedTagId, request.CombineWord);
     }
