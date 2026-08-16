@@ -1683,8 +1683,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                 continue;
 
             collection.AppliedTags.Add(storedTag);
+            logger.LogInformation("Applying new tag on import to collection {CollectionId}", collection.Id);
         }
 
+        // Clear these to let the user keep importing stuff without accidentally putting tags all over
         section.AppliedTags.Clear();
 
         // Need to remove items first to detect when things become blank
