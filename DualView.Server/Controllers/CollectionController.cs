@@ -180,8 +180,19 @@ public class CollectionController : Controller
     public async Task<IActionResult> RemoveMediaFromCollection([Required] long id,
         [Required] long mediaId)
     {
-        await databaseService.RemoveMediaFromCollection(mediaId, id);
-        return Ok();
+        try
+        {
+            await databaseService.RemoveMediaFromCollection(mediaId, id);
+            return Ok();
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("{id:long}/previewRemoveMedia")]
@@ -195,7 +206,18 @@ public class CollectionController : Controller
     public async Task<ActionResult<CollectionMediaRemovalResult>> RemoveSelectedMedia([Required] long id,
         [FromBody] List<long> mediaIds)
     {
-        return await databaseService.RemoveMediaFromCollectionAsync(id, mediaIds);
+        try
+        {
+            return await databaseService.RemoveMediaFromCollectionAsync(id, mediaIds);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
     }
 
     [HttpPost("undoRemoveMedia")]
