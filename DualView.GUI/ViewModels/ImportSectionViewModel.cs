@@ -71,6 +71,17 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         collectionBrowse = new ImportSectionBrowse(section.Id, databaseService,
             serviceProvider ?? Program.ServiceProvider!);
 
+        if (windowService != null)
+        {
+            TagEditor = new TagEditorViewModel(databaseService, windowService);
+            TagEditor.ConfigureUploadSections([section.Id]);
+        }
+        else
+        {
+            // Dummy
+            TagEditor = new TagEditorViewModel();
+        }
+
         id = section.Id;
         Name = section.Name;
         KeepEvenWhenEmpty = section.KeepTarget;
@@ -79,7 +90,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         TargetFolderId = section.TargetFolderId;
 
         // If one service is given, assume all are available
-        FolderPicker = folderPickerLogger != null && windowService != null
+        FolderPicker = folderPickerLogger != null
             ? new FolderPickerViewModel(folderPickerLogger, databaseService, windowService, serviceProvider!)
             : new FolderPickerViewModel();
         FolderPicker.PropertyChanged += OnFolderPickerPropertyChanged;
@@ -546,6 +557,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             isInitialized = true;
         }
 
+        _ = TagEditor.RefreshAsync();
         _ = InitializeFolderPathAsync(section.TargetFolderId);
     }
 
