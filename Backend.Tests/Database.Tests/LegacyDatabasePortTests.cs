@@ -58,6 +58,107 @@ public class LegacyDatabasePortTests
     }
 
     [Fact]
+    public async Task Folders_CanBeAddedAndRemovedFromFolders()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var firstParentId = await service.CreateMediaFolder("First parent", MediaFolder.RootFolderId);
+        var secondParentId = await service.CreateMediaFolder("Second parent", MediaFolder.RootFolderId);
+        var childId = await service.CreateMediaFolder("Child", MediaFolder.RootFolderId);
+
+        await service.AddFolderToFolder(childId, firstParentId);
+        await service.AddFolderToFolder(childId, secondParentId);
+
+        var firstParentChildren = await service.GetMediaFoldersAsync(firstParentId);
+        var secondParentChildren = await service.GetMediaFoldersAsync(secondParentId);
+        Assert.Contains(firstParentChildren, folder => folder.Id == childId);
+        Assert.Contains(secondParentChildren, folder => folder.Id == childId);
+
+        await service.RemoveFolderFromFolder(childId, firstParentId);
+        Assert.DoesNotContain(await service.GetMediaFoldersAsync(firstParentId), folder => folder.Id == childId);
+        Assert.Contains(await service.GetMediaFoldersAsync(secondParentId), folder => folder.Id == childId);
+
+        await service.RemoveFolderFromFolder(childId, secondParentId);
+        Assert.Contains(await service.GetMediaFoldersAsync(MediaFolder.RootFolderId), folder => folder.Id == childId);
+    }
+
+    [Fact]
+    public async Task FolderContents_KeepRootAndNestedItemsSeparate()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var folderId = await service.CreateMediaFolder("Nested", MediaFolder.RootFolderId);
+        var childId = await service.CreateMediaFolder("Child", folderId);
+        var collectionId = await service.CreateCollection("Nested collection", folderId);
+
+        var rootFolders = await service.GetMediaFoldersAsync(MediaFolder.RootFolderId);
+        var nestedFolders = await service.GetMediaFoldersAsync(folderId);
+        var rootCollections = await service.GetCollectionsInFolderAsync(MediaFolder.RootFolderId);
+        var nestedCollections = await service.GetCollectionsInFolderAsync(folderId);
+
+        Assert.Contains(rootFolders, folder => folder.Id == folderId);
+        Assert.DoesNotContain(rootFolders, folder => folder.Id == childId);
+        Assert.Contains(nestedFolders, folder => folder.Id == childId);
+        Assert.DoesNotContain(rootCollections, collection => collection.Id == collectionId);
+        Assert.Contains(nestedCollections, collection => collection.Id == collectionId);
+        Assert.Equal(childId, (await service.GetMediaFolderFromPathAsync("Root/Nested/Child"))!.Id);
+    }
+
+    [Fact]
+    public async Task RemovingLastCollectionParent_ReturnsCollectionToRoot()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var folderId = await service.CreateMediaFolder("Collection folder", MediaFolder.RootFolderId);
+        var collectionId = await service.CreateCollection("Movable collection", folderId);
+
+        await service.RemoveCollectionFromFolder(collectionId, folderId);
+
+        Assert.Contains(await service.GetCollectionsInFolderAsync(MediaFolder.RootFolderId),
+            collection => collection.Id == collectionId);
+        Assert.DoesNotContain(await service.GetCollectionsInFolderAsync(folderId),
+            collection => collection.Id == collectionId);
+    }
+
+    [Fact]
+    public async Task Folders_RejectConflictingSiblingWhenAddedAndRenamed()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var parentId = await service.CreateMediaFolder("Parent", MediaFolder.RootFolderId);
+        var movingId = await service.CreateMediaFolder("Moving", MediaFolder.RootFolderId);
+        var conflictId = await service.CreateMediaFolder("Moving", parentId);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.AddFolderToFolder(movingId, parentId));
+        Assert.DoesNotContain(await service.GetMediaFoldersAsync(parentId), folder => folder.Id == movingId);
+        Assert.Contains(await service.GetMediaFoldersAsync(parentId), folder => folder.Id == conflictId);
+
+        var otherId = await service.CreateMediaFolder("Other", parentId);
+        await Assert.ThrowsAsync<Exception>(() => service.RenameMediaFolder(otherId, "moving"));
+        var other = await service.GetMediaFolderAsync(otherId);
+        Assert.Equal("Other", other!.Name);
+    }
+
+    [Fact]
+    public async Task RenamingFolderAndCollection_UpdatesLowercaseName()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var folderId = await service.CreateMediaFolder("Original folder", MediaFolder.RootFolderId);
+        var collectionId = await service.CreateCollection("Original collection", folderId);
+
+        await service.RenameMediaFolder(folderId, "Renamed Folder");
+        await service.RenameCollection(collectionId, "Renamed Collection");
+
+        var folder = await context.MediaFolders.FindAsync(folderId);
+        var collection = await context.Collections.FindAsync(collectionId);
+        Assert.Equal("Renamed Folder", folder!.Name);
+        Assert.Equal("renamed folder", folder.NameLowerCase);
+        Assert.Equal("Renamed Collection", collection!.Name);
+        Assert.Equal("renamed collection", collection.NameLowerCase);
+    }
+
+    [Fact]
     public async Task SoftDeletedMedia_CanBeRestoredAndPurged()
     {
         await using var context = SqliteTestHelpers.CreateContext(seed: true);
