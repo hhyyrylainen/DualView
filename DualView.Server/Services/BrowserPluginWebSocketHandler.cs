@@ -28,6 +28,8 @@ public sealed class BrowserPluginWebSocketHandler
         this.logger = logger;
     }
 
+    // TODO: should we have some key already in the query parameters?
+    // That would prevent opening a lot of websockets if someone doesn't know the key.
     public async Task HandleAsync(WebSocket socket, string apiVersion, CancellationToken cancellation)
     {
         try
