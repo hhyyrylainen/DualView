@@ -6,13 +6,15 @@ const DEFAULT_SETTINGS = {
 const READY_MESSAGE = "DVREADY";
 const GREETING_MESSAGE = "HELODV3";
 const RECONNECT_ALARM = "dualview-web-reconnect";
-const KEEP_ALIVE_INTERVAL_MS = 60000;
+const RECONNECT_DELAY_MS = 500;
+const CONNECTION_CHECK_TIMEOUT_MS = 2500;
 
 let socket;
 let status = "disconnected";
 let statusDetail = "Not connected";
 let reconnectRequested = false;
 let pendingTabIds = new Set();
+let pongWaiter;
 
 browser.runtime.onInstalled.addListener(async () => {
   await browser.storage.local.set(await getSettings());
@@ -152,15 +154,22 @@ async function connectIfConfigured(forceReconnect = false) {
   setStatus("connecting", "Connecting to DualView");
 
   try {
-    socket = new WebSocket(socketUrl);
-    socket.binaryType = "arraybuffer";
-    socket.addEventListener("open", () => {
-      socket.send(GREETING_MESSAGE);
-      socket.send(settings.accessKey);
+    const newSocket = new WebSocket(socketUrl);
+    socket = newSocket;
+    newSocket.binaryType = "arraybuffer";
+    newSocket.addEventListener("open", () => {
+      if (socket !== newSocket) {
+        return;
+      }
+      newSocket.send(GREETING_MESSAGE);
+      newSocket.send(settings.accessKey);
     });
-    socket.addEventListener("message", event => handleSocketMessage(event));
-    socket.addEventListener("close", event => handleSocketClosed(event));
-    socket.addEventListener("error", () => {
+    newSocket.addEventListener("message", event => handleSocketMessage(event, newSocket));
+    newSocket.addEventListener("close", event => handleSocketClosed(event, newSocket));
+    newSocket.addEventListener("error", () => {
+      if (socket !== newSocket) {
+        return;
+      }
       setStatus("error", "Unable to connect to DualView");
     });
   } catch (error) {
@@ -186,7 +195,11 @@ function createSocketUrl(serverUrl) {
   return parsedUrl.toString();
 }
 
-function handleSocketMessage(event) {
+function handleSocketMessage(event, messageSocket) {
+  if (socket !== messageSocket) {
+    return;
+  }
+
   if (typeof event.data === "string") {
     if (event.data === READY_MESSAGE) {
       reconnectRequested = true;
@@ -199,12 +212,26 @@ function handleSocketMessage(event) {
   const message = decodeProtocolMessage(event.data);
   if (message?.type === "pong") {
     setStatus("connected", "Connected to DualView");
+    if (pongWaiter) {
+      const resolvePong = pongWaiter;
+      pongWaiter = undefined;
+      resolvePong(true);
+    }
   }
 }
 
-function handleSocketClosed(event) {
+function handleSocketClosed(event, closedSocket) {
+  if (socket !== closedSocket) {
+    return;
+  }
+
   socket = undefined;
   const wasConnected = status === "connected";
+  if (pongWaiter) {
+    const resolvePong = pongWaiter;
+    pongWaiter = undefined;
+    resolvePong(false);
+  }
   const reason = event.reason || (event.code === 1000 ? "Connection closed" : "Server rejected or closed the connection");
   setStatus("disconnected", reason);
 
@@ -215,6 +242,10 @@ function handleSocketClosed(event) {
     pendingTabIds.clear();
   } else if (wasConnected && event.code !== 1000) {
     console.warn("DualView websocket closed:", event.code, reason);
+  }
+
+  if (reconnectRequested && closedSocket !== undefined && wasConnected) {
+    window.setTimeout(() => connectIfConfigured(), RECONNECT_DELAY_MS);
   }
 }
 
@@ -234,14 +265,72 @@ function sendPing() {
 }
 
 async function sendContextMessage(tabId, message) {
-  if (status !== "connected" || !socket || socket.readyState !== WebSocket.OPEN) {
+  if (!await ensureConnection()) {
     await showTabToast(tabId, "DualView is not connected. Open the DualView Web toolbar menu to connect.", "error");
-    await connectIfConfigured();
     return;
   }
 
   pendingTabIds.add(tabId);
-  sendProtocolMessage({ ...message, sentAt: new Date().toISOString() });
+  if (!sendProtocolMessage({ ...message, sentAt: new Date().toISOString() })) {
+    pendingTabIds.delete(tabId);
+    await showTabToast(tabId, "DualView connection changed. Please try again.", "error");
+    await connectIfConfigured();
+  }
+}
+
+async function ensureConnection() {
+  if (status !== "connected" || !socket || socket.readyState !== WebSocket.OPEN) {
+    await connectIfConfigured();
+    return await waitForConnected();
+  }
+
+  // The websocket can still look open locally while the server has already closed it.
+  // A ping/pong round trip makes the state check authoritative before sending a command.
+  if (await pingAndWait()) {
+    return true;
+  }
+
+  await connectIfConfigured(true);
+  return await waitForConnected();
+}
+
+async function waitForConnected() {
+  const deadline = Date.now() + CONNECTION_CHECK_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (status === "connected" && socket?.readyState === WebSocket.OPEN) {
+      return true;
+    }
+
+    await new Promise(resolve => window.setTimeout(resolve, 50));
+  }
+
+  return false;
+}
+
+function pingAndWait() {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    return Promise.resolve(false);
+  }
+
+  return new Promise(resolve => {
+    const timeout = window.setTimeout(() => {
+      if (pongWaiter) {
+        pongWaiter = undefined;
+      }
+      resolve(false);
+    }, CONNECTION_CHECK_TIMEOUT_MS);
+
+    pongWaiter = receivedPong => {
+      window.clearTimeout(timeout);
+      resolve(receivedPong);
+    };
+
+    if (!sendProtocolMessage({ type: "ping" })) {
+      window.clearTimeout(timeout);
+      pongWaiter = undefined;
+      resolve(false);
+    }
+  });
 }
 
 function sendProtocolMessage(message) {
@@ -253,8 +342,13 @@ function sendProtocolMessage(message) {
   const frame = new Uint8Array(4 + messageBytes.length);
   new DataView(frame.buffer).setUint32(0, messageBytes.length, false);
   frame.set(messageBytes, 4);
-  socket.send(frame);
-  return true;
+  try {
+    socket.send(frame);
+    return true;
+  } catch (error) {
+    console.debug("Unable to send a DualView websocket message", error);
+    return false;
+  }
 }
 
 function decodeProtocolMessage(data) {
