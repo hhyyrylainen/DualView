@@ -17,6 +17,9 @@
   "background": {
     "scripts": ["background.js"]
   },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; connect-src http: https: ws: wss:"
+  },
   "action": {
     "default_title": "DualView Web",
     "default_popup": "popup/popup.html",
