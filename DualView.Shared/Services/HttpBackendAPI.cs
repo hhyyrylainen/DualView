@@ -17,8 +17,10 @@ public class HttpBackendAPI : IBackendAPI
     {
         var response = await HttpClient.PostAsync("api/v1/settings/regenerateBrowserPluginAccessKey", null);
         response.EnsureSuccessStatusCode();
-        return await response.Content.ReadFromJsonAsync<string>() ??
-               throw new InvalidOperationException("The server returned an empty browser plugin access key");
+        var accessKey = (await response.Content.ReadAsStringAsync()).Trim();
+        return string.IsNullOrEmpty(accessKey)
+            ? throw new InvalidOperationException("The server returned an empty browser plugin access key")
+            : accessKey;
     }
 
     public async Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName,

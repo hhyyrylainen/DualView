@@ -141,6 +141,12 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     }
 
+    public bool ShowBrowserPluginKey
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
     public int AudioBufferingMs
     {
         get => generalSettings?.AudioBufferingMs ?? 60;
