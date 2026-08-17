@@ -26,6 +26,7 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
     private readonly Dictionary<long, MediaFolderInfo> visibleFolders = new();
     private long currentFolderId = MediaFolderInfo.RootFolderId;
     private CancellationTokenSource? searchDebounceCancellation;
+    private int navigationVersion;
 
     public FolderPickerViewModel()
     {
@@ -134,6 +135,7 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        ++navigationVersion;
         foreach (var folder in Folders)
             folder.Dispose();
 
@@ -160,10 +162,12 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task NavigateToPathAsync(string? path)
+    public async Task NavigateToPathAsync(string? path)
     {
         if (clientDatabaseService == null)
             return;
+
+        var currentNavigationVersion = ++navigationVersion;
 
         path = string.IsNullOrWhiteSpace(path) ? "/" : path.Trim();
         if (!path.StartsWith('/'))
@@ -173,6 +177,9 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
             path = "/";
 
         var folder = path == "/" ? null : await clientDatabaseService.GetMediaFolderFromPathAsync(path);
+        if (currentNavigationVersion != navigationVersion)
+            return;
+
         if (path != "/" && folder == null)
         {
             windowService?.ShowNoticeWindow("The entered folder path does not exist");
@@ -189,8 +196,14 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase)
             .ToList();
 
+        if (currentNavigationVersion != navigationVersion)
+            return;
+
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
+            if (currentNavigationVersion != navigationVersion)
+                return;
+
             ScrollOffset = new Vector(0, 0);
 
             foreach (var existing in Folders)

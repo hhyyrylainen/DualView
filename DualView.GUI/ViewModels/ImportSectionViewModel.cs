@@ -35,7 +35,9 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     private readonly ICollectionBrowse? collectionBrowse;
 
     private CancellationTokenSource? nameSaveCancellation;
+    private CancellationTokenSource? folderPathInitializationCancellation;
     private bool isInitialized;
+    private int folderPathInitializationCount;
     private bool isRefreshingActive;
 
     private int targetNameSearchVersion;
@@ -478,6 +480,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         FolderPicker.PropertyChanged -= OnFolderPickerPropertyChanged;
         FolderPicker.Dispose();
         CancelNameSave();
+        folderPathInitializationCancellation?.Cancel();
+        folderPathInitializationCancellation?.Dispose();
         signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
         signalRService?.OnUploadSectionUpdated -= OnUploadSectionUpdated;
         signalRService?.OnUploadSectionContentsUpdated -= OnUploadSectionContentsUpdated;
@@ -485,15 +489,33 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     private async Task InitializeFolderPathAsync(long folderId)
     {
-        if (folderId == MediaFolderInfo.RootFolderId)
-        {
-            FolderPicker.SelectedPath = "/";
+        if (databaseService == null)
             return;
-        }
+
+        folderPathInitializationCancellation?.Cancel();
+        folderPathInitializationCancellation?.Dispose();
+        folderPathInitializationCancellation = new CancellationTokenSource();
+        var cancellationToken = folderPathInitializationCancellation.Token;
 
         try
         {
-            FolderPicker.SelectedPath = await databaseService.GetMediaFolderPath(folderId);
+            var path = folderId == MediaFolderInfo.RootFolderId
+                ? "/"
+                : await databaseService.GetMediaFolderPath(folderId);
+            cancellationToken.ThrowIfCancellationRequested();
+
+            ++folderPathInitializationCount;
+            try
+            {
+                await FolderPicker.NavigateToPathAsync(path);
+            }
+            finally
+            {
+                --folderPathInitializationCount;
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
         }
         catch (Exception ex)
         {
@@ -503,14 +525,18 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     private async void OnFolderPickerPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(FolderPickerViewModel.SelectedPath))
+        if (databaseService == null)
             return;
 
-        var folder = await databaseService.GetMediaFolderFromPathAsync(FolderPicker.SelectedPath);
-        if (folder != null)
-        {
-            TargetFolderId = folder.Id;
-        }
+        if (e.PropertyName != nameof(FolderPickerViewModel.SelectedPath) || folderPathInitializationCount > 0)
+            return;
+
+        var selectedPath = FolderPicker.SelectedPath;
+        var folder = await databaseService.GetMediaFolderFromPathAsync(selectedPath);
+        if (selectedPath != FolderPicker.SelectedPath)
+            return;
+
+        TargetFolderId = folder?.Id ?? MediaFolderInfo.RootFolderId;
     }
 
     private void OnUploadSectionActiveChanged(long? activeSectionId)
