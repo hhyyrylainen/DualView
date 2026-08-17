@@ -8,6 +8,8 @@ namespace DualView.Shared.Services;
 /// </summary>
 public interface IBackendAPI
 {
+    public Task<string> RegenerateBrowserPluginAccessKey();
+
     public Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName,
         string? sourcePath = null);
 

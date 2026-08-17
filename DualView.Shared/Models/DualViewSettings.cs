@@ -20,7 +20,7 @@ public class DualViewSettings
     public string? AIRunManagerAccessKey { get; set; }
 
     [MaxLength(36)]
-    public string BrowserPluginAccessKey { get; set; } = Guid.NewGuid().ToString();
+    public string? BrowserPluginAccessKey { get; set; }
 
     public int AudioBufferingMs { get; set; } = 60;
 

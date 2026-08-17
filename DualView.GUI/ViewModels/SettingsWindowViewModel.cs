@@ -24,6 +24,8 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
 
     private DualViewSettings? generalSettings;
 
+    public Func<string, Task>? RequestCopyToClipboard { get; set; }
+
     // Design time constructor
     public SettingsWindowViewModel()
     {
@@ -131,6 +133,8 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public string BrowserPluginAccessKey => generalSettings?.BrowserPluginAccessKey ?? string.Empty;
+
     public bool ShowRunManagerKey
     {
         get;
@@ -211,6 +215,36 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         SidePanelOpen = false;
     }
 
+    public void RegenerateBrowserPluginAccessKey()
+    {
+        Task.Run(RegenerateBrowserPluginAccessKeyAsync);
+    }
+
+    public async Task CopyBrowserPluginAccessKey()
+    {
+        if (RequestCopyToClipboard == null)
+            throw new InvalidOperationException("Clipboard is not available");
+
+        await RequestCopyToClipboard(BrowserPluginAccessKey);
+    }
+
+    private async Task RegenerateBrowserPluginAccessKeyAsync()
+    {
+        if (backendAPI == null)
+            throw new InvalidOperationException("No backend API provided");
+
+        try
+        {
+            await backendAPI.RegenerateBrowserPluginAccessKey();
+            await LoadMainSettings();
+        }
+        catch (Exception e)
+        {
+            logger?.LogError(e, "Failed to regenerate the browser plugin access key");
+            windowService?.ShowErrorWindow("Failed to regenerate browser plugin access key", e);
+        }
+    }
+
     public async Task SaveChanges()
     {
         if (!UnsavedChanges)
@@ -276,6 +310,7 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(LocalMediaStorageLocation));
         OnPropertyChanged(nameof(AIRunManagerAccessKey));
         OnPropertyChanged(nameof(AIRunManagerUrl));
+        OnPropertyChanged(nameof(BrowserPluginAccessKey));
         OnPropertyChanged(nameof(AudioBufferingMs));
         OnPropertyChanged(nameof(AudioBufferingMsText));
         OnPropertyChanged(nameof(HoldPurge));

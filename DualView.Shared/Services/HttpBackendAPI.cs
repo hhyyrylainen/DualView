@@ -13,6 +13,14 @@ public class HttpBackendAPI : IBackendAPI
         HttpClient = httpClient;
     }
 
+    public async Task<string> RegenerateBrowserPluginAccessKey()
+    {
+        var response = await HttpClient.PostAsync("api/v1/settings/regenerateBrowserPluginAccessKey", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<string>() ??
+               throw new InvalidOperationException("The server returned an empty browser plugin access key");
+    }
+
     public async Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName,
         string? sourcePath = null)
     {

@@ -40,4 +40,18 @@ public class SettingsController : Controller
         appEvents.NotifySettingsChanged();
         return Ok();
     }
+
+    [HttpPost("regenerateBrowserPluginAccessKey")]
+    public async Task<ActionResult<string>> RegenerateBrowserPluginAccessKey()
+    {
+        var settings = await databaseService.GetAppSettingsAsync();
+        settings.BrowserPluginAccessKey = Guid.NewGuid().ToString();
+
+        logger.LogInformation("Regenerated the browser plugin access key through the API from: {RemoteAddress}",
+            Request.HttpContext.Connection.RemoteIpAddress);
+
+        await databaseService.SaveAppSettingsAsync(settings);
+        appEvents.NotifySettingsChanged();
+        return settings.BrowserPluginAccessKey;
+    }
 }
