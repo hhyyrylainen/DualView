@@ -39,8 +39,8 @@ public sealed class ImportSectionVisualSimilaritySortOperation : BaseOperationWi
             Error = HasError,
             Message = Processed == 0
                 ? "Loading import section information..."
-                : loadedImageCount < images.Count
-                    ? $"Loaded {loadedImageCount} of {images.Count} images"
+                : loadedImageCount < mediaItems.Count
+                    ? $"Loaded {loadedImageCount} of {mediaItems.Count} images"
                     : similarityImageIndex < images.Count
                         ? $"Calculating similarities for image {similarityImageIndex + 1} of {images.Count}"
                         : orderSaved ? "Import section reordered" : "Creating sorted order...",
