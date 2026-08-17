@@ -85,6 +85,12 @@ public class MediaImportHandler : IMediaImportHandler
         {
             logger.LogInformation("Hash is already imported: {Hash}", hash);
 
+            if (existing.IsDeleted)
+            {
+                await databaseService.RestoreMediaAsync(existing.Id);
+                logger.LogInformation("Restored media with hash {Hash} due to it being uploaded again", hash);
+            }
+
             // If it already exists, make sure it is added to the section as desired
             try
             {
@@ -187,6 +193,9 @@ public class MediaImportHandler : IMediaImportHandler
         if (existing != null)
         {
             logger.LogInformation("Hash is already imported: {Hash}", hash);
+
+            if (existing.IsDeleted)
+                await databaseService.RestoreMediaAsync(existing.Id);
 
             // If it already exists, we should update the parent media if it wasn't already set
             if (existing.ParentMediaId == null && parentMediaId != null)
