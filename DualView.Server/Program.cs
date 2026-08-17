@@ -144,6 +144,7 @@ builder.Services.AddScoped<IMediaImportHandler, MediaImportHandler>();
 builder.Services.AddScoped<IMediaProcessingService, MediaProcessingService>();
 builder.Services.AddSingleton<IOperationsStorage, OperationsStorage>();
 builder.Services.AddSingleton<ITemporaryFolderService, TemporaryFolderService>();
+builder.Services.AddScoped<BrowserPluginWebSocketHandler>();
 
 // Prerendering compatibility
 builder.Services.AddScoped<IClientDatabaseService, DatabaseService>();
@@ -170,6 +171,8 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 
 app.UseAntiforgery();
 
+app.UseWebSockets();
+
 app.UseMiddleware<LocalhostOrBearerTokenMiddleware>();
 
 app.MapStaticAssets();
@@ -178,6 +181,21 @@ app.MapRazorComponents<App>()
     .AddAdditionalAssemblies(typeof(DualView.Client._Imports).Assembly);
 
 app.MapControllers();
+
+app.Map("/api/{apiVersion}/browser-plugin", async context =>
+{
+    if (!context.WebSockets.IsWebSocketRequest)
+    {
+        context.Response.StatusCode = StatusCodes.Status400BadRequest;
+        await context.Response.WriteAsync("A websocket connection is required");
+        return;
+    }
+
+    var socket = await context.WebSockets.AcceptWebSocketAsync();
+    var handler = context.RequestServices.GetRequiredService<BrowserPluginWebSocketHandler>();
+    await handler.HandleAsync(socket, context.Request.RouteValues["apiVersion"]?.ToString() ?? string.Empty,
+        context.RequestAborted);
+});
 
 app.MapHub<DataHub>("/hubs/runner");
 app.MapHub<RealTimeDataHub>("/hubs/realtime");

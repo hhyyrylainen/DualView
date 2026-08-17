@@ -15,7 +15,7 @@ namespace Backend.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.10");
+            modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
 
             modelBuilder.Entity("AppliedTagCollection", b =>
                 {
@@ -828,6 +828,11 @@ namespace Backend.Migrations
 
                     b.Property<int>("AudioBufferingMs")
                         .HasColumnType("INTEGER");
+
+                    b.Property<string>("BrowserPluginAccessKey")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");

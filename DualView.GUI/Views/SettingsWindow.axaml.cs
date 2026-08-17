@@ -14,6 +14,7 @@ public partial class SettingsWindow : Window
         AudioBufferingSpinner.Spin += OnAudioBufferingSpin;
 
         MediaInputPick.Click += OnPickMediaInputFolder;
+        DataContextChanged += OnDataContextChanged;
     }
 
     private void OnAudioBufferingSpin(object? sender, SpinEventArgs args)
@@ -36,6 +37,14 @@ public partial class SettingsWindow : Window
         else if (args.Direction == SpinDirection.Increase)
         {
             context.AudioBufferingMs += 5;
+        }
+    }
+
+    private void OnDataContextChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is SettingsWindowViewModel viewModel)
+        {
+            viewModel.RequestCopyToClipboard = text => Clipboard?.SetTextAsync(text) ?? Task.CompletedTask;
         }
     }
 

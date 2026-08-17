@@ -65,6 +65,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             await dbContext.AppSettings.AddAsync(settings);
             await dbContext.SaveChangesAsync();
         }
+        else if (string.IsNullOrWhiteSpace(settings.BrowserPluginAccessKey))
+        {
+            logger.LogInformation("Generating a browser plugin access key for the existing settings");
+            settings.BrowserPluginAccessKey = Guid.NewGuid().ToString();
+            await dbContext.SaveChangesAsync();
+        }
     }
 
     public async Task<DualViewSettings> GetAppSettingsAsync()
