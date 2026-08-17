@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DualView Web</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="../icons/dualview.svg" alt="">
+    <div>
+      <h1>DualView Web</h1>
+      <p id="connection-status" class="status disconnected">Checking connection…</p>
+    </div>
+  </header>
+
+  <nav aria-label="DualView Web sections">
+    <button class="tab-button selected" type="button" data-tab="info">Info</button>
+    <button class="tab-button" type="button" data-tab="settings">Settings</button>
+  </nav>
+
+  <main>
+    <section id="info" class="tab-panel selected">
+      <h2>Connection</h2>
+      <p id="connection-detail">Checking connection…</p>
+      <div class="future-space">More DualView import controls will appear here.</div>
+    </section>
+
+    <section id="settings" class="tab-panel">
+      <label for="server-url">DualView server URL</label>
+      <input id="server-url" type="url" placeholder="http://localhost:5000">
+
+      <label for="access-key">Browser plugin access key</label>
+      <input id="access-key" type="password" autocomplete="off">
+      <label class="check-label"><input id="show-access-key" type="checkbox"> Show access key</label>
+
+      <div class="buttons">
+        <button id="save-connect" type="button">Save and connect</button>
+        <button id="disconnect" type="button" class="secondary">Disconnect</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>

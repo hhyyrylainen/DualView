@@ -1,0 +1,48 @@
+{
+  "manifest_version": 3,
+  "name": "DualView Web",
+  "version": "0.1.0",
+  "description": "Send pages, images, and links to DualView.",
+  "permissions": [
+    "alarms",
+    "contextMenus",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*",
+    "ws://*/*",
+    "wss://*/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "DualView Web",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/dualview.svg",
+      "32": "icons/dualview.svg",
+      "48": "icons/dualview.svg",
+      "96": "icons/dualview.svg"
+    }
+  },
+  "icons": {
+    "16": "icons/dualview.svg",
+    "32": "icons/dualview.svg",
+    "48": "icons/dualview.svg",
+    "96": "icons/dualview.svg"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/toast.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "dualview-web@boostslair.com"
+    }
+  }
+}

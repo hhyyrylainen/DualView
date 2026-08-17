@@ -1,0 +1,129 @@
+:root {
+    color-scheme: light dark;
+    font: 14px/1.4 system-ui, sans-serif;
+}
+
+body {
+    width: 330px;
+    margin: 0;
+    padding: 14px;
+}
+
+header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+header img {
+    width: 36px;
+    height: 36px;
+}
+
+h1, h2, p {
+    margin: 0;
+}
+
+h1 {
+    font-size: 18px;
+}
+
+h2 {
+    font-size: 15px;
+    margin-bottom: 8px;
+}
+
+.status {
+    font-size: 12px;
+}
+
+.status.connected {
+    color: #16833b;
+}
+
+.status.connecting {
+    color: #a66c00;
+}
+
+.status.disconnected, .status.error {
+    color: #b3261e;
+}
+
+nav {
+    display: flex;
+    gap: 4px;
+    margin: 16px 0 12px;
+    border-bottom: 1px solid #8892a0;
+}
+
+.tab-button {
+    border: 0;
+    border-radius: 5px 5px 0 0;
+    padding: 6px 10px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+}
+
+.tab-button.selected {
+    background: #1769aa;
+    color: #fff;
+}
+
+.tab-panel {
+    display: none;
+    min-height: 130px;
+}
+
+.tab-panel.selected {
+    display: block;
+}
+
+.future-space {
+    min-height: 72px;
+    margin-top: 14px;
+    padding: 10px;
+    border: 1px dashed #8892a0;
+    border-radius: 6px;
+    color: #66717f;
+}
+
+label {
+    display: block;
+    margin: 10px 0 4px;
+    font-weight: 600;
+}
+
+input[type="url"], input[type="password"], input[type="text"] {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 7px;
+    border: 1px solid #8892a0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+}
+
+.check-label {
+    font-size: 12px;
+    font-weight: normal;
+}
+
+.buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+button {
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 4px;
+    background: #1769aa;
+    color: #fff;
+    cursor: pointer;
+}
+
+button.secondary {
+    background: #697582;
+}
