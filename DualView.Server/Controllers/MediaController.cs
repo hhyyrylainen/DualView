@@ -43,9 +43,8 @@ public class MediaController : Controller
         return media.GetDTO();
     }
 
-    // TODO: when creating a collection the name should have preceding and trailing spaces stripped
-
     [HttpPost("import")]
+    [RequestSizeLimit(50 * 1024 * 1024)]
     public async Task<ActionResult<MediaFileDTO>> ImportMedia([FromQuery] string? sectionName,
         [FromQuery] string? sourcePath, [Required] IFormFile file)
     {
