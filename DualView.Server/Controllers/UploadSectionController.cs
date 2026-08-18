@@ -158,8 +158,8 @@ public class UploadSectionController : Controller
     }
 
     [HttpPost("{sectionId:long}/addMedia")]
-    public async Task<ActionResult> AddMediaToUploadSection([Required] long sectionId, [FromQuery] [Required] long mediaId,
-        [FromQuery] [Required] int index)
+    public async Task<ActionResult> AddMediaToUploadSection([Required] long sectionId,
+        [FromQuery] [Required] long mediaId, [FromQuery] [Required] int index)
     {
         await databaseService.AddMediaToUploadSectionAsync(mediaId, sectionId, index);
         return Ok();
@@ -169,12 +169,5 @@ public class UploadSectionController : Controller
     public async Task<ActionResult<int>> GetNextUploadSectionIndex([Required] long sectionId)
     {
         return await databaseService.GetNextUploadSectionIndexAsync(sectionId);
-    }
-
-    [HttpPost("{sectionId:long}/bumpLastImported")]
-    public async Task<ActionResult> BumpLastImported([Required] long sectionId)
-    {
-        await databaseService.BumpUploadSectionLastImportedAsync(sectionId);
-        return Ok();
     }
 }

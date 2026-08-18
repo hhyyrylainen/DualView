@@ -499,12 +499,6 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task BumpUploadSectionLastImportedAsync(long sectionId)
-    {
-        var response = await HttpClient.PostAsync($"api/v1/uploadSection/{sectionId}/bumpLastImported", null);
-        response.EnsureSuccessStatusCode();
-    }
-
     public async Task<List<UploadSectionDTO>> GetUploadSectionsAsync()
     {
         return await HttpClient.GetFromJsonAsync<List<UploadSectionDTO>>("api/v1/uploadSection") ?? new();

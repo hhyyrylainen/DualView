@@ -1653,7 +1653,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         logger.LogInformation("Trying to import {ItemCount} items from upload section '{SectionName}' ({SectionId})",
             selectedIds.Count, section.Name, section.Id);
 
-        var originalSectionName = section.Name;
         var targetCollectionName = section.Name.Trim();
         var targetFolderApplied = section.TargetFolderId != MediaFolder.RootFolderId;
 
@@ -1686,7 +1685,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await AddMediaToCollection(selectedIds, collection.Id, nextSequence);
 
         await dbContext.Entry(collection).Collection(item => item.AppliedTags).LoadAsync();
-        var hadSectionTags = section.AppliedTags.Count > 0;
         foreach (var sectionTag in section.AppliedTags)
         {
             var storedTag = await GetOrCreateAppliedTagAsync(sectionTag.GetDTO());
@@ -1728,8 +1726,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (targetFolderApplied)
             section.TargetFolderId = MediaFolder.RootFolderId;
 
-        var sectionUpdated = hadSectionTags || targetFolderApplied ||
-                             !string.Equals(originalSectionName, section.Name, StringComparison.Ordinal);
+        section.LastImported = DateTime.UtcNow;
+        section.BumpUpdatedAtTime();
+        var sectionUpdated = true;
 
         if (section.RemoveAfterImport)
         {
@@ -1834,21 +1833,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         media.IsTemporary = isTemporary;
         await SaveAsync();
         logger.LogInformation("Set media {MediaId} temporary status to {IsTemporary}", mediaId, isTemporary);
-    }
-
-    public async Task BumpUploadSectionLastImportedAsync(long sectionId)
-    {
-        var section = await dbContext.UploadSections.FindAsync(sectionId) ??
-                      throw new ArgumentException("Section not found");
-        section.LastImported = DateTime.UtcNow;
-        section.BumpUpdatedAtTime();
-        await SaveAsync();
-
-        logger.LogInformation("Updated last imported time for upload section '{SectionName}' ({SectionId})",
-            section.Name, section.Id);
-
-        // For now, this is not shown in the GUI, so we don't need to trigger an update event
-        // await updateNotifier.NotifyUploadSectionUpdated(sectionId);
     }
 
     public async Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, long collectionId)

@@ -70,8 +70,6 @@ public interface IDatabaseCommonService
     public Task AddMediaToUploadSectionAsync(long mediaId, long sectionId, int index);
     public Task<int> GetNextUploadSectionIndexAsync(long sectionId);
     public Task SetMediaTemporaryStatusAsync(long mediaId, bool isTemporary);
-    public Task BumpUploadSectionLastImportedAsync(long sectionId);
-
     public Task<List<string>> SearchUploadTargetNamesAsync(string search, int limit = 100);
 
     // Tags

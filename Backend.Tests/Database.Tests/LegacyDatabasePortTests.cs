@@ -227,4 +227,20 @@ public class LegacyDatabasePortTests
         Assert.Contains(collection.Items, item => item.MediaFileId == media.Id);
         Assert.Null(await service.GetUploadSectionAsync(section.Id));
     }
+
+    [Fact]
+    public async Task ImportUploadSection_UpdatesLastImported()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var section = await service.GetOrCreateUploadSectionAsync("Imported images");
+        section.KeepTarget = true;
+        await service.CreateMediaAsync(new MediaFile("image.jpg", "hash-import-time"), section.Name);
+
+        await service.ImportUploadSectionAsync(section.Id, null);
+
+        var importedSection = await service.GetUploadSectionAsync(section.Id);
+        Assert.NotNull(importedSection);
+        Assert.NotNull(importedSection.LastImported);
+    }
 }
