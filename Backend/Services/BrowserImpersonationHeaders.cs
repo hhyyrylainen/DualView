@@ -1,4 +1,4 @@
-namespace DualView.Server.Services;
+namespace Backend.Services;
 
 /// <summary>
 ///   Stores browser request headers captured from a browser plugin websocket connection.
@@ -16,14 +16,11 @@ public sealed class BrowserImpersonationHeaders
         "Trailer",
         "Transfer-Encoding",
         "Upgrade",
-        "Referer",
         "Sec-WebSocket-Accept",
         "Sec-WebSocket-Extensions",
         "Sec-WebSocket-Key",
         "Sec-WebSocket-Protocol",
         "Sec-WebSocket-Version",
-        "Upgrade-Insecure-Requests",
-        "Pragma",
     };
 
     /// <summary>
@@ -41,25 +38,6 @@ public sealed class BrowserImpersonationHeaders
     public IReadOnlyDictionary<string, string> Headers { get; }
 
     /// <summary>
-    ///   Captures request headers from a websocket upgrade request, excluding cookies.
-    /// </summary>
-    /// <param name="requestHeaders">The websocket upgrade request headers.</param>
-    /// <returns>The captured impersonation headers.</returns>
-    public static BrowserImpersonationHeaders Capture(IHeaderDictionary requestHeaders)
-    {
-        var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var header in requestHeaders)
-        {
-            if (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            headers[header.Key] = header.Value.ToString();
-        }
-
-        return new BrowserImpersonationHeaders(headers);
-    }
-
-    /// <summary>
     ///   Adds captured browser headers to an HTTP request without replacing explicitly configured headers.
     ///   The captured user agent always replaces the request user agent.
     /// </summary>
@@ -70,9 +48,7 @@ public sealed class BrowserImpersonationHeaders
         {
             if (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase) ||
                 HeadersNotSuitableForReplay.Contains(header.Key))
-            {
                 continue;
-            }
 
             if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase))
             {
