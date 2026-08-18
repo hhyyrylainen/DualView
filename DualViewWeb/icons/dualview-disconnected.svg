@@ -8,7 +8,7 @@
    version="1.1"
    id="svg1"
    inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
-   sodipodi:docname="DualViewLogo-disconnected.svg"
+   sodipodi:docname="dualview-disconnected.svg"
    inkscape:export-filename="DualViewLogo.png"
    inkscape:export-xdpi="96"
    inkscape:export-ydpi="96"
@@ -27,9 +27,9 @@
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
      inkscape:document-units="mm"
-     inkscape:zoom="1"
-     inkscape:cx="263"
-     inkscape:cy="195"
+     inkscape:zoom="5.6568542"
+     inkscape:cx="299.28295"
+     inkscape:cy="334.99184"
      inkscape:window-width="2560"
      inkscape:window-height="1371"
      inkscape:window-x="0"
@@ -306,5 +306,21 @@
            y="71.497627" />
       </g>
     </g>
+    <path
+       style="fill:#ffcc00;stroke-width:4;stroke-linejoin:bevel;stroke-dashoffset:49.138"
+       d="m 83.447424,61.767469 24.498446,38.249161 -49.340662,-0.004 z"
+       id="path1"
+       sodipodi:nodetypes="cccc" />
+    <path
+       style="fill:#000000;stroke-width:4.13523;stroke-linejoin:bevel;stroke-dashoffset:49.138"
+       d="m 81.347681,70.88288 4.377318,0.0085 0.01605,16.712681 -4.381675,-0.02891 z"
+       id="path2"
+       sodipodi:nodetypes="ccccc" />
+    <circle
+       style="fill:#000000;stroke-width:0.853892;stroke-linejoin:bevel;stroke-dashoffset:49.138"
+       id="path3"
+       cx="83.481659"
+       cy="92.731499"
+       r="3" />
   </g>
 </svg>
