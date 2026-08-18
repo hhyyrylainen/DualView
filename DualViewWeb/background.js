@@ -36,7 +36,10 @@ browser.alarms.onAlarm.addListener(async alarm => {
   }
 
   if (status === "connected") {
-    sendPing();
+    if (!await pingAndWait()) {
+      await disconnect("DualView server is not responding");
+      await connectIfConfigured();
+    }
   } else {
     await connectIfConfigured();
   }
