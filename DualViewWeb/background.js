@@ -59,7 +59,7 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
       await sendContextMessage(tab.id, {
         type: "sendImage",
         imageUrl: info.srcUrl,
-        pageUrl: info.pageUrl,
+        referrer: info.pageUrl,
       }, info.pageUrl);
       break;
     case "scan-link":
@@ -221,6 +221,10 @@ function handleSocketMessage(event, messageSocket) {
       resolvePong(true);
     }
   }
+
+  if (message?.type === "downloadQueued") {
+    pendingTabIds.clear();
+  }
 }
 
 function handleSocketClosed(event, closedSocket) {
@@ -292,7 +296,11 @@ async function getRelevantCookies(pageUrl) {
   }
 
   try {
-    const cookies = await browser.cookies.getAll({ url: pageUrl });
+    const browserCookies = await browser.cookies.getAll({ url: pageUrl });
+    const cookies = {};
+    for (const cookie of browserCookies) {
+      cookies[cookie.name] = cookie.value;
+    }
     return await addRelatedCookies(pageUrl, cookies);
   } catch (error) {
     console.warn("Unable to read cookies for the DualView request", error);
