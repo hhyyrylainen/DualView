@@ -20,14 +20,17 @@ public sealed class BrowserPluginWebSocketHandler
 
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly ILogger<BrowserPluginWebSocketHandler> logger;
+    private readonly IHostApplicationLifetime applicationLifetime;
+
     private BrowserImpersonationHeaders impersonationHeaders =
         new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
     public BrowserPluginWebSocketHandler(IServiceScopeFactory serviceScopeFactory,
-        ILogger<BrowserPluginWebSocketHandler> logger)
+        ILogger<BrowserPluginWebSocketHandler> logger, IHostApplicationLifetime applicationLifetime)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
+        this.applicationLifetime = applicationLifetime;
     }
 
     // TODO: should we have some key already in the query parameters?
@@ -35,6 +38,10 @@ public sealed class BrowserPluginWebSocketHandler
     public async Task HandleAsync(WebSocket socket, string apiVersion,
         BrowserImpersonationHeaders impersonation, CancellationToken cancellation)
     {
+        using var shutdownCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellation,
+            applicationLifetime.ApplicationStopping);
+        cancellation = shutdownCancellation.Token;
+
         impersonationHeaders = impersonation;
         try
         {
@@ -66,6 +73,7 @@ public sealed class BrowserPluginWebSocketHandler
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
             logger.LogInformation("Browser plugin connection was cancelled");
+            await CloseForShutdownAsync(socket);
         }
         catch (OperationCanceledException ex)
         {
@@ -253,5 +261,26 @@ public sealed class BrowserPluginWebSocketHandler
     {
         if (socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
             await socket.CloseAsync(status, description, CancellationToken.None);
+    }
+
+    private static async Task CloseForShutdownAsync(WebSocket socket)
+    {
+        if (socket.State is not (WebSocketState.Open or WebSocketState.CloseReceived))
+            return;
+
+        using var closeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        try
+        {
+            await socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Server shutting down",
+                closeTimeout.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            socket.Abort();
+        }
+        catch (WebSocketException)
+        {
+            socket.Abort();
+        }
     }
 }
