@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using DualView.Server.Models;
+using DualView.Shared.Models;
 using Backend.Services;
 
 namespace DualView.Server.Services;
@@ -21,16 +22,19 @@ public sealed class BrowserPluginWebSocketHandler
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly ILogger<BrowserPluginWebSocketHandler> logger;
     private readonly IHostApplicationLifetime applicationLifetime;
+    private readonly IRemoteDownloadService remoteDownloadService;
 
     private BrowserImpersonationHeaders impersonationHeaders =
         new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
     public BrowserPluginWebSocketHandler(IServiceScopeFactory serviceScopeFactory,
-        ILogger<BrowserPluginWebSocketHandler> logger, IHostApplicationLifetime applicationLifetime)
+        ILogger<BrowserPluginWebSocketHandler> logger, IHostApplicationLifetime applicationLifetime,
+        IRemoteDownloadService remoteDownloadService)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
         this.applicationLifetime = applicationLifetime;
+        this.remoteDownloadService = remoteDownloadService;
     }
 
     // TODO: should we have some key already in the query parameters?
@@ -141,6 +145,19 @@ public sealed class BrowserPluginWebSocketHandler
                     using var messageScope = serviceScopeFactory.CreateScope();
                     _ = messageScope.ServiceProvider.GetRequiredService<IDatabaseService>();
                     await SendMessageAsync(socket, new BrowserPluginMessage { Type = "pong" }, cancellation);
+                    break;
+                }
+                case "sendImage":
+                {
+                    var downloadRequest = JsonSerializer.Deserialize<RemoteDownloadRequest>(messageData) ??
+                                           throw new JsonException("The image download request was empty");
+                    if (string.IsNullOrWhiteSpace(downloadRequest.ImageUrl))
+                        throw new JsonException("The image download request has no image URL");
+
+                    downloadRequest.ImpersonationHeaders = impersonationHeaders.Headers.ToDictionary(
+                        header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
+                    await remoteDownloadService.QueueDownloadAsync(downloadRequest, cancellation);
+                    await SendMessageAsync(socket, new BrowserPluginMessage { Type = "downloadQueued" }, cancellation);
                     break;
                 }
                 default:
