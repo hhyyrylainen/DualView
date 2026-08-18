@@ -1993,7 +1993,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     // Tags
     public async Task<long> CreateTagAsync(string name, TagCategory category)
     {
-        var tag = new Tag(name.TrimOrThrowIfEmpty().ToLowerInvariant(), category);
+        var tag = new Tag(NormalizeTagText(name), category);
         await dbContext.Tags.AddAsync(tag);
         await SaveAsync();
         await updateNotifier.NotifyTagsUpdated();
@@ -2007,7 +2007,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var tag = await dbContext.Tags.FindAsync(id) ?? throw new ArgumentException("Tag not found");
 
         if (name != null)
-            tag.Name = name.TrimOrThrowIfEmpty().ToLowerInvariant();
+            tag.Name = NormalizeTagText(name);
 
         if (description != null)
             tag.Description = description;
@@ -2036,7 +2036,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<long> CreateTagModifierAsync(string name)
     {
-        var modifier = new TagModifier(name.TrimOrThrowIfEmpty().ToLowerInvariant());
+        var modifier = new TagModifier(NormalizeTagText(name));
         await dbContext.TagModifiers.AddAsync(modifier);
         await SaveAsync();
         await updateNotifier.NotifyTagModifiersUpdated();
@@ -2049,7 +2049,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var modifier = await dbContext.TagModifiers.FindAsync(id) ?? throw new ArgumentException("Modifier not found");
 
         if (name != null)
-            modifier.Name = name.TrimOrThrowIfEmpty().ToLowerInvariant();
+            modifier.Name = NormalizeTagText(name);
 
         if (description != null)
             modifier.Description = description;
@@ -2088,7 +2088,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task CreateTagAliasAsync(long tagId, string alias)
     {
-        var tagAlias = new TagAlias(alias.TrimOrThrowIfEmpty().ToLowerInvariant(), tagId);
+        var tagAlias = new TagAlias(NormalizeTagText(alias), tagId);
         await dbContext.TagAliases.AddAsync(tagAlias);
         await SaveAsync();
         await updateNotifier.NotifyTagUpdated(tagId);
@@ -2986,5 +2986,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (tag.Id == 0)
             await SaveAsync();
         return tag.Id;
+    }
+
+    private static string NormalizeTagText(string value)
+    {
+        var normalizedValue = value.TrimOrThrowIfEmpty().ToLowerInvariant();
+        if (normalizedValue.Contains(','))
+            throw new ArgumentException("Tags, tag modifiers, and aliases cannot contain ','");
+
+        return normalizedValue;
     }
 }

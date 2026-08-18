@@ -40,6 +40,46 @@ public class TagDatabaseTests
     }
 
     [Fact]
+    public async Task CreateAndUpdateTag_DisallowCommas()
+    {
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            service.CreateTagAsync("tag,withcomma", TagCategory.DescribeCharacterObject));
+
+        var tagId = await service.CreateTagAsync("validtag", TagCategory.DescribeCharacterObject);
+        await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateTagAsync(tagId, "tag,withcomma",
+            null, null, null));
+    }
+
+    [Fact]
+    public async Task CreateAndUpdateTagModifier_DisallowCommas()
+    {
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateTagModifierAsync("modifier,withcomma"));
+
+        var modifierId = await service.CreateTagModifierAsync("validmodifier");
+        await Assert.ThrowsAsync<ArgumentException>(() => service.UpdateTagModifierAsync(modifierId,
+            "modifier,withcomma", null));
+    }
+
+    [Fact]
+    public async Task CreateTagAlias_DisallowsCommas()
+    {
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var tagId = await service.CreateTagAsync("validtag", TagCategory.DescribeCharacterObject);
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.CreateTagAliasAsync(tagId, "alias,withcomma"));
+    }
+
+    [Fact]
     public async Task SearchTagsWildcard_ReturnsMatchingTags()
     {
         // Arrange
