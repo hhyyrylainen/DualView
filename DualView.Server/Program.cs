@@ -191,10 +191,11 @@ app.Map("/api/{apiVersion}/browser-plugin", async context =>
         return;
     }
 
+    var impersonationHeaders = BrowserImpersonationHeaders.Capture(context.Request.Headers);
     var socket = await context.WebSockets.AcceptWebSocketAsync();
     var handler = context.RequestServices.GetRequiredService<BrowserPluginWebSocketHandler>();
     await handler.HandleAsync(socket, context.Request.RouteValues["apiVersion"]?.ToString() ?? string.Empty,
-        context.RequestAborted);
+        impersonationHeaders, context.RequestAborted);
 });
 
 app.MapHub<DataHub>("/hubs/runner");

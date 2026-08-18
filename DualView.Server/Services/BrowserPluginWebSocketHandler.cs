@@ -20,6 +20,8 @@ public sealed class BrowserPluginWebSocketHandler
 
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly ILogger<BrowserPluginWebSocketHandler> logger;
+    private BrowserImpersonationHeaders impersonationHeaders =
+        new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
     public BrowserPluginWebSocketHandler(IServiceScopeFactory serviceScopeFactory,
         ILogger<BrowserPluginWebSocketHandler> logger)
@@ -30,8 +32,10 @@ public sealed class BrowserPluginWebSocketHandler
 
     // TODO: should we have some key already in the query parameters?
     // That would prevent opening a lot of websockets if someone doesn't know the key.
-    public async Task HandleAsync(WebSocket socket, string apiVersion, CancellationToken cancellation)
+    public async Task HandleAsync(WebSocket socket, string apiVersion,
+        BrowserImpersonationHeaders impersonation, CancellationToken cancellation)
     {
+        impersonationHeaders = impersonation;
         try
         {
             var greeting = await ReceiveHandshakeStringAsync(socket, ExpectedGreeting, cancellation);
@@ -85,6 +89,15 @@ public sealed class BrowserPluginWebSocketHandler
         {
             socket.Dispose();
         }
+    }
+
+    /// <summary>
+    ///   Configures an HTTP request with the browser headers captured for this connection.
+    /// </summary>
+    /// <param name="request">The request to configure.</param>
+    public void ConfigureHttpRequest(HttpRequestMessage request)
+    {
+        impersonationHeaders.ConfigureHttpRequest(request);
     }
 
     private async Task ProcessMessagesAsync(WebSocket socket, CancellationToken cancellation)
