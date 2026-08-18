@@ -144,6 +144,8 @@ builder.Services.AddScoped<IMediaImportHandler, MediaImportHandler>();
 builder.Services.AddScoped<IMediaProcessingService, MediaProcessingService>();
 builder.Services.AddSingleton<IOperationsStorage, OperationsStorage>();
 builder.Services.AddSingleton<ITemporaryFolderService, TemporaryFolderService>();
+builder.Services.AddSingleton<IRemoteScanService, RemoteScanService>();
+builder.Services.AddSingleton<IRemoteDownloadService, RemoteDownloadService>();
 builder.Services.AddScoped<BrowserPluginWebSocketHandler>();
 
 // Prerendering compatibility
@@ -191,7 +193,14 @@ app.Map("/api/{apiVersion}/browser-plugin", async context =>
         return;
     }
 
-    var impersonationHeaders = BrowserImpersonationHeaders.Capture(context.Request.Headers);
+    var capturedHeaders = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+    foreach (var header in context.Request.Headers)
+    {
+        if (!header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase))
+            capturedHeaders[header.Key] = header.Value.ToString();
+    }
+
+    var impersonationHeaders = new BrowserImpersonationHeaders(capturedHeaders);
     var socket = await context.WebSockets.AcceptWebSocketAsync();
     var handler = context.RequestServices.GetRequiredService<BrowserPluginWebSocketHandler>();
     await handler.HandleAsync(socket, context.Request.RouteValues["apiVersion"]?.ToString() ?? string.Empty,
@@ -214,11 +223,13 @@ lifetime.ApplicationStopping.Register(() =>
     try
     {
         var backgroundJobs = services.GetService<IBackgroundJobs>();
+        var remoteDownloadService = services.GetService<IRemoteDownloadService>();
         var operations = app.Services.GetRequiredService<IOperationsStorage>();
 
         operationsStop = Task.Run(() => operations.OnAppShutdown());
 
         backgroundJobs?.Stop(true, TimeSpan.FromMinutes(1));
+        remoteDownloadService?.Stop(true, TimeSpan.FromMinutes(1));
     }
     catch (Exception e)
     {
@@ -259,10 +270,12 @@ if (ResourceLimits.Memory >= reasonableMemoryLimit)
 }
 
 var backgroundJobs = app.Services.GetRequiredService<IBackgroundJobs>();
+var remoteDownloadService = app.Services.GetRequiredService<IRemoteDownloadService>();
 // Make sure some (optional services) are started so that info is available (almost) immediately
 var maintenanceJobs = app.Services.GetRequiredService<IMaintenanceService>();
 
 backgroundJobs.Start();
+remoteDownloadService.Start();
 
 //
 // Main start of the application
@@ -280,6 +293,7 @@ else
 // Stop specific services that need some more care on shutdown
 var maintenanceStop = maintenanceJobs.Stop(TimeSpan.FromSeconds(60));
 backgroundJobs.Stop(true, TimeSpan.FromSeconds(30));
+remoteDownloadService.Stop(true, TimeSpan.FromSeconds(30));
 maintenanceStop.Wait();
 operationsStop?.Wait();
 
