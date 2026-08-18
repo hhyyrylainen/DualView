@@ -1,5 +1,6 @@
 const serverUrlInput = document.getElementById("server-url");
 const accessKeyInput = document.getElementById("access-key");
+const sendCookiesInput = document.getElementById("send-cookies");
 const statusElement = document.getElementById("connection-status");
 const detailElement = document.getElementById("connection-detail");
 
@@ -16,6 +17,7 @@ document.getElementById("save-connect").addEventListener("click", async () => {
     type: "save-settings",
     serverUrl: serverUrlInput.value,
     accessKey: accessKeyInput.value,
+    sendCookies: sendCookiesInput.checked,
   });
   updateStatus(status);
   selectTab("info");
@@ -26,9 +28,10 @@ document.getElementById("disconnect").addEventListener("click", async () => {
 });
 
 async function initialize() {
-  const settings = await browser.storage.local.get({ serverUrl: "", accessKey: "" });
+  const settings = await browser.storage.local.get({ serverUrl: "", accessKey: "", sendCookies: false });
   serverUrlInput.value = settings.serverUrl;
   accessKeyInput.value = settings.accessKey;
+  sendCookiesInput.checked = settings.sendCookies === true;
   updateStatus(await browser.runtime.sendMessage({ type: "get-status" }));
   window.setInterval(refreshStatus, 1000);
 }

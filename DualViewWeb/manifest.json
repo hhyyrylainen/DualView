@@ -5,6 +5,7 @@
   "description": "Send pages, images, and links to DualView.",
   "permissions": [
     "alarms",
+    "cookies",
     "contextMenus",
     "storage"
   ],

@@ -1,6 +1,7 @@
 const DEFAULT_SETTINGS = {
   serverUrl: "",
   accessKey: "",
+  sendCookies: false,
 };
 
 const READY_MESSAGE = "DVREADY";
@@ -52,21 +53,21 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
         type: "sendPage",
         pageUrl: info.pageUrl,
         title: tab.title ?? "",
-      });
+      }, info.pageUrl);
       break;
     case "send-image":
       await sendContextMessage(tab.id, {
         type: "sendImage",
         imageUrl: info.srcUrl,
         pageUrl: info.pageUrl,
-      });
+      }, info.pageUrl);
       break;
     case "scan-link":
       await sendContextMessage(tab.id, {
         type: "scanLink",
         linkUrl: info.linkUrl,
         pageUrl: info.pageUrl,
-      });
+      }, info.pageUrl);
       break;
   }
 });
@@ -80,6 +81,7 @@ browser.runtime.onMessage.addListener(async message => {
     await browser.storage.local.set({
       serverUrl: message.serverUrl.trim(),
       accessKey: message.accessKey.trim(),
+      sendCookies: message.sendCookies === true,
     });
     await disconnect("Settings changed");
     await connectIfConfigured();
@@ -124,6 +126,7 @@ async function getSettings() {
   return {
     serverUrl: settings.serverUrl ?? "",
     accessKey: settings.accessKey ?? "",
+    sendCookies: settings.sendCookies === true,
   };
 }
 
@@ -264,10 +267,15 @@ function sendPing() {
   }
 }
 
-async function sendContextMessage(tabId, message) {
+async function sendContextMessage(tabId, message, pageUrl) {
   if (!await ensureConnection()) {
     await showTabToast(tabId, "DualView is not connected. Open the DualView Web toolbar menu to connect.", "error");
     return;
+  }
+
+  const settings = await getSettings();
+  if (settings.sendCookies) {
+    message.cookies = await getRelevantCookies(pageUrl);
   }
 
   pendingTabIds.add(tabId);
@@ -276,6 +284,25 @@ async function sendContextMessage(tabId, message) {
     await showTabToast(tabId, "DualView connection changed. Please try again.", "error");
     await connectIfConfigured();
   }
+}
+
+async function getRelevantCookies(pageUrl) {
+  if (!pageUrl) {
+    return [];
+  }
+
+  try {
+    const cookies = await browser.cookies.getAll({ url: pageUrl });
+    return await addRelatedCookies(pageUrl, cookies);
+  } catch (error) {
+    console.warn("Unable to read cookies for the DualView request", error);
+    return [];
+  }
+}
+
+// Extension site plugins can add related cookies here in the future.
+async function addRelatedCookies(_pageUrl, cookies) {
+  return cookies;
 }
 
 async function ensureConnection() {
