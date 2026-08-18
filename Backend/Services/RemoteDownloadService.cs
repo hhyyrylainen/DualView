@@ -1,0 +1,265 @@
+using System.Net;
+using System.Threading.Channels;
+using Backend.Models;
+using DualView.Shared.Models;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace Backend.Services;
+
+/// <summary>
+///   Downloads remote media sequentially and imports it into upload sections.
+/// </summary>
+public sealed class RemoteDownloadService : IRemoteDownloadService
+{
+    private const int MaximumAttempts = 10;
+
+    private readonly IServiceScopeFactory serviceScopeFactory;
+    private readonly IRemoteScanService remoteScanService;
+    private readonly ILogger<RemoteDownloadService> logger;
+    private readonly SemaphoreSlim processingLock = new(1, 1);
+    private readonly Channel<RemoteDownloadRequest> downloadQueue = Channel.CreateUnbounded<RemoteDownloadRequest>();
+    private readonly HttpClient httpClient;
+
+    private CancellationTokenSource? cancellationTokenSource;
+    private Task? processingTask;
+    private bool running;
+
+    public RemoteDownloadService(IServiceScopeFactory serviceScopeFactory,
+        IRemoteScanService remoteScanService, ILogger<RemoteDownloadService> logger)
+    {
+        this.serviceScopeFactory = serviceScopeFactory;
+        this.remoteScanService = remoteScanService;
+        this.logger = logger;
+
+        var httpHandler = new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.All,
+            ConnectTimeout = TimeSpan.FromSeconds(30),
+            KeepAlivePingDelay = TimeSpan.FromMinutes(2),
+            KeepAlivePingPolicy = HttpKeepAlivePingPolicy.Always,
+            KeepAlivePingTimeout = TimeSpan.FromSeconds(10),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            UseCookies = false,
+        };
+        httpClient = new HttpClient(httpHandler)
+        {
+            Timeout = TimeSpan.FromMinutes(15),
+        };
+    }
+
+    public void Start()
+    {
+        if (running)
+            return;
+
+        running = true;
+        cancellationTokenSource = new CancellationTokenSource();
+        processingTask = Task.Run(() => RunDownloadThreadAsync(cancellationTokenSource.Token));
+        logger.LogDebug("Remote download service started");
+    }
+
+    public void Stop(bool wait, TimeSpan timeout)
+    {
+        if (!running)
+            return;
+
+        running = false;
+        cancellationTokenSource?.Cancel();
+
+        if (wait && processingTask != null && !processingTask.Wait(timeout))
+            logger.LogWarning("Remote download service did not stop within {Timeout}", timeout);
+
+        if (processingTask?.IsCompleted == true)
+        {
+            processingTask = null;
+            cancellationTokenSource?.Dispose();
+            cancellationTokenSource = null;
+        }
+
+        logger.LogDebug("Remote download service stopped");
+    }
+
+    public async ValueTask QueueDownloadAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(request.ImageUrl))
+            throw new ArgumentException("A remote download requires an image URL", nameof(request));
+
+        await remoteScanService.RecordEventAsync(new RemoteScanEvent
+        {
+            EventType = "download-queued",
+            ImageUrl = request.ImageUrl,
+        }, cancellationToken);
+        await downloadQueue.Writer.WriteAsync(request, cancellationToken);
+    }
+
+    private async Task RunDownloadThreadAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                // This loops normally forever if there are no problems
+                await foreach (var request in downloadQueue.Reader.ReadAllAsync(stoppingToken))
+                {
+                    try
+                    {
+                        await ProcessDownloadAsync(request, stoppingToken);
+                    }
+                    catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                    {
+                        logger.LogInformation("Stopping remote download processing");
+                        return;
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Remote download worker failed for {ImageUrl}", request.ImageUrl);
+
+                        await remoteScanService.RecordEventAsync(new RemoteScanEvent
+                        {
+                            EventType = "download-worker-fail",
+                            ImageUrl = request.ImageUrl,
+                            Detail = ex.ToString(),
+                        }, stoppingToken);
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                logger.LogInformation("Remote download queue stopped");
+                break;
+            }
+
+            // This is reached only if an exception happened
+            if (stoppingToken.IsCancellationRequested)
+                break;
+
+            // Restart worker every 15 seconds
+            await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
+        }
+    }
+
+    private async Task ProcessDownloadAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
+    {
+        await processingLock.WaitAsync(cancellationToken);
+        try
+        {
+            var enrichedRequest = request;
+            var enrichmentCompleted = false;
+            for (var attempt = 1; attempt <= MaximumAttempts; ++attempt)
+            {
+                try
+                {
+                    if (!enrichmentCompleted)
+                    {
+                        enrichedRequest = await remoteScanService.EnrichDownloadAsync(request, cancellationToken);
+                        enrichmentCompleted = true;
+                    }
+
+                    await DownloadAndImportAsync(enrichedRequest, cancellationToken);
+                    await remoteScanService.RecordEventAsync(new RemoteScanEvent
+                    {
+                        EventType = "download-succeeded",
+                        ImageUrl = enrichedRequest.ImageUrl,
+                        Attempt = attempt,
+                    }, cancellationToken);
+                    return;
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    await remoteScanService.RecordEventAsync(new RemoteScanEvent
+                    {
+                        EventType = attempt == MaximumAttempts ? "download-failed" : "download-retry",
+                        ImageUrl = request.ImageUrl,
+                        Detail = ex.Message,
+                        Attempt = attempt,
+                    }, cancellationToken);
+
+                    if (attempt == MaximumAttempts)
+                    {
+                        logger.LogError(ex, "Remote download failed after {AttemptCount} attempts for {ImageUrl}",
+                            MaximumAttempts, request.ImageUrl);
+                        return;
+                    }
+
+                    var delaySeconds = Math.Min(300, 3 * Math.Pow(2, attempt - 1));
+                    await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
+                }
+            }
+        }
+        finally
+        {
+            processingLock.Release();
+        }
+    }
+
+    private async Task DownloadAndImportAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Get, request.ImageUrl);
+        new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest);
+
+        if (!string.IsNullOrWhiteSpace(request.Referrer) && Uri.TryCreate(request.Referrer, UriKind.Absolute,
+                out var referrer))
+        {
+            httpRequest.Headers.Referrer = referrer;
+        }
+
+        if (request.Cookies.Count > 0)
+        {
+            var cookieHeader = string.Join("; ", request.Cookies.Select(cookie =>
+                $"{cookie.Key}={cookie.Value}"));
+            httpRequest.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
+        }
+
+        using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var mediaStream = new MemoryStream();
+        await responseStream.CopyToAsync(mediaStream, cancellationToken);
+        mediaStream.Position = 0;
+
+        using var scope = serviceScopeFactory.CreateScope();
+        var databaseService = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
+        var section = await databaseService.GetOrCreateUploadSectionAsync(request.TargetImportSection);
+
+        // Make sure there is an active upload section to avoid images bundling up as separate sections if we have
+        // a long queue
+        await databaseService.SetUploadSectionActiveAsync(section.Id);
+
+        var media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, section.Name);
+
+        // Image is imported successfully, next update the download source information
+        var importInfo = await databaseService.GetMediaImportInfoAsync(media.Id) ?? new MediaImportInfo(media.Id);
+        importInfo.SourceUrl = request.ImageUrl;
+        importInfo.Referrer = request.Referrer;
+        importInfo.PreferredName = request.OverrideName;
+        importInfo.TagsString = string.Join(", ", request.Tags);
+        importInfo.DownloadGalleryId = request.DownloadGalleryId.HasValue &&
+                                       await databaseService.GetDownloadGalleryAsync(request.DownloadGalleryId.Value) !=
+                                       null
+            ? request.DownloadGalleryId
+            : null;
+        await databaseService.SaveMediaImportInfoAsync(importInfo);
+    }
+
+    private static string GetImportFileName(RemoteDownloadRequest request)
+    {
+        var fileName = request.OverrideName;
+        if (string.IsNullOrWhiteSpace(fileName) && Uri.TryCreate(request.ImageUrl, UriKind.Absolute, out var imageUri))
+            fileName = Path.GetFileName(Uri.UnescapeDataString(imageUri.LocalPath));
+
+        fileName = Path.GetFileName(fileName ?? string.Empty);
+        if (string.IsNullOrWhiteSpace(fileName))
+            fileName = "remote-download";
+
+        return string.IsNullOrWhiteSpace(Path.GetExtension(fileName)) ? $"{fileName}.jpg" : fileName;
+    }
+}
