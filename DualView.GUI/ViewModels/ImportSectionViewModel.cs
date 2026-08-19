@@ -239,6 +239,12 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     }
 
+    public bool AutoDeselectAfterImport
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
     public bool IsActive
     {
         get;
@@ -325,6 +331,9 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             var selected = Media.Where(item => item.Selected)
                 .Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList();
             await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
+
+            if (AutoDeselectAfterImport)
+                DeselectAll();
         }
         catch (Exception ex)
         {

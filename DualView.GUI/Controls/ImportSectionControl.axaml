@@ -72,6 +72,9 @@
                         <CheckBox IsChecked="{Binding ShowImageTagEditor}" IsEnabled="False">
                             Edit Image Tags
                         </CheckBox>
+                        <CheckBox IsChecked="{Binding AutoDeselectAfterImport}">
+                            Auto deselect after import
+                        </CheckBox>
                     </WrapPanel>
                     <ScrollViewer Grid.Row="2" Height="{Binding PreviewScrollViewerHeight}">
                         <ItemsControl ItemsSource="{Binding Media}">
