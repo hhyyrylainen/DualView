@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:controls="using:DualView.GUI.Controls"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="700"
+        x:Class="DualView.GUI.Views.ImportSectionWindow"
+        x:DataType="vm:ImportSectionWindowViewModel"
+        Width="1200" Height="800" MinWidth="600" MinHeight="300"
+        Icon="/Assets/logo.ico" Title="{Binding WindowTitle}">
+    <Design.DataContext>
+        <vm:ImportSectionWindowViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="*,Auto">
+        <controls:ImportSectionControl Grid.Row="0" DataContext="{Binding Section}" />
+
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Background="#F0F0F0" Height="42">
+            <ContentControl Grid.Column="0" Margin="6,0" DataContext="{Binding Hamburger}">
+                <controls:HamburgerMenuControl />
+            </ContentControl>
+            <TextBlock Grid.Column="1" Text="Pop-out import section" VerticalAlignment="Center" Margin="8,0" />
+            <Button Grid.Column="2" Content="Close" Command="{Binding Close}" Margin="4" />
+        </Grid>
+    </Grid>
+</Window>

@@ -356,6 +356,11 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public void PopOut()
+    {
+        windowService?.ShowWindow<ImportSectionWindowViewModel>(window => _ = window.InitializeAsync(id));
+    }
+
     public async Task DeleteAsync()
     {
         if (databaseService == null)
