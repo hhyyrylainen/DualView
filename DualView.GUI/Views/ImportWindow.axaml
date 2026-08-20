@@ -43,13 +43,15 @@
         </Button>
         <Border Grid.Column="1" Width="1" Background="Black" />
         <Grid Grid.Column="2" RowDefinitions="Auto,*">
-            <StackPanel Orientation="Horizontal" Spacing="4" Margin="4">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="4">
                 <ToggleButton IsChecked="{Binding ImportTabSelected}" Command="{Binding SelectImportTab}">Import</ToggleButton>
                 <ToggleButton IsChecked="{Binding ScanTabSelected}" Command="{Binding SelectScanTab}">Scan</ToggleButton>
                 <ToggleButton IsChecked="{Binding StatusTabSelected}" Command="{Binding SelectStatusTab}">Status</ToggleButton>
                 <Button Command="{Binding OpenUploadWindow}">Upload media</Button>
             </StackPanel>
-            <ScrollViewer Grid.Row="1" IsVisible="{Binding ImportTabSelected}">
+            <!-- This extra padding is room for the scrollbar -->
+            <ScrollViewer Grid.Row="1" IsVisible="{Binding ImportTabSelected}"
+                          VerticalScrollBarVisibility="Visible" Padding="0 0 10 3">
                 <ItemsControl ItemsSource="{Binding Sections}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
@@ -58,9 +60,11 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
-            <TextBlock Grid.Row="1" IsVisible="{Binding ScanTabSelected}" Text="Scanning is not implemented yet."
+            <TextBlock Grid.Row="1" IsVisible="{Binding ScanTabSelected}"
+                       Text="Scanning is not implemented yet."
                        Margin="12" />
-            <TextBlock Grid.Row="1" IsVisible="{Binding StatusTabSelected}" Text="Import status will appear here."
+            <TextBlock Grid.Row="1" IsVisible="{Binding StatusTabSelected}"
+                       Text="Import status will appear here."
                        Margin="12" />
         </Grid>
     </Grid>
