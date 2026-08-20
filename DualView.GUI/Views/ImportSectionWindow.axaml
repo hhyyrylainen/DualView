@@ -14,7 +14,7 @@
     </Design.DataContext>
 
     <Grid RowDefinitions="*,Auto">
-        <controls:ImportSectionControl Grid.Row="0" DataContext="{Binding Section}" />
+        <controls:ImportSectionControl Grid.Row="0" ExpandContent="True" DataContext="{Binding Section}" />
 
         <Grid Grid.Row="1" ColumnDefinitions="Auto,*,Auto" Background="#F0F0F0" Height="42">
             <ContentControl Grid.Column="0" Margin="6,0" DataContext="{Binding Hamburger}">

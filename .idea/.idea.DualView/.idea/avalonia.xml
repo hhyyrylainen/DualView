@@ -12,6 +12,7 @@
         <entry key="DualView.GUI/Views/AddToFolderWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Views/EditMediaFoldersWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Views/ImageViewerWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
+        <entry key="DualView.GUI/Views/ImportSectionWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Views/ImportWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Views/MainWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />
         <entry key="DualView.GUI/Views/MediaCollectionWindow.axaml" value="DualView.GUI/DualView.GUI.csproj" />

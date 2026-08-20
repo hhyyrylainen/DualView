@@ -41,8 +41,9 @@
                 <Button Grid.Column="5" Margin="4,0" Command="{Binding ImportAsync}" Background="#2878D0">Import</Button>
             </Grid>
 
-            <StackPanel Grid.Row="1" IsVisible="{Binding CollectionTabSelected}">
-                <WrapPanel>
+            <Grid x:Name="CollectionLayout" Grid.Row="1" RowDefinitions="Auto,Auto" IsVisible="{Binding CollectionTabSelected}"
+                  VerticalAlignment="Top">
+                <WrapPanel Grid.Row="0">
                     <CheckBox Margin="2" IsChecked="{Binding KeepEvenWhenEmpty}">Keep even when empty</CheckBox>
                     <CheckBox Margin="8,0" IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
                     <Button Margin="8,0" Command="{Binding CloneAsync}">Clone</Button>
@@ -50,17 +51,17 @@
                     <Button Margin="8,0" Command="{Binding DeleteAsync}" Background="#C62828">DELETE</Button>
                 </WrapPanel>
 
-                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,*">
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" RowDefinitions="Auto,*">
                     <TextBlock Grid.Row="0" Grid.Column="0" Margin="2" HorizontalAlignment="Center">Target folder:</TextBlock>
                     <controls:FolderPicker Grid.Row="1" Grid.Column="0" DataContext="{Binding FolderPicker}"
-                                           Height="305" />
+                                           x:Name="FolderPickerControl" Height="305" />
 
                     <TextBlock Grid.Row="0" Grid.Column="1" Margin="2" HorizontalAlignment="Center">Collection tags:</TextBlock>
                     <controls:TagEditor Grid.Row="1" Grid.Column="1" DataContext="{Binding TagEditor}" />
                 </Grid>
-            </StackPanel>
-            <Grid Grid.Row="1" IsVisible="{Binding ImagesTabSelected}">
-                <Grid RowDefinitions="Auto,Auto,*">
+            </Grid>
+            <Grid x:Name="ImagesLayout" Grid.Row="1" IsVisible="{Binding ImagesTabSelected}" VerticalAlignment="Top">
+                <Grid x:Name="ImageContentLayout" RowDefinitions="Auto,Auto,*" VerticalAlignment="Stretch">
                     <WrapPanel ItemSpacing="5">
                         <Button Command="{Binding RemoveSelectedAsync}" Background="#C62828">Remove Selected</Button>
                         <Button Command="{Binding ReverseImagesAsync}">Reverse Images</Button>
@@ -78,7 +79,7 @@
                             Auto deselect after import
                         </CheckBox>
                     </WrapPanel>
-                    <ScrollViewer Grid.Row="2" Height="{Binding PreviewScrollViewerHeight}">
+                    <ScrollViewer x:Name="ImagesScrollViewer" Grid.Row="2">
                         <ItemsControl ItemsSource="{Binding Media}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
