@@ -130,14 +130,15 @@ public sealed class ImportSectionWindowViewModel : ViewModelBase, IDisposable
         try
         {
             var section = await databaseService.GetUploadSectionAsync(sectionId);
-            if (section == null)
-            {
-                Close();
-                return;
-            }
-
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (section == null)
+                {
+                    // Close need to happen on the UI thread
+                    Close();
+                    return;
+                }
+
                 Section?.UpdateFromServer(section);
                 WindowTitle = $"DualView - Import section: {section.Name}";
             });

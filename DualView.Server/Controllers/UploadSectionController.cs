@@ -44,7 +44,10 @@ public class UploadSectionController : Controller
     {
         var section = await databaseService.GetUploadSectionAsync(sectionId);
         if (section == null)
-            return NotFound();
+        {
+            // To make fetch work
+            return Json(null);
+        }
 
         return section.GetDTO();
     }
