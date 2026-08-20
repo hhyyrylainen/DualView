@@ -509,8 +509,17 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         FolderPicker.PropertyChanged -= OnFolderPickerPropertyChanged;
         FolderPicker.Dispose();
         CancelNameSave();
-        folderPathInitializationCancellation?.Cancel();
-        folderPathInitializationCancellation?.Dispose();
+
+        try
+        {
+            folderPathInitializationCancellation?.Cancel();
+            folderPathInitializationCancellation?.Dispose();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Ignore if already disposed
+        }
+
         signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
         signalRService?.OnUploadSectionUpdated -= OnUploadSectionUpdated;
         signalRService?.OnUploadSectionContentsUpdated -= OnUploadSectionContentsUpdated;
