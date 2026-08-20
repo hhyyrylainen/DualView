@@ -1554,6 +1554,43 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .FirstOrDefaultAsync(section => section.Id == sectionId);
     }
 
+    public async Task<UploadSection> CloneUploadSectionAsync(long sectionId)
+    {
+        var section = await GetUploadSectionAsync(sectionId) ?? throw new ArgumentException("Section not found");
+        var minimumDisplayIndex = await dbContext.UploadSections
+            .Select(uploadSection => uploadSection.DisplayIndex)
+            .DefaultIfEmpty()
+            .MinAsync();
+        var clonedSection = new UploadSection(section.Name)
+        {
+            KeepTarget = section.KeepTarget,
+            DisplayIndex = minimumDisplayIndex - 1,
+            Selected = section.Selected,
+            TargetFolderId = section.TargetFolderId,
+            RemoveAfterImport = section.RemoveAfterImport,
+            AppliedTags = section.AppliedTags.ToList(),
+            Items = section.Items.Select(item => new UploadSectionItem
+            {
+                MediaFileId = item.MediaFileId,
+                MediaFile = item.MediaFile,
+                Index = item.Index,
+            }).ToList(),
+        };
+
+        if (section.Selected)
+            section.Selected = false;
+
+        await dbContext.UploadSections.AddAsync(clonedSection);
+        await SaveAsync();
+        await updateNotifier.NotifyUploadSectionsUpdated();
+        if (clonedSection.Selected)
+            await updateNotifier.NotifyUploadSectionActiveChanged(clonedSection.Id);
+
+        logger.LogInformation("Cloned upload section '{SourceName}' ({SourceId}) to '{Name}' ({Id})",
+            section.Name, section.Id, clonedSection.Name, clonedSection.Id);
+        return clonedSection;
+    }
+
     public async Task SaveUploadSectionAsync(UploadSection section)
     {
         section.Name = section.Name.Trim();
@@ -2574,6 +2611,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         section.RemoveAfterImport = request.RemoveAfterImport;
         section.TargetFolderId = request.TargetFolderId;
         await SaveUploadSectionAsync(section);
+    }
+
+    async Task<UploadSectionDTO> IClientDatabaseService.CloneUploadSectionAsync(long sectionId)
+    {
+        return (await CloneUploadSectionAsync(sectionId)).GetDTO();
     }
 
     Task IClientDatabaseService.DeleteUploadSectionAsync(long sectionId) => DeleteUploadSectionAsync(sectionId);

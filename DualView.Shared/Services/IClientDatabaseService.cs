@@ -72,6 +72,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<List<UploadSectionDTO>> GetUploadSectionsAsync();
     public Task<List<RecentImportSectionDTO>> GetRecentImportSectionsAsync();
     public Task<UploadSectionDTO?> GetUploadSectionAsync(long sectionId);
+    public Task<UploadSectionDTO> CloneUploadSectionAsync(long sectionId);
     public Task<UploadSectionDTO> GetOrCreateUploadSectionAsync(string? name);
     public Task SaveUploadSectionAsync(UploadSectionDTO section);
     public Task DeleteUploadSectionAsync(long sectionId);

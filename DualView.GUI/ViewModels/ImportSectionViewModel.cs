@@ -341,6 +341,21 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public async Task CloneAsync()
+    {
+        if (databaseService == null)
+            return;
+
+        try
+        {
+            await databaseService.CloneUploadSectionAsync(id);
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to clone import section", ex);
+        }
+    }
+
     public async Task DeleteAsync()
     {
         if (databaseService == null)

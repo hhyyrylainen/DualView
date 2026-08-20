@@ -49,6 +49,19 @@ public class UploadSectionController : Controller
         return section.GetDTO();
     }
 
+    [HttpPost("{sectionId:long}/clone")]
+    public async Task<ActionResult<UploadSectionDTO>> Clone(long sectionId)
+    {
+        try
+        {
+            return (await databaseService.CloneUploadSectionAsync(sectionId)).GetDTO();
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(ex.Message);
+        }
+    }
+
     [HttpGet("{sectionId:long}/appliedTag")]
     public async Task<ActionResult<List<AppliedTagDTO>>> GetAppliedTags(long sectionId)
     {

@@ -45,6 +45,7 @@
                 <WrapPanel>
                     <CheckBox Margin="2" IsChecked="{Binding KeepEvenWhenEmpty}">Keep even when empty</CheckBox>
                     <CheckBox Margin="8,0" IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
+                    <Button Margin="8,0" Command="{Binding CloneAsync}">Clone</Button>
                     <Button Margin="8,0" Command="{Binding DeleteAsync}" Background="#C62828">DELETE</Button>
                 </WrapPanel>
 

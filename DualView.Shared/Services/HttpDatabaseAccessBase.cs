@@ -514,6 +514,14 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return HttpClient.GetFromJsonAsync<UploadSectionDTO>($"api/v1/uploadSection/{sectionId}");
     }
 
+    public async Task<UploadSectionDTO> CloneUploadSectionAsync(long sectionId)
+    {
+        var response = await HttpClient.PostAsync($"api/v1/uploadSection/{sectionId}/clone", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<UploadSectionDTO>() ??
+               throw new Exception("Couldn't get cloned section");
+    }
+
     public async Task<UploadSectionDTO> GetOrCreateUploadSectionAsync(string? name)
     {
         var response = await HttpClient.PostAsync(
