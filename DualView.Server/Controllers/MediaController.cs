@@ -35,7 +35,9 @@ public class MediaController : Controller
     [HttpGet("{mediaId:long}")]
     public async Task<ActionResult<MediaFileDTO>> GetFullMedia([Required] long mediaId, bool isView = true)
     {
-        var media = await databaseService.GetMediaByIdAsync(mediaId);
+        var media = isView
+            ? await databaseService.GetMediaByIdAsync(mediaId)
+            : await databaseService.GetMediaByIdIncludingDeletedAsync(mediaId);
 
         if (media == null)
             return NotFound();

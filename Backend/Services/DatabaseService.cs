@@ -1378,6 +1378,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.MediaFiles.FindAsync(id);
     }
 
+    public async Task<MediaFile?> GetMediaByIdIncludingDeletedAsync(long id)
+    {
+        return await dbContext.MediaFiles
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(media => media.Id == id);
+    }
+
     public async Task<List<long>> GetAllMediaFileIdsAsync()
     {
         return await dbContext.MediaFiles.Select(m => m.Id).ToListAsync();

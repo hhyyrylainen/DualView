@@ -7,9 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace DualView.GUI.ViewModels;
 
-public sealed class HamburgerMenuItem
+public sealed class HamburgerMenuItem : ViewModelBase
 {
-    public string Title { get; init; } = "";
+    public string Title
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "";
     public ICommand? Command { get; init; }
     public object? Parameter { get; init; }
 }

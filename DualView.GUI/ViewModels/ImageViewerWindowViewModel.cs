@@ -28,6 +28,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     private string currentMediaName = string.Empty;
     private int mediaDisplayVersion;
     private int? previousBrowseIndex;
+    private HamburgerMenuItem? deleteMediaMenuItem;
 
     public delegate void ClipboardTextSetRequested(string text);
 
@@ -96,6 +97,18 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref field, value);
     }
 
+    public bool IsDeleted
+    {
+        get;
+        private set
+        {
+            if (SetProperty(ref field, value) && deleteMediaMenuItem != null)
+            {
+                deleteMediaMenuItem.Title = value ? "Restore" : "Delete";
+            }
+        }
+    }
+
     public string ImageInfo
     {
         get;
@@ -132,11 +145,16 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         // Initialize extra data
         if (source is ServerMediaSource serverMediaSource)
         {
+            HasServerMedia = false;
+            IsDeleted = false;
+            currentConfiguredMediaId = 0;
+            currentMediaFileId = 0;
             _ = LoadMediaFileStatus(serverMediaSource.ServerId);
         }
         else
         {
             HasServerMedia = false;
+            IsDeleted = false;
             IsTemporary = false;
             currentConfiguredMediaId = 0;
             currentMediaFileId = 0;
@@ -304,7 +322,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var media = await clientDatabaseService.GetConfiguredMediaAsync(configuredMediaId);
+            var media = await clientDatabaseService.GetConfiguredMediaAsync(configuredMediaId, false);
             if (media?.MediaFile == null)
             {
                 HasServerMedia = false;
@@ -314,11 +332,12 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             currentConfiguredMediaId = media.Id;
             currentMediaFileId = media.MediaFile.Id;
             HasServerMedia = true;
+            IsDeleted = media.MediaFile.IsDeleted;
             IsTemporary = media.MediaFile.IsTemporary;
         }
         catch (Exception e)
         {
-            windowService?.ShowErrorWindow("Failed to get media keep status", e);
+            windowService?.ShowErrorWindow("Failed to get media status", e);
         }
     }
 
@@ -420,6 +439,13 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Edit This...", Command = new RelayCommand(OpenMediaEditorSetup) });
 
+        deleteMediaMenuItem = new HamburgerMenuItem
+        {
+            Title = "Delete",
+            Command = new RelayCommand(ToggleDeleteMedia),
+        };
+        Hamburger.MenuItems.Add(deleteMediaMenuItem);
+
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Copy ID", Command = new RelayCommand(RequestIDCopy) });
 
@@ -430,6 +456,33 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             { Title = "Edit Contained Folders...", Command = new RelayCommand(EditContainedFolders) });
 
         MainWindowViewModel.AddTrailingMenuItems(Hamburger, windowService);
+    }
+
+    private async void ToggleDeleteMedia()
+    {
+        if (clientDatabaseService == null || !HasServerMedia || currentMediaFileId == 0)
+        {
+            windowService?.ShowNoticeWindow("Only server media can be deleted.");
+            return;
+        }
+
+        try
+        {
+            if (IsDeleted)
+            {
+                await clientDatabaseService.RestoreMediaAsync(currentMediaFileId);
+            }
+            else
+            {
+                await clientDatabaseService.DeleteMediaAsync(currentMediaFileId);
+            }
+
+            IsDeleted = !IsDeleted;
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow(IsDeleted ? "Failed to restore media" : "Failed to delete media", e);
+        }
     }
 
     private void EditContainedFolders()

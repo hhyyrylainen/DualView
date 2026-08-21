@@ -45,6 +45,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     // Media
     public Task<MediaFile?> GetMediaByHashAsync(string hash);
     public Task<MediaFile?> GetMediaByIdAsync(long id);
+    public Task<MediaFile?> GetMediaByIdIncludingDeletedAsync(long id);
 
     public Task SaveMediaFileAsync(MediaFile mediaFile);
     public Task<List<long>> GetAllMediaFileIdsAsync();
