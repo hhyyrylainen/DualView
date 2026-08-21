@@ -1,7 +1,6 @@
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
-using DualView.Shared.Requests;
 
 namespace DualView.Shared.Services;
 
