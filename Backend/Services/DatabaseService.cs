@@ -2380,6 +2380,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var section = await dbContext.UploadSections.Include(s => s.AppliedTags)
             .ThenInclude(tag => tag.Modifiers)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(s => s.Id == sectionId) ?? throw new ArgumentException("Upload section not found");
 
         var appliedTag = await GetOrCreateAppliedTagAsync(tagId, modifierIds, combinedWithAppliedTagId, combineWord);
@@ -2444,6 +2445,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var section = await dbContext.UploadSections.Include(item => item.AppliedTags)
             .ThenInclude(tag => tag.Modifiers)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(item => item.Id == sectionId) ??
             throw new ArgumentException("Upload section not found");
         var storedTag = await GetOrCreateAppliedTagAsync(appliedTag);
