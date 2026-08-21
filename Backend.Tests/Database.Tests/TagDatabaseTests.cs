@@ -169,6 +169,11 @@ public class TagDatabaseTests
         await service.AddParsedAppliedTagToUploadSectionAsync(section.Id, sharedTag.GetDTO());
         await service.AddParsedAppliedTagToCollectionAsync(collectionId, modifiedTag.GetDTO());
         await service.AddParsedAppliedTagToUploadSectionAsync(section.Id, combinedTag.GetDTO());
+        var appliedTagCount = await context.AppliedTags.CountAsync();
+        await service.AddParsedAppliedTagToUploadSectionAsync(section.Id, sharedTag.GetDTO());
+        await service.AddParsedAppliedTagToUploadSectionAsync(section.Id, sharedTag.GetDTO());
+
+        Assert.Equal(appliedTagCount, await context.AppliedTags.CountAsync());
 
         var collectionTags = (await service.GetCollectionAppliedTagsAsync(collectionId))
             .Select(tag => tag.GetDTO()).ToList();
@@ -191,5 +196,28 @@ public class TagDatabaseTests
         Assert.Contains(await service.GetUploadSectionAppliedTagsAsync(section.Id),
             tag => tag.Id == sharedSectionTag.Id);
         Assert.NotNull(await service.GetAppliedTagAsync(sharedCollectionTag.Id));
+    }
+
+    [Fact]
+    public async Task UploadSection_DoesNotAddEquivalentAppliedTagTwice()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var tagId = await service.CreateTagAsync("duplicate test", TagCategory.DescribeCharacterObject);
+        var section = await service.GetOrCreateUploadSectionAsync("Duplicate tag section");
+
+        var firstAppliedTag = new AppliedTag(tagId);
+        var secondAppliedTag = new AppliedTag(tagId);
+        context.AppliedTags.AddRange(firstAppliedTag, secondAppliedTag);
+        await context.SaveChangesAsync();
+        section.AppliedTags.Add(firstAppliedTag);
+        await context.SaveChangesAsync();
+
+        var returnedId = await service.AddAppliedTagToUploadSectionAsync(section.Id, tagId, null, null, null);
+        var sectionTags = await service.GetUploadSectionAppliedTagsAsync(section.Id);
+
+        Assert.Contains(returnedId, new[] { firstAppliedTag.Id, secondAppliedTag.Id });
+        Assert.Single(sectionTags);
+        Assert.Equal(2, await context.AppliedTags.CountAsync());
     }
 }

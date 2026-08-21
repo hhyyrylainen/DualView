@@ -2379,10 +2379,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         long? combinedWithAppliedTagId, string? combineWord)
     {
         var section = await dbContext.UploadSections.Include(s => s.AppliedTags)
+            .ThenInclude(tag => tag.Modifiers)
             .FirstOrDefaultAsync(s => s.Id == sectionId) ?? throw new ArgumentException("Upload section not found");
 
         var appliedTag = await GetOrCreateAppliedTagAsync(tagId, modifierIds, combinedWithAppliedTagId, combineWord);
-        if (section.AppliedTags.All(tag => tag.Id != appliedTag.Id))
+        if (section.AppliedTags.All(tag => !AreEquivalentAppliedTags(tag, appliedTag)))
         {
             section.AppliedTags.Add(appliedTag);
             await SaveAsync();
@@ -2442,10 +2443,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<long> AddParsedAppliedTagToUploadSectionAsync(long sectionId, AppliedTagDTO appliedTag)
     {
         var section = await dbContext.UploadSections.Include(item => item.AppliedTags)
-                          .FirstOrDefaultAsync(item => item.Id == sectionId) ??
-                      throw new ArgumentException("Upload section not found");
+            .ThenInclude(tag => tag.Modifiers)
+            .FirstOrDefaultAsync(item => item.Id == sectionId) ??
+            throw new ArgumentException("Upload section not found");
         var storedTag = await GetOrCreateAppliedTagAsync(appliedTag);
-        if (section.AppliedTags.All(tag => tag.Id != storedTag.Id))
+        if (section.AppliedTags.All(tag => !AreEquivalentAppliedTags(tag, storedTag)))
         {
             section.AppliedTags.Add(storedTag);
             await SaveAsync();
@@ -2975,6 +2977,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Where(tag => tag.TagId == tagId && tag.CombinedWithId == combinedWithAppliedTagId &&
                           tag.CombineWord == combineWord)
             .ToListAsync();
+        foreach (var trackedTag in dbContext.ChangeTracker.Entries<AppliedTag>()
+                     .Where(entry => entry.State != EntityState.Deleted)
+                     .Select(entry => entry.Entity)
+                     .Where(tag => tag.TagId == tagId && tag.CombinedWithId == combinedWithAppliedTagId &&
+                                   tag.CombineWord == combineWord))
+        {
+            if (!candidates.Contains(trackedTag))
+                candidates.Add(trackedTag);
+        }
+
         var existing = candidates.FirstOrDefault(tag => tag.Modifiers.Select(modifier => modifier.Id)
             .OrderBy(id => id).SequenceEqual(requestedModifierIds));
         if (existing != null)
@@ -2995,6 +3007,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         dbContext.AppliedTags.Add(appliedTag);
         return appliedTag;
+    }
+
+    private static bool AreEquivalentAppliedTags(AppliedTag first, AppliedTag second)
+    {
+        return first.TagId == second.TagId && first.CombinedWithId == second.CombinedWithId &&
+               string.Equals(first.CombineWord, second.CombineWord, StringComparison.Ordinal) &&
+               first.Modifiers.Select(modifier => modifier.Id).Order()
+                   .SequenceEqual(second.Modifiers.Select(modifier => modifier.Id).Order());
     }
 
     private async Task<AppliedTag> GetOrCreateAppliedTagAsync(AppliedTagDTO dto)
