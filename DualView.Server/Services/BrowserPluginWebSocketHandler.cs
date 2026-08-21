@@ -164,6 +164,31 @@ public sealed class BrowserPluginWebSocketHandler
                     }, cancellation);
                     break;
                 }
+                case "sendPage":
+                {
+                    var pageUrl = GetRequiredString(message, "pageUrl", "page scan");
+                    logger.LogInformation("Received page URL to scan from the browser plugin: {Url}", pageUrl);
+                    await SendMessageAsync(socket, new BrowserPluginMessage
+                    {
+                        Type = "scanAccepted",
+                        RequestId = message.RequestId,
+                    }, cancellation);
+                    break;
+                }
+                case "scanLink":
+                {
+                    var linkUrl = GetRequiredString(message, "linkUrl", "link scan");
+                    logger.LogInformation("Received link URL to scan from the browser plugin: {Url}", linkUrl);
+
+                    // TODO: determine if it is a link to an image (from extension)
+
+                    await SendMessageAsync(socket, new BrowserPluginMessage
+                    {
+                        Type = "scanAccepted",
+                        RequestId = message.RequestId,
+                    }, cancellation);
+                    break;
+                }
                 default:
                 {
                     logger.LogWarning("Browser plugin sent an unknown message type: {MessageType}", message.Type);
@@ -172,6 +197,18 @@ public sealed class BrowserPluginWebSocketHandler
                 }
             }
         }
+    }
+
+    private static string GetRequiredString(BrowserPluginMessage message, string propertyName, string requestName)
+    {
+        if (!message.Data.TryGetValue(propertyName, out var property) ||
+            property.ValueKind != JsonValueKind.String ||
+            string.IsNullOrWhiteSpace(property.GetString()))
+        {
+            throw new JsonException($"The {requestName} request has no {propertyName}");
+        }
+
+        return property.GetString()!;
     }
 
     private async Task<string?> ReceiveHandshakeStringAsync(WebSocket socket, string? expected,
