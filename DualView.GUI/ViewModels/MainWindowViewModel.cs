@@ -317,6 +317,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     public void OpenCollection(long id, string name)
     {
         navigationHistory.Push((CurrentPath, MainScrollOffset, SearchText));
+        ClearSearchText();
         pendingScrollOffsetRestore = null;
         currentCollectionId = id;
         CurrentCollectionName = name;
@@ -523,6 +524,18 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         Hamburger.Dispose();
         searchDebounceCancellation?.Cancel();
         searchDebounceCancellation?.Dispose();
+    }
+
+    private void ClearSearchText()
+    {
+        if (string.IsNullOrEmpty(searchText))
+            return;
+
+        searchDebounceCancellation?.Cancel();
+        searchDebounceCancellation?.Dispose();
+        searchDebounceCancellation = null;
+        searchText = string.Empty;
+        OnPropertyChanged(nameof(SearchText));
     }
 
     private void ScheduleSearchRefresh()
