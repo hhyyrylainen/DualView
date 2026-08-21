@@ -88,17 +88,17 @@ public class TagDatabaseTests
             appEvents, dataFolderService, mediaProcessingService);
 
         await service.CreateTagAsync("Apple", TagCategory.DescribeCharacterObject);
+        await service.CreateTagAsync("Apple Pie", TagCategory.DescribeCharacterObject);
         await service.CreateTagAsync("Banana", TagCategory.DescribeCharacterObject);
         await service.CreateTagAsync("Cherry", TagCategory.DescribeCharacterObject);
         await service.CreateTagAsync("Pineapple", TagCategory.DescribeCharacterObject);
+        await service.CreateTagAsync("Zapple", TagCategory.DescribeCharacterObject);
 
         // Act
         var results = await service.SearchTagsWildcardAsync("apple");
 
         // Assert
-        Assert.Equal(2, results.Count);
-        Assert.Contains(results, t => t.Name == "apple");
-        Assert.Contains(results, t => t.Name == "pineapple");
+        Assert.Equal(["apple", "apple pie", "zapple", "pineapple"], results.Select(tag => tag.Name));
     }
 
     [Fact]
