@@ -1,0 +1,67 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        x:Class="DualView.GUI.Views.ExportSetupWindow"
+        x:DataType="vm:ExportSetupWindowViewModel"
+        Width="620" Height="620" MinWidth="520" MinHeight="500"
+        Icon="/Assets/logo.ico" Title="{Binding Title}">
+    <Grid RowDefinitions="Auto,*,Auto" Margin="16" RowSpacing="12">
+        <StackPanel Grid.Row="0" Spacing="6">
+            <TextBlock Text="{Binding ProgressText}" TextTrimming="CharacterEllipsis" />
+            <ProgressBar Minimum="0" Maximum="1" Value="{Binding Progress}" Height="18" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Export path" />
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                    <TextBox Grid.Column="0" Text="{Binding ExportPath}" />
+                    <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseExportPath}" />
+                </Grid>
+                <TextBlock Text="Format" />
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <RadioButton Content="Individual files" GroupName="Format"
+                                 IsChecked="{Binding Format, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=IndividualFiles}" />
+                    <RadioButton Content="Zip" GroupName="Format" IsEnabled="False" />
+                </StackPanel>
+                <CheckBox Content="Create a new subfolder with the collection name"
+                          IsChecked="{Binding CreateCollectionSubfolder}" />
+                <TextBlock Text="File naming" />
+                <StackPanel Spacing="4">
+                    <RadioButton Content="Original name" GroupName="NameMode"
+                                 IsChecked="{Binding NameMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=OriginalName}" />
+                    <RadioButton Content="Media Id" GroupName="NameMode"
+                                 IsChecked="{Binding NameMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=MediaId}" />
+                </StackPanel>
+                <CheckBox Content="Prefix names with collection order" IsChecked="{Binding PrefixCollectionOrder}" />
+                <TextBlock Text="Order" />
+                <StackPanel Spacing="4">
+                    <RadioButton Content="Collection order" GroupName="Order"
+                                 IsChecked="{Binding Order, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=CollectionOrder}" />
+                    <RadioButton Content="Created time" GroupName="Order"
+                                 IsChecked="{Binding Order, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=CreatedTime}" />
+                    <RadioButton Content="Last viewed time" GroupName="Order"
+                                 IsChecked="{Binding Order, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=LastViewedTime}" />
+                    <RadioButton Content="Name" GroupName="Order"
+                                 IsChecked="{Binding Order, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Name}" />
+                    <RadioButton Content="Type" GroupName="Order"
+                                 IsChecked="{Binding Order, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=Type}" />
+                </StackPanel>
+                <CheckBox Content="Reverse order" IsChecked="{Binding ReverseOrder}" />
+                <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                    <StackPanel Grid.Column="0" Spacing="4">
+                        <TextBlock Text="Skip first n items" />
+                        <NumericUpDown Minimum="0" Value="{Binding SkipCount}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Spacing="4">
+                        <TextBlock Text="Export limit" />
+                        <NumericUpDown Minimum="1" Value="{Binding ExportLimit}" />
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+            <Button Content="Cancel" Command="{Binding Cancel}" />
+            <Button Content="Export" Command="{Binding Export}" IsEnabled="{Binding !IsExporting}" />
+        </StackPanel>
+    </Grid>
+</Window>
