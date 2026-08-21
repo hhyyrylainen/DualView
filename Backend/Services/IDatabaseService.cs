@@ -64,7 +64,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<CollectionMediaRemovalResult> DeleteCollectionAndImagesAsync(long collectionId);
     public Task<List<Collection>> GetEligibleCollectionsForPurgeAsync(TimeSpan timeSinceDeletion);
 
-    public Task<List<MediaFile>> GetDeletedMediaAsync(int limit);
+    public Task<List<MediaFile>> GetDeletedMediaAsync(int limit, int offset = 0);
     public Task<List<MediaFolder>> GetDeletedMediaFoldersAsync(int limit);
     public Task<List<Collection>> GetDeletedCollectionsAsync(int limit);
     public Task<List<FolderPathDTO>> GetFolderParentFolderPaths(long folderId);

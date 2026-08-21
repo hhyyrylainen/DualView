@@ -337,9 +337,10 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<List<MediaFileDTO>> GetDeletedMediaAsync(int limit)
+    public async Task<List<MediaFileDTO>> GetDeletedMediaAsync(int limit, int offset = 0)
     {
-        return await HttpClient.GetFromJsonAsync<List<MediaFileDTO>>($"api/v1/media/deleted?limit={limit}") ??
+        return await HttpClient.GetFromJsonAsync<List<MediaFileDTO>>(
+                   $"api/v1/media/deleted?limit={limit}&offset={offset}") ??
                new List<MediaFileDTO>();
     }
 

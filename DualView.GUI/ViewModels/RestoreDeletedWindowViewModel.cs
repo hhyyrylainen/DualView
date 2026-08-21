@@ -15,11 +15,15 @@ namespace DualView.GUI.ViewModels;
 
 public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
 {
+    private const int MediaPageSize = 100;
+
     private readonly ILogger<RestoreDeletedWindowViewModel>? logger;
     private readonly IClientDatabaseService? databaseService;
     private readonly IBackendAPI? backendAPI;
     private readonly IWindowService? windowService;
     private readonly IServiceProvider? serviceProvider;
+
+    private int mediaPageIndex;
 
     // Design time constructor
     public RestoreDeletedWindowViewModel()
@@ -70,6 +74,38 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
 
     public void RefreshMedia()
     {
+        _ = LoadMedia();
+    }
+
+    public bool HasPreviousMediaPage => mediaPageIndex > 0;
+
+    public bool HasNextMediaPage
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
+
+    public int MediaPageNumber => mediaPageIndex + 1;
+
+    public void PreviousMediaPage()
+    {
+        if (!HasPreviousMediaPage)
+            return;
+
+        --mediaPageIndex;
+        OnPropertyChanged(nameof(HasPreviousMediaPage));
+        OnPropertyChanged(nameof(MediaPageNumber));
+        _ = LoadMedia();
+    }
+
+    public void NextMediaPage()
+    {
+        if (!HasNextMediaPage)
+            return;
+
+        ++mediaPageIndex;
+        OnPropertyChanged(nameof(HasPreviousMediaPage));
+        OnPropertyChanged(nameof(MediaPageNumber));
         _ = LoadMedia();
     }
 
@@ -160,9 +196,11 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
 
         try
         {
-            var media = await databaseService.GetDeletedMediaAsync(100);
+            var media = await databaseService.GetDeletedMediaAsync(MediaPageSize + 1,
+                mediaPageIndex * MediaPageSize);
+            HasNextMediaPage = media.Count > MediaPageSize;
 
-            var groups = media.GroupBy(m => m.Id)
+            var groups = media.Take(MediaPageSize).GroupBy(m => m.Id)
                 .Select(g =>
                 {
                     var first = g.First();
@@ -179,6 +217,14 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
 
             Dispatcher.UIThread.Post(() =>
             {
+                foreach (var group in DeletedMedia)
+                {
+                    foreach (var config in group.Configurations)
+                    {
+                        config.Dispose();
+                    }
+                }
+
                 DeletedMedia.Clear();
                 foreach (var group in groups)
                 {
@@ -203,27 +249,8 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
             await databaseService.RestoreMediaAsync(configId);
             await WarnAboutUnbalancedPairedCollections(configId);
 
-            Dispatcher.UIThread.Post(() =>
-            {
-                logger?.LogInformation("Restored media config {Id}", configId);
-
-                // Find and remove the config from the list
-                foreach (var group in DeletedMedia)
-                {
-                    var config = group.Configurations.FirstOrDefault(c => c.Id == configId);
-                    if (config != null)
-                    {
-                        config.Dispose();
-                        group.Configurations.Remove(config);
-                        if (group.Configurations.Count == 0)
-                        {
-                            DeletedMedia.Remove(group);
-                        }
-
-                        break;
-                    }
-                }
-            });
+            logger?.LogInformation("Restored media config {Id}", configId);
+            await LoadMedia();
         }
         catch (Exception e)
         {

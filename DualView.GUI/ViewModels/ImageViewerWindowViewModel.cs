@@ -105,6 +105,11 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref field, value) && deleteMediaMenuItem != null)
             {
                 deleteMediaMenuItem.Title = value ? "Restore" : "Delete";
+                ImageInfo = value ? "DELETED" : "Loading...";
+                if (!value)
+                {
+                    CheckMediaDetails(this, EventArgs.Empty);
+                }
             }
         }
     }
@@ -274,7 +279,11 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             // If this happens when immediately on close, then this can get an error
             try
             {
-                if (frame == null)
+                if (IsDeleted)
+                {
+                    ImageInfo = "DELETED";
+                }
+                else if (frame == null)
                 {
                     ImageInfo = "No image loaded";
                 }

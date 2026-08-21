@@ -32,7 +32,7 @@ public class MediaContentController : Controller
     [HttpGet("{mediaId:long}/content")]
     public async Task<ActionResult> GetFullMediaContent([Required] long mediaId)
     {
-        var media = await databaseService.GetMediaByIdAsync(mediaId);
+        var media = await databaseService.GetMediaByIdIncludingDeletedAsync(mediaId);
 
         if (media == null)
             return NotFound();
@@ -53,7 +53,7 @@ public class MediaContentController : Controller
     [HttpGet("{mediaId:long}/thumbnail")]
     public async Task<ActionResult> GetThumbnail([Required] long mediaId)
     {
-        var media = await databaseService.GetMediaByIdAsync(mediaId);
+        var media = await databaseService.GetMediaByIdIncludingDeletedAsync(mediaId);
 
         if (media == null)
             return NotFound();

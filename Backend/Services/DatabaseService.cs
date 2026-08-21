@@ -857,12 +857,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         logger.LogInformation("Purged media file {MediaId}", mediaId);
     }
 
-    public async Task<List<MediaFile>> GetDeletedMediaAsync(int limit)
+    public async Task<List<MediaFile>> GetDeletedMediaAsync(int limit, int offset = 0)
     {
         return await dbContext.MediaFiles
             .IgnoreQueryFilters()
             .Where(m => m.IsDeleted)
             .OrderByDescending(m => m.UpdatedAt)
+            .Skip(offset)
             .Take(limit)
             .ToListAsync();
     }
@@ -887,9 +888,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
-    async Task<List<MediaFileDTO>> IClientDatabaseService.GetDeletedMediaAsync(int limit)
+    async Task<List<MediaFileDTO>> IClientDatabaseService.GetDeletedMediaAsync(int limit, int offset)
     {
-        var media = await GetDeletedMediaAsync(limit);
+        var media = await GetDeletedMediaAsync(limit, offset);
         return media.ConvertToDTO<MediaFile, MediaFileDTO>();
     }
 

@@ -133,9 +133,10 @@ public class MediaController : Controller
     }
 
     [HttpGet("deleted")]
-    public async Task<ActionResult<List<MediaFileDTO>>> GetDeletedMedia([FromQuery] int limit = 100)
+    public async Task<ActionResult<List<MediaFileDTO>>> GetDeletedMedia([FromQuery] int limit = 100,
+        [FromQuery] int offset = 0)
     {
-        return (await databaseService.GetDeletedMediaAsync(limit)).ConvertToDTO<MediaFile, MediaFileDTO>();
+        return (await databaseService.GetDeletedMediaAsync(limit, offset)).ConvertToDTO<MediaFile, MediaFileDTO>();
     }
 
     [HttpPost("{mediaId:long}/restore")]

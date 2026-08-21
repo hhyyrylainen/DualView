@@ -33,7 +33,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<MediaFileDTO> CreateMediaFileAsync(MediaFileDTO mediaFile, long collectionId);
     public Task SaveMediaFileAsync(MediaFileDTO media);
 
-    public Task<List<MediaFileDTO>> GetDeletedMediaAsync(int limit);
+    public Task<List<MediaFileDTO>> GetDeletedMediaAsync(int limit, int offset = 0);
     public Task<List<MediaFolderDTO>> GetDeletedMediaFoldersAsync(int limit);
     public Task<List<CollectionDTO>> GetDeletedCollectionsAsync(int limit);
 
