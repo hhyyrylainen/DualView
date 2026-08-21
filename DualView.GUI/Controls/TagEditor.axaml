@@ -27,12 +27,14 @@
                 <Button Content="Delete selected" Command="{Binding DeleteSelected}" />
                 <Button Content="Tag manager" Command="{Binding OpenTagManager}" />
             </StackPanel>
-            <AutoCompleteBox Grid.Row="1" Text="{Binding TagText}" Margin="0 2"
-                             ItemsSource="{Binding Suggestions}" FilterMode="None"
-                             SelectedItem="{Binding SelectedSuggestion}"
-                             MinimumPrefixLength="1" TextChanged="OnTextChanged"
-                             Background="{Binding EntryBackground}"
-                             PlaceholderText="Type a tag and press Enter" />
+            <Border Grid.Row="1" Margin="0 2" Padding="2" Background="{Binding EntryBackground}">
+                <AutoCompleteBox Text="{Binding TagText}"
+                                 ItemsSource="{Binding Suggestions}" FilterMode="None"
+                                 SelectedItem="{Binding SelectedSuggestion}"
+                                 MinimumPrefixLength="1" TextChanged="OnTextChanged"
+                                 Background="Transparent"
+                                 PlaceholderText="Type a tag and press Enter" />
+            </Border>
         </Grid>
     </Grid>
 </UserControl>

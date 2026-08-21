@@ -85,7 +85,7 @@ public sealed class TagEditorViewModel : ViewModelBase
         private set => SetProperty(ref field, value);
     }
 
-    public IBrush EntryBackground => IsInvalid ? Brushes.MistyRose : Brushes.Transparent;
+    public IBrush EntryBackground => IsInvalid ? Brushes.LightCoral : Brushes.Transparent;
 
     public bool IsInvalid
     {
@@ -280,9 +280,14 @@ public sealed class TagEditorViewModel : ViewModelBase
 
     private async Task FlashInvalidAsync()
     {
-        IsInvalid = true;
-        await Task.Delay(450);
-        IsInvalid = false;
+        for (var flash = 0; flash < 2; ++flash)
+        {
+            IsInvalid = true;
+            await Task.Delay(250);
+            IsInvalid = false;
+            if (flash == 0)
+                await Task.Delay(150);
+        }
     }
 
     private Task AddCollectionTagAsync(long targetId, AppliedTagDTO tag)
