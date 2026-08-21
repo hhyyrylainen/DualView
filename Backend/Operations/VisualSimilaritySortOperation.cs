@@ -82,8 +82,9 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
             var image = new MagickImage(path);
             image.AutoOrient();
 
+            // 96 is a bit too low to get consistent results. So 128 is used for now.
             // TODO: pick the most optimal size
-            image.Resize(new MagickGeometry(96, 96) { IgnoreAspectRatio = true });
+            image.Resize(new MagickGeometry(128, 128) { IgnoreAspectRatio = true });
             images.Add(new SimilarityImage(media.Id, image));
             return true;
         }
