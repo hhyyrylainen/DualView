@@ -225,6 +225,7 @@ sealed class Program
         services.AddTransient<InformationWindowViewModel>();
         services.AddTransient<TextEditWindowViewModel>();
         services.AddTransient<MediaCollectionWindowViewModel>();
+        services.AddTransient<ExportSetupWindowViewModel>();
         services.AddTransient<ImportWindowViewModel>();
         services.AddTransient<ImportSectionWindowViewModel>();
         services.AddTransient<ConfirmationWindowViewModel>();

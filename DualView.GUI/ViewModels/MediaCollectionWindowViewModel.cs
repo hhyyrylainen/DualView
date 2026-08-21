@@ -284,8 +284,36 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public void SendSelectedToImport() => _ = SendSelectedToImportAsync();
     public void DeleteCollection() => _ = DeleteCollectionAsync();
     public void DeleteCollectionAndImages() => _ = DeleteCollectionAndImagesAsync();
-    public void Export() => Placeholder("Export");
-    public void ExportSelected() => Placeholder("Export selected");
+
+    public void Export()
+    {
+        if (Collection == null || windowService == null)
+            return;
+
+        windowService.ShowWindow<ExportSetupWindowViewModel>(export =>
+            export.Initialize(Collection, null));
+    }
+
+    public void ExportSelected()
+    {
+        if (Collection == null || windowService == null)
+            return;
+
+        var selectedIds = CollectionItems
+            .Where(item => item.Selected && item.MediaToShow is ServerMediaSource)
+            .Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId)
+            .ToHashSet();
+
+        if (selectedIds.Count == 0)
+        {
+            windowService.ShowNoticeWindow("No media is selected.");
+            return;
+        }
+
+        windowService.ShowWindow<ExportSetupWindowViewModel>(export =>
+            export.Initialize(Collection, selectedIds));
+    }
+
     public void Placeholder(string action) => windowService?.ShowNoticeWindow($"{action} is not implemented yet.");
 
     public void ShowCollectionInfo()
