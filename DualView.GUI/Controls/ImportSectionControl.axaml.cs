@@ -1,21 +1,39 @@
 using System;
+using System.Linq;
+using Avalonia;
 using System.ComponentModel;
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Layout;
+using DualView.GUI.Models;
 using DualView.GUI.ViewModels;
 
 namespace DualView.GUI.Controls;
 
 public partial class ImportSectionControl : UserControl
 {
+    private static readonly DataFormat<ImportMediaDragData> MediaDragFormat =
+        DataFormat.CreateInProcessFormat<ImportMediaDragData>("DualView.ImportMedia");
+
     private bool expandContent;
     private ImportSectionViewModel? dataContextViewModel;
+    private Point dragStartPoint;
+    private MediaViewer? dragSource;
+    private PointerPressedEventArgs? dragPressedEvent;
+    private bool dragInProgress;
 
     public ImportSectionControl()
     {
         InitializeComponent();
         AttachedToVisualTree += (_, _) => ApplyExpandedLayout();
         DataContextChanged += OnDataContextChanged;
+
+        AddHandler(PointerPressedEvent, OnDragPointerPressed, RoutingStrategies.Bubble, true);
+        AddHandler(PointerMovedEvent, OnDragPointerMoved, RoutingStrategies.Bubble, true);
+        AddHandler(PointerReleasedEvent, OnDragPointerReleased, RoutingStrategies.Bubble, true);
+        AddHandler(DragDrop.DragOverEvent, OnDragOver, RoutingStrategies.Bubble, true);
+        AddHandler(DragDrop.DropEvent, OnDrop, RoutingStrategies.Bubble, true);
     }
 
     /// <summary>
@@ -93,5 +111,103 @@ public partial class ImportSectionControl : UserControl
         {
             _ = viewModel.LoadTargetNameSuggestionsAsync(text ?? string.Empty);
         }
+    }
+
+    private void OnDragPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.Properties.IsLeftButtonPressed || e.Source is not Control source)
+            return;
+
+        dragSource = FindMediaViewer(source);
+        if (dragSource == null)
+            return;
+
+        dragStartPoint = e.GetPosition(this);
+        dragPressedEvent = e;
+        dragInProgress = false;
+    }
+
+    private async void OnDragPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (dragInProgress || dragSource == null || dragPressedEvent == null || !e.Properties.IsLeftButtonPressed ||
+            DataContext is not ImportSectionViewModel viewModel)
+            return;
+
+        var currentPoint = e.GetPosition(this);
+        if (Math.Abs(currentPoint.X - dragStartPoint.X) < 4 && Math.Abs(currentPoint.Y - dragStartPoint.Y) < 4)
+            return;
+
+        if (dragSource.DataContext is not MediaViewerViewModel mediaViewModel ||
+            mediaViewModel.MediaToShow is not ServerMediaSource source)
+            return;
+
+        var mediaIds = viewModel.Media.Where(media => media.Selected)
+            .Select(media => ((ServerMediaSource)media.MediaToShow!).ServerId)
+            .ToList();
+        if (!mediaIds.Contains(source.ServerId))
+            mediaIds.Add(source.ServerId);
+
+        dragInProgress = true;
+        var transfer = new DataTransfer();
+        transfer.Add(DataTransferItem.Create(MediaDragFormat,
+            new ImportMediaDragData(viewModel, mediaIds)));
+        await DragDrop.DoDragDropAsync(dragPressedEvent, transfer, DragDropEffects.Move | DragDropEffects.Copy);
+        dragSource = null;
+        dragPressedEvent = null;
+        dragInProgress = false;
+    }
+
+    private void OnDragPointerReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        dragSource = null;
+        dragPressedEvent = null;
+        dragInProgress = false;
+    }
+
+    private void OnDragOver(object? sender, DragEventArgs e)
+    {
+        if (!e.DataTransfer.Contains(MediaDragFormat) || DataContext is not ImportSectionViewModel)
+            return;
+
+        e.DragEffects = e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            ? DragDropEffects.Copy
+            : DragDropEffects.Move;
+        e.Handled = true;
+    }
+
+    private async void OnDrop(object? sender, DragEventArgs e)
+    {
+        if (DataContext is not ImportSectionViewModel viewModel ||
+            e.DataTransfer.TryGetValue(MediaDragFormat) is not { } dragData)
+        {
+            return;
+        }
+
+        var target = FindMediaViewer(e.Source as Control);
+        var index = target?.DataContext is MediaViewerViewModel targetViewModel
+            ? viewModel.Media.IndexOf(targetViewModel)
+            : viewModel.Media.Count;
+        if (target != null)
+        {
+            var point = e.GetPosition(target);
+            if (point.Y > target.Bounds.Height / 2 || point.X > target.Bounds.Width / 2)
+                ++index;
+        }
+
+        await viewModel.MoveMediaAsync(dragData, index,
+            e.KeyModifiers.HasFlag(KeyModifiers.Control));
+        e.Handled = true;
+    }
+
+    private static MediaViewer? FindMediaViewer(Control? control)
+    {
+        while (control != null)
+        {
+            if (control is MediaViewer mediaViewer)
+                return mediaViewer;
+            control = control.Parent as Control;
+        }
+
+        return null;
     }
 }

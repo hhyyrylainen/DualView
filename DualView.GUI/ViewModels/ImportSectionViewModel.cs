@@ -467,6 +467,76 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public async Task MoveMediaAsync(ImportMediaDragData dragData, int index, bool copy)
+    {
+        if (databaseService == null)
+            return;
+
+        var mediaIds = dragData.MediaIds
+            .Where(mediaId => dragData.SourceSection.Media.Any(media =>
+                ((ServerMediaSource)media.MediaToShow!).ServerId == mediaId))
+            .Distinct()
+            .ToList();
+        if (mediaIds.Count == 0)
+            return;
+
+        if (ReferenceEquals(dragData.SourceSection, this))
+        {
+            if (copy)
+                return;
+
+            var currentIds = Media
+                .Select(media => ((ServerMediaSource)media.MediaToShow!).ServerId)
+                .ToList();
+            var movedIds = currentIds.Where(mediaIds.Contains).ToList();
+            var originalIndex = Math.Clamp(index, 0, currentIds.Count);
+            index -= currentIds.Take(originalIndex).Count(mediaIds.Contains);
+            currentIds.RemoveAll(mediaIds.Contains);
+            index = Math.Clamp(index, 0, currentIds.Count);
+            currentIds.InsertRange(index, movedIds);
+
+            try
+            {
+                await databaseService.ReorderUploadSectionAsync(id, currentIds);
+                await RefreshContentsAsync();
+            }
+            catch (Exception ex)
+            {
+                windowService?.ShowErrorWindow("Failed to reorder images", ex);
+            }
+
+            return;
+        }
+
+        var targetIds = Media
+            .Select(media => ((ServerMediaSource)media.MediaToShow!).ServerId)
+            .ToList();
+
+        try
+        {
+            var idsToAdd = mediaIds.Where(mediaId => !targetIds.Contains(mediaId)).ToList();
+            foreach (var mediaId in idsToAdd)
+                await databaseService.AddMediaToUploadSectionAsync(mediaId, id, targetIds.Count);
+
+            index = Math.Clamp(index, 0, targetIds.Count);
+            targetIds.InsertRange(index, idsToAdd);
+            await databaseService.ReorderUploadSectionAsync(id, targetIds);
+            if (!copy)
+            {
+                await dragData.SourceSection.databaseService!.RemoveMediaFromUploadSectionAsync(
+                    dragData.SourceSection.id, mediaIds);
+            }
+
+            await RefreshContentsAsync();
+            if (!copy)
+                await dragData.SourceSection.RefreshContentsAsync();
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to move images", ex);
+        }
+    }
+
     public async Task RefreshDetailsAsync()
     {
         if (databaseService == null)

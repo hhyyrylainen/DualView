@@ -5,7 +5,8 @@
              xmlns:controls="using:DualView.GUI.Controls"
              x:Class="DualView.GUI.Controls.ImportSectionControl"
              x:DataType="vm:ImportSectionViewModel"
-             d:DesignWidth="800" d:DesignHeight="450">
+             d:DesignWidth="800" d:DesignHeight="450"
+             DragDrop.AllowDrop="True">
 
     <Design.DataContext>
         <vm:ImportSectionViewModel />
