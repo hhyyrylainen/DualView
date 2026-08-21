@@ -19,6 +19,7 @@ public interface IBackendAPI
     public Task<bool> ResumeOperation(long operationId);
     public Task<bool> CancelOperation(long operationId);
     public Task<long> StartCollectionVisualSimilaritySort(long collectionId);
+    public Task<long> StartCollectionVisualSimilaritySort(long collectionId, IReadOnlyList<long> selectedImageIds);
     public Task<long> StartImportSectionVisualSimilaritySort(long sectionId);
     public Task<List<long>> GetCollectionVisualSimilarityOrder(long operationId);
 

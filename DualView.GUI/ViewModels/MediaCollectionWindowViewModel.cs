@@ -343,6 +343,11 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         _ = StartVisualSimilaritySortAsync();
     }
 
+    public void FindMostSimilarToSelection()
+    {
+        _ = FindMostSimilarToSelectionAsync();
+    }
+
     public void ExitVisualSimilarityMode()
     {
         visualSimilarityCancellation?.Cancel();
@@ -741,6 +746,42 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             windowService?.ShowErrorWindow("Failed to sort collection by visual similarity", ex);
+            ExitVisualSimilarityMode();
+        }
+    }
+
+    private async Task FindMostSimilarToSelectionAsync()
+    {
+        if (Collection == null || backendAPI == null || IsVisualSimilarityMode)
+            return;
+
+        var selectedImageIds = GetSelectedMediaIds();
+        if (selectedImageIds.Count == 0)
+        {
+            windowService?.ShowNoticeWindow("Select at least one image first.");
+            return;
+        }
+
+        IsVisualSimilarityMode = true;
+        visualSimilarityOrder = null;
+        VisualSimilarityStatus = "Starting visual similarity search...";
+        searchText = string.Empty;
+        currentPage = 1;
+        OnPropertyChanged(nameof(SearchText));
+        OnPropertyChanged(nameof(CurrentPage));
+
+        visualSimilarityCancellation = new CancellationTokenSource();
+        try
+        {
+            var operationId = await backendAPI.StartCollectionVisualSimilaritySort(Collection.Id, selectedImageIds);
+            await MonitorVisualSimilaritySort(operationId, visualSimilarityCancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to find similar images", ex);
             ExitVisualSimilarityMode();
         }
     }

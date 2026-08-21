@@ -42,6 +42,9 @@
                           IsEnabled="{Binding CanNavigateForwards}" />
                 <MenuItem Header="Sort by visual similarity" Command="{Binding StartVisualSimilaritySort}"
                           IsEnabled="{Binding !IsVisualSimilarityMode}" />
+                <MenuItem Header="Find most similar images to current selection"
+                          Command="{Binding FindMostSimilarToSelection}"
+                          IsEnabled="{Binding !IsVisualSimilarityMode}" />
             </MenuItem>
             <MenuItem Header="Tools">
                 <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />

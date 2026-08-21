@@ -20,8 +20,15 @@ public sealed class CollectionSimilarityService : ICollectionSimilarityService
 
     public Task<long> StartSortByVisualSimilarity(long collectionId)
     {
+        return StartSortByVisualSimilarity(collectionId, []);
+    }
+
+    public Task<long> StartSortByVisualSimilarity(long collectionId, IReadOnlyList<long> selectedImageIds)
+    {
         var operationId = operationsStorage.GetNextOperationId();
-        var operation = new VisualSimilaritySortOperation(operationId, collectionId, logger, scopeFactory);
+        var operation = selectedImageIds.Count == 0
+            ? new VisualSimilaritySortOperation(operationId, collectionId, logger, scopeFactory)
+            : new VisualSimilaritySortOperation(operationId, collectionId, selectedImageIds, logger, scopeFactory);
         operationsStorage.RegisterOperation(operation);
         _ = Task.Run(operation.Run);
         return Task.FromResult(operationId);

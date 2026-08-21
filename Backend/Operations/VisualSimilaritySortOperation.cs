@@ -11,6 +11,7 @@ namespace Backend.Operations;
 public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
 {
     private readonly long collectionId;
+    private readonly IReadOnlyList<long>? selectedImageIds;
     private readonly List<MediaFile> orderedCollectionItems = new();
     private readonly List<MediaFile> imageItems = new();
     private readonly List<SimilarityImage> images = new();
@@ -29,6 +30,12 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
         IServiceScopeFactory scopeFactory) : base(id, logger, scopeFactory)
     {
         this.collectionId = collectionId;
+    }
+
+    public VisualSimilaritySortOperation(long id, long collectionId, IReadOnlyList<long> selectedImageIds,
+        ILogger logger, IServiceScopeFactory scopeFactory) : this(id, collectionId, logger, scopeFactory)
+    {
+        this.selectedImageIds = selectedImageIds;
     }
 
     public override string Name => "Sort by visual similarity";
@@ -62,7 +69,20 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
         var dataFolderService = CreatedScope.ServiceProvider.GetRequiredService<IDataFolderService>();
         storageLocation = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
 
-        imageItems.AddRange(collectionItems.Where(media => !media.IsDeleted && media.MediaType.IsImage()));
+        var collectionImages = collectionItems.Where(media => !media.IsDeleted && media.MediaType.IsImage()).ToList();
+        if (selectedImageIds is { Count: > 0 })
+        {
+            var selectedIds = selectedImageIds.ToHashSet();
+            imageItems.AddRange(selectedImageIds
+                .Select(selectedId => collectionImages.FirstOrDefault(media => media.Id == selectedId))
+                .OfType<MediaFile>()
+                .DistinctBy(media => media.Id));
+            imageItems.AddRange(collectionImages.Where(media => !selectedIds.Contains(media.Id)));
+        }
+        else
+        {
+            imageItems.AddRange(collectionImages);
+        }
 
         groupSize = Math.Max(1, collection.ImageGroupSize);
         similarityScores = new double[imageItems.Count, imageItems.Count];
@@ -91,7 +111,7 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
 
         if (similarityImageIndex < images.Count)
         {
-            var groupEnd = groupSize <= 1
+            var groupEnd = selectedImageIds is { Count: > 0 } || groupSize <= 1
                 ? images.Count
                 : Math.Min((similarityImageIndex / groupSize + 1) * groupSize, images.Count);
             for (var second = similarityImageIndex + 1; second < groupEnd; ++second)
@@ -161,6 +181,13 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
 
     private List<long> BuildSortedImageIds()
     {
+        if (selectedImageIds is { Count: > 0 })
+        {
+            return BuildSelectedImageOrder()
+                .Select(index => images[index].MediaId)
+                .ToList();
+        }
+
         if (groupSize > 1)
         {
             return images.Select((image, index) => (image, index))
@@ -173,6 +200,44 @@ public sealed class VisualSimilaritySortOperation : BaseOperationWithItemCount
         return BuildGreedyInsertedImageOrder()
             .Select(index => images[index].MediaId)
             .ToList();
+    }
+
+    private List<int> BuildSelectedImageOrder()
+    {
+        var selectedIndices = selectedImageIds!
+            .Select(selectedId => images.FindIndex(image => image.MediaId == selectedId))
+            .Where(index => index >= 0)
+            .Distinct()
+            .ToList();
+        var remaining = new HashSet<int>(Enumerable.Range(0, images.Count));
+        foreach (var selectedIndex in selectedIndices)
+            remaining.Remove(selectedIndex);
+
+        var ordered = new List<int>(images.Count);
+
+        foreach (var selectedIndex in selectedIndices)
+        {
+            ordered.Add(selectedIndex);
+
+            if (remaining.Count == 0)
+                continue;
+
+            var closestIndex = remaining
+                .OrderBy(index => similarityScores[selectedIndex, index])
+                .ThenBy(index => index)
+                .First();
+            ordered.Add(closestIndex);
+            remaining.Remove(closestIndex);
+        }
+
+        var remainingByBestMatch = remaining
+            .OrderBy(index => selectedIndices
+                .Select(selectedIndex => similarityScores[selectedIndex, index])
+                .DefaultIfEmpty(double.PositiveInfinity)
+                .Min())
+            .ThenBy(index => index);
+        ordered.AddRange(remainingByBestMatch);
+        return ordered;
     }
 
     private List<int> BuildGreedyInsertedImageOrder()

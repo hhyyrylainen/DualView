@@ -84,6 +84,14 @@ public class HttpBackendAPI : IBackendAPI
         return await response.Content.ReadFromJsonAsync<long>();
     }
 
+    public async Task<long> StartCollectionVisualSimilaritySort(long collectionId, IReadOnlyList<long> selectedImageIds)
+    {
+        var response = await HttpClient.PostAsJsonAsync(
+            $"api/v1/collection/{collectionId}/findMostSimilar", selectedImageIds);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<long>();
+    }
+
     public async Task<long> StartImportSectionVisualSimilaritySort(long sectionId)
     {
         var response = await HttpClient.PostAsync($"api/v1/uploadSection/{sectionId}/sortByVisualSimilarity", null);

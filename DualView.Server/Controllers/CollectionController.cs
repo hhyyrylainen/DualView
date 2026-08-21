@@ -29,6 +29,16 @@ public class CollectionController : Controller
         return await collectionSimilarityService.StartSortByVisualSimilarity(id);
     }
 
+    [HttpPost("{id:long}/findMostSimilar")]
+    public async Task<ActionResult<long>> FindMostSimilar([Required] long id,
+        [FromBody] [Required] List<long> selectedImageIds)
+    {
+        if (selectedImageIds.Count == 0)
+            return BadRequest("At least one image must be selected");
+
+        return await collectionSimilarityService.StartSortByVisualSimilarity(id, selectedImageIds);
+    }
+
     [HttpGet("sortByVisualSimilarity/{operationId:long}")]
     public ActionResult<List<long>> GetVisualSimilarityOrder([Required] long operationId)
     {
