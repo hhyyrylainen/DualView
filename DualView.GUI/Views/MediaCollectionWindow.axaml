@@ -105,13 +105,15 @@
             <ContentControl Grid.Column="0" Margin="6,0" DataContext="{Binding Hamburger}">
                 <controls:HamburgerMenuControl />
             </ContentControl>
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
+            <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,*">
                 <TextBlock Text="{Binding CollectionCreatedAt, StringFormat='Created: {0:g}'}"
                            VerticalAlignment="Center" Margin="8 0" />
-                <TextBlock Text="{Binding CollectionStatistics}" VerticalAlignment="Center" Margin="10 0 0 0" />
-                <TextBlock Text="{Binding CollectionTags}" VerticalAlignment="Center" Margin="10 0 0 0" MaxLines="1"
+                <TextBlock Grid.Column="1" Text="{Binding CollectionStatistics}" VerticalAlignment="Center"
+                           Margin="10 0 0 0" />
+                <TextBlock Grid.Column="2" Text="{Binding CollectionTags}" VerticalAlignment="Center"
+                           Margin="10 0 0 0" MaxLines="2" TextWrapping="Wrap"
                            TextTrimming="CharacterEllipsis" />
-            </StackPanel>
+            </Grid>
             <TextBlock Grid.Column="2" Text="Page " VerticalAlignment="Center" />
             <TextBlock Grid.Column="3" Text="{Binding CurrentPage, StringFormat='{}{0} / '}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="3" Text="{Binding TotalPages}" VerticalAlignment="Center" Margin="45 0 8 0" />

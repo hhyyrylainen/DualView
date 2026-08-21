@@ -12,6 +12,7 @@ using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
+using DualView.Shared.Utils;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -128,7 +129,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     {
         get;
         set => SetProperty(ref field, value);
-    } = "TODO: implement tag fetching";
+    } = string.Empty;
 
     public string SearchText
     {
@@ -262,11 +263,13 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         currentPage = 1;
         OnPropertyChanged(nameof(CurrentPage));
         CollectionScrollOffset = new Vector(0, 0);
+        CollectionTags = string.Empty;
         if (databaseService == null)
             return;
 
         Collection = await databaseService.GetCollectionAsync(id) ??
                      new CollectionDTO(fallbackName ?? "Collection") { Id = id };
+        await LoadCollectionTagsAsync(id);
         collectionBrowse = new CollectionBrowse(id, databaseService, serviceProvider!);
         await RefreshItems();
     }
@@ -463,6 +466,15 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         foreach (var item in CollectionItems)
             item.Dispose();
         Hamburger.Dispose();
+    }
+
+    private async Task LoadCollectionTagsAsync(long id)
+    {
+        if (databaseService == null)
+            return;
+
+        var appliedTags = await databaseService.GetCollectionAppliedTagsAsync(id);
+        CollectionTags = string.Join(", ", appliedTags.Select(AppliedTagText.ToText));
     }
 
     private void SetSelection(bool selected)
