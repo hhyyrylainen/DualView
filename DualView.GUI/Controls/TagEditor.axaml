@@ -11,7 +11,8 @@
     <Grid RowDefinitions="Auto,*,Auto" MinHeight="180">
         <TextBlock Grid.Row="0" Text="Tags" FontWeight="Bold" Margin="2" HorizontalAlignment="Center" />
         <ListBox Grid.Row="1" ItemsSource="{Binding Tags}" SelectedItem="{Binding SelectedTag}"
-                 IsEnabled="{Binding IsEnabled}" Margin="2" KeyDown="OnListKeyDown">
+                 IsEnabled="{Binding IsEnabled}" Margin="2" MaxHeight="250"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto" KeyDown="OnListKeyDown">
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:TagEditorRowViewModel">
                     <Grid ColumnDefinitions="*,Auto" Margin="2">
@@ -28,8 +29,9 @@
             </StackPanel>
             <AutoCompleteBox Grid.Row="1" Text="{Binding TagText}" Margin="0 2"
                              ItemsSource="{Binding Suggestions}" FilterMode="None"
+                             SelectedItem="{Binding SelectedSuggestion}"
                              MinimumPrefixLength="1" TextChanged="OnTextChanged"
-                             KeyDown="OnKeyDown" Background="{Binding EntryBackground}"
+                             Background="{Binding EntryBackground}"
                              PlaceholderText="Type a tag and press Enter" />
         </Grid>
     </Grid>

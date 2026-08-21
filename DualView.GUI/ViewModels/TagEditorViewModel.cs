@@ -30,6 +30,7 @@ public sealed class TagEditorViewModel : ViewModelBase
     private RemoveTagDelegate? removeTag;
 
     private int suggestionVersion;
+    private bool isAddingTag;
 
     // Design-time constructor
     public TagEditorViewModel()
@@ -65,6 +66,12 @@ public sealed class TagEditorViewModel : ViewModelBase
     } = string.Empty;
 
     public TagEditorRowViewModel? SelectedTag
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
+    public string? SelectedSuggestion
     {
         get;
         set => SetProperty(ref field, value);
@@ -181,41 +188,50 @@ public sealed class TagEditorViewModel : ViewModelBase
 
     public async Task AddTagAsync(string text)
     {
-        if (databaseService == null || addTag == null || string.IsNullOrWhiteSpace(text))
+        if (isAddingTag || databaseService == null || addTag == null || string.IsNullOrWhiteSpace(text))
             return;
 
-        AppliedTagDTO? appliedTag;
+        isAddingTag = true;
         try
         {
-            appliedTag = await databaseService.ParseTagAsync(text.Trim());
-            if (appliedTag == null)
+            AppliedTagDTO? appliedTag;
+            try
             {
+                appliedTag = await databaseService.ParseTagAsync(text.Trim());
+                if (appliedTag == null)
+                {
+                    await FlashInvalidAsync();
+                    return;
+                }
+            }
+            catch (Exception)
+            {
+                // Assume server returned an error / can't parse state
                 await FlashInvalidAsync();
                 return;
             }
-        }
-        catch (Exception)
-        {
-            // Assume server returned an error / can't parse state
-            await FlashInvalidAsync();
-            return;
-        }
 
-        var appliedText = AppliedTagText.ToText(appliedTag);
+            var appliedText = AppliedTagText.ToText(appliedTag);
 
-        foreach (var targetId in targetIds)
-        {
-            // TODO: this might be too slow to reload all tags for everything
-            var existingTags = loadTags == null ? [] : await loadTags(targetId);
-            if (existingTags.All(existingTag => !string.Equals(AppliedTagText.ToText(existingTag),
-                    appliedText, StringComparison.OrdinalIgnoreCase)))
+            foreach (var targetId in targetIds)
             {
-                await addTag(targetId, appliedTag);
+                // TODO: this might be too slow to reload all tags for everything
+                var existingTags = loadTags == null ? [] : await loadTags(targetId);
+                if (existingTags.All(existingTag => !string.Equals(AppliedTagText.ToText(existingTag),
+                        appliedText, StringComparison.OrdinalIgnoreCase)))
+                {
+                    await addTag(targetId, appliedTag);
+                }
             }
-        }
 
-        TagText = string.Empty;
-        await RefreshAsync();
+            TagText = string.Empty;
+            SelectedSuggestion = null;
+            await RefreshAsync();
+        }
+        finally
+        {
+            isAddingTag = false;
+        }
     }
 
     public void DeleteSelected() => _ = DeleteSelectedAsync();
