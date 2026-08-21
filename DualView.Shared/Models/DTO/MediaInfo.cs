@@ -40,7 +40,6 @@ public class ConfiguredMediaDTO(string name, string hash)
     public bool IsFolder => false;
     public bool IsCollection => false;
     public float Scale { get; set; } = 1;
-    public DateTime UpdatedAt { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public MediaFileDTO MediaFile => this;
@@ -49,6 +48,7 @@ public class ConfiguredMediaDTO(string name, string hash)
     {
         Id = media.Id;
         ImportedAt = media.ImportedAt;
+        UpdatedAt = media.UpdatedAt;
         IsDeleted = media.IsDeleted;
         MediaType = media.MediaType;
         Width = media.Width;

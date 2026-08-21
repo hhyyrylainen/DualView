@@ -17,6 +17,8 @@ public class MediaFileDTO(string originalFileName, string hash) : IMediaFile
 
     public DateTime ImportedAt { get; set; }
 
+    public DateTime UpdatedAt { get; set; }
+
     public DateTime? LastViewed { get; set; }
 
     public bool IsDeleted { get; set; }

@@ -407,6 +407,8 @@ public class RestoreDeletedWindowViewModel : ViewModelBase, IDisposable
                 serviceProvider.GetRequiredService<IWindowService>())
             {
                 MediaToShow = new ServerMediaSource(new ConfiguredMediaInfo(config), serviceProvider),
+                MediaOpenResources = new ShowMediaInSeparateWindow(
+                    serviceProvider.GetRequiredService<IWindowService>(), null),
                 ShowName = false,
                 AutoThumbnailSize = false,
                 ShowingThumbnail = true,
