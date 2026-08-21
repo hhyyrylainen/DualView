@@ -11,6 +11,9 @@ public sealed class BrowserPluginMessage
     [JsonPropertyName("type")]
     public string Type { get; set; } = string.Empty;
 
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; set; }
+
     [JsonExtensionData]
     public Dictionary<string, JsonElement> Data { get; set; } = new();
 }

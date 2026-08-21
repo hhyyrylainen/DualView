@@ -157,7 +157,11 @@ public sealed class BrowserPluginWebSocketHandler
                     downloadRequest.ImpersonationHeaders = impersonationHeaders.Headers.ToDictionary(
                         header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
                     await remoteDownloadService.QueueDownloadAsync(downloadRequest, cancellation);
-                    await SendMessageAsync(socket, new BrowserPluginMessage { Type = "downloadQueued" }, cancellation);
+                    await SendMessageAsync(socket, new BrowserPluginMessage
+                    {
+                        Type = "downloadQueued",
+                        RequestId = message.RequestId,
+                    }, cancellation);
                     break;
                 }
                 default:
