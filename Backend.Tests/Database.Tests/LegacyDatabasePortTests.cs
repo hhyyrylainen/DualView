@@ -209,6 +209,21 @@ public class LegacyDatabasePortTests
     }
 
     [Fact]
+    public async Task TagSuggestions_PutExactTagNameBeforeLongerMatchingNames()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        await service.CreateTagAsync("table", TagCategory.DescribeCharacterObject);
+        await service.CreateTagAsync("red table", TagCategory.DescribeCharacterObject);
+        await service.CreateTagAsync("sturdy table", TagCategory.DescribeCharacterObject);
+        var parser = new TagParser(service);
+
+        var suggestions = await parser.GetSuggestions("tabl");
+
+        Assert.Equal("table", suggestions[0]);
+    }
+
+    [Fact]
     public async Task UploadSection_ProvidesTwoStepImportFlow()
     {
         await using var context = SqliteTestHelpers.CreateContext(seed: true);

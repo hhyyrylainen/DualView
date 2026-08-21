@@ -209,9 +209,25 @@ public class TagParser : ITagParser
             }
         }
 
-        // Sort and deduplicate
-        // TODO: custom sorting like in C++ (DV::SortSuggestions)
-        return result.Distinct().Take(maxCount).OrderBy(s => s).ToList();
+        // Sort and deduplicate. Prefer an exact match, then suggestions that start with the
+        // complete search text, before suggestions that only contain it.
+        return result.Distinct()
+            .OrderBy(s => GetSuggestionMatchRank(s, str))
+            .ThenBy(s => s.Length)
+            .ThenBy(s => s, StringComparer.Ordinal)
+            .Take(maxCount)
+            .ToList();
+    }
+
+    private static int GetSuggestionMatchRank(string suggestion, string search)
+    {
+        if (suggestion.Equals(search, StringComparison.Ordinal))
+            return 0;
+
+        if (suggestion.StartsWith(search, StringComparison.Ordinal))
+            return 1;
+
+        return 2;
     }
 
     private async Task<List<string>> RetrieveTagsMatching(string str)
