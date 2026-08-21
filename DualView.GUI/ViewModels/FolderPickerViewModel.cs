@@ -52,6 +52,8 @@ public class FolderPickerViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     } = "/";
 
+    public long CurrentFolderId => currentFolderId;
+
     public string SelectedPath
     {
         get;

@@ -622,7 +622,8 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         }
 
         _ = TagEditor.RefreshAsync();
-        _ = InitializeFolderPathAsync(section.TargetFolderId);
+        if (FolderPicker.CurrentFolderId != section.TargetFolderId)
+            _ = InitializeFolderPathAsync(section.TargetFolderId);
     }
 
     private void ApplySectionContents(UploadSectionDTO section)
