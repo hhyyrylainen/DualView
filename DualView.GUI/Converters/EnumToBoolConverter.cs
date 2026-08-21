@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using Avalonia.Data;
 using Avalonia.Data.Converters;
 
 namespace DualView.GUI.Converters;
@@ -19,6 +20,9 @@ public class EnumToBoolConverter : IValueConverter
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        throw new NotImplementedException();
+        if (value is not true || parameter == null)
+            return BindingOperations.DoNothing;
+
+        return Enum.Parse(targetType, parameter.ToString()!, true);
     }
 }
