@@ -40,7 +40,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
 
     // TODO: remove these when confirmed are unneeded
     // Compatibility methods
-    public Task<ConfiguredMediaDTO?> GetConfiguredMediaAsync(long mediaConfigId);
+    public Task<ConfiguredMediaDTO?> GetConfiguredMediaAsync(long mediaConfigId, bool isView = true);
     public Task<MediaConfigFolderInfo> GetConfiguredMediaFoldersAsync(long mediaConfigId);
     public Task<List<ConfiguredMediaDTO>> GetConfiguredMediaSiblingsAsync(long mediaConfigId);
     public Task<Tuple<List<ConfiguredMediaInfo>, int>> GetMediaFolderContents(long folderId, int itemPage, int pageSize,

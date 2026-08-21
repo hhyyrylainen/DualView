@@ -17,6 +17,8 @@ public class MediaFileDTO(string originalFileName, string hash) : IMediaFile
 
     public DateTime ImportedAt { get; set; }
 
+    public DateTime? LastViewed { get; set; }
+
     public bool IsDeleted { get; set; }
 
     public bool IsTemporary { get; set; }
@@ -52,6 +54,8 @@ public interface IMediaFile
     public string Hash { get; set; }
 
     public DateTime ImportedAt { get; set; }
+
+    public DateTime? LastViewed { get; set; }
 
     public bool IsDeleted { get; set; }
 

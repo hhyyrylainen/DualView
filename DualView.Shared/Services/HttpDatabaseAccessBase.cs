@@ -403,9 +403,10 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task<ConfiguredMediaDTO?> GetConfiguredMediaAsync(long mediaConfigId)
+    public async Task<ConfiguredMediaDTO?> GetConfiguredMediaAsync(long mediaConfigId, bool isView = true)
     {
-        var media = await GetMediaFileAsync(mediaConfigId);
+        var media = await HttpClient.GetFromJsonAsync<MediaFileDTO?>
+            ($"api/v1/media/{mediaConfigId}?isView={isView.ToString().ToLowerInvariant()}");
         return media != null ? new ConfiguredMediaDTO(media) : null;
     }
 

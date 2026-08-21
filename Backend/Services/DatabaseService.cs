@@ -2759,7 +2759,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     }
 
     // Note: these are dummy compatibility methods that can be deleted when not found useful when converting
-    async Task<ConfiguredMediaDTO?> IClientDatabaseService.GetConfiguredMediaAsync(long mediaConfigId)
+    async Task<ConfiguredMediaDTO?> IClientDatabaseService.GetConfiguredMediaAsync(long mediaConfigId, bool isView)
     {
         var media = await GetMediaByIdAsync(mediaConfigId);
         return media != null ? new ConfiguredMediaDTO(media.GetDTO()) : null;

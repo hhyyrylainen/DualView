@@ -33,7 +33,7 @@ public class MediaController : Controller
     }
 
     [HttpGet("{mediaId:long}")]
-    public async Task<ActionResult<MediaFileDTO>> GetFullMedia([Required] long mediaId)
+    public async Task<ActionResult<MediaFileDTO>> GetFullMedia([Required] long mediaId, bool isView = true)
     {
         var media = await databaseService.GetMediaByIdAsync(mediaId);
 

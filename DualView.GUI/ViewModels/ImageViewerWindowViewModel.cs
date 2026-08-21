@@ -202,7 +202,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                var data = await clientDatabaseService.GetConfiguredMediaAsync(id);
+                var data = await clientDatabaseService.GetConfiguredMediaAsync(id, false);
 
                 if (data?.MediaFile == null)
                     throw new Exception("Media not found");

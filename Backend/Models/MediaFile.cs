@@ -105,6 +105,7 @@ public class MediaFile : UpdateableModel, IDTOProvider<MediaFileDTO>, IMediaFile
         {
             Id = Id,
             ImportedAt = ImportedAt,
+            LastViewed = LastViewed,
             IsDeleted = IsDeleted,
             IsTemporary = IsTemporary,
             MediaType = MediaType,
