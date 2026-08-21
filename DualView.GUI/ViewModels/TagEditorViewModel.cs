@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Media;
 using Avalonia.Threading;
@@ -30,6 +31,7 @@ public sealed class TagEditorViewModel : ViewModelBase
     private RemoveTagDelegate? removeTag;
 
     private int suggestionVersion;
+    private int refreshVersion;
     private bool isAddingTag;
 
     // Design-time constructor
@@ -135,10 +137,19 @@ public sealed class TagEditorViewModel : ViewModelBase
 
     public async Task RefreshAsync()
     {
-        Tags.Clear();
-        SelectedTag = null;
+        var version = Interlocked.Increment(ref refreshVersion);
         if (!IsEnabled || loadTags == null)
+        {
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (version != refreshVersion)
+                    return;
+
+                Tags.Clear();
+                SelectedTag = null;
+            });
             return;
+        }
 
         var allTags = new List<(AppliedTagDTO Tag, string Text, int Count)>();
         foreach (var targetId in targetIds)
@@ -159,10 +170,16 @@ public sealed class TagEditorViewModel : ViewModelBase
             }
         }
 
-        foreach (var item in allTags.OrderBy(item => item.Text, StringComparer.OrdinalIgnoreCase))
+        await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            Tags.Add(new TagEditorRowViewModel(item.Text, item.Count, item.Tag.Id));
-        }
+            if (version != refreshVersion)
+                return;
+
+            Tags.Clear();
+            SelectedTag = null;
+            foreach (var item in allTags.OrderBy(item => item.Text, StringComparer.OrdinalIgnoreCase))
+                Tags.Add(new TagEditorRowViewModel(item.Text, item.Count, item.Tag.Id));
+        });
     }
 
     public async Task LoadSuggestionsAsync(string search)
