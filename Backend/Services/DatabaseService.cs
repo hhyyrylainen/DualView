@@ -1022,7 +1022,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await sectionNames.Concat(collectionNames)
             .Distinct()
             .OrderBy(name => name.ToLower().StartsWith(searchLower) ? 0 : 1)
+            .ThenBy(name => name.Contains(search) ? 0 : 1)
             .ThenBy(name => name.ToLower().IndexOf(searchLower))
+            .ThenBy(name => name.Length)
             .ThenBy(name => name)
             .Take(limit)
             .ToListAsync();
