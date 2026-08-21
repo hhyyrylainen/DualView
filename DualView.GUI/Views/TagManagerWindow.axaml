@@ -13,7 +13,9 @@
         <vm:TagManagerWindowViewModel />
     </Design.DataContext>
 
-    <Grid ColumnDefinitions="*, 2*">
+    <TabControl TabStripPlacement="Top">
+        <TabItem Header="Tags">
+            <Grid ColumnDefinitions="*, 2*">
         <!-- Left: Search and List -->
         <Grid RowDefinitions="Auto, *" Margin="10">
             <StackPanel Grid.Row="0" Spacing="5">
@@ -38,7 +40,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="Create New Tag" FontWeight="Bold" FontSize="16" />
                         
-                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto">
+                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center" Margin="0,0,10,0" />
                             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NewTagName, UpdateSourceTrigger=PropertyChanged}" />
 
@@ -58,7 +60,6 @@
                             <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding NewTagImplies}" 
                                      AcceptsReturn="True" Height="60" PlaceholderText="One per line" Margin="0,10,0,0" />
 
-                            <CheckBox Grid.Row="5" Grid.Column="1" Content="Is Private" IsChecked="{Binding NewTagIsPrivate}" Margin="0,10,0,0" />
                         </Grid>
 
                         <Button Content="Create Tag" Command="{Binding CreateNewTag}" HorizontalAlignment="Right" />
@@ -70,7 +71,7 @@
                     <StackPanel Spacing="10">
                         <TextBlock Text="Edit Tag" FontWeight="Bold" FontSize="16" />
 
-                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto">
+                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto">
                             <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center" Margin="0,0,10,0" />
                             <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditTagName}" />
 
@@ -90,7 +91,6 @@
                             <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditTagImplies}" 
                                      AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
 
-                            <CheckBox Grid.Row="5" Grid.Column="1" Content="Is Private" IsChecked="{Binding EditTagIsPrivate}" Margin="0,10,0,0" />
                         </Grid>
 
                         <Button Content="Save Changes" Command="{Binding SaveEditedTag}" HorizontalAlignment="Right" />
@@ -98,5 +98,67 @@
                 </Border>
             </StackPanel>
         </ScrollViewer>
-    </Grid>
+            </Grid>
+        </TabItem>
+
+        <TabItem Header="Modifiers">
+            <Grid ColumnDefinitions="*, 2*">
+                <Grid RowDefinitions="Auto, *" Margin="10">
+                    <StackPanel Grid.Row="0" Spacing="5">
+                        <TextBlock Text="Search Modifiers" FontWeight="Bold" />
+                        <TextBox Text="{Binding ModifierSearchString, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Enter modifier name..." />
+                    </StackPanel>
+
+                    <ListBox Grid.Row="1" ItemsSource="{Binding FoundModifiers}"
+                             SelectedItem="{Binding SelectedModifier}" Margin="0,10,0,0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+
+                <ScrollViewer Grid.Column="1" Margin="10">
+                    <StackPanel Spacing="20">
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Create New Modifier" FontWeight="Bold" FontSize="16" />
+                                <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NewModifierName}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NewModifierDescription}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+                                </Grid>
+                                <Button Content="Create Modifier" Command="{Binding CreateNewModifier}"
+                                        HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10"
+                                IsVisible="{Binding IsEditingModifier}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Edit Modifier" FontWeight="Bold" FontSize="16" />
+                                <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditModifierName}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Description:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditModifierDescription}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+                                </Grid>
+                                <Button Content="Save Changes" Command="{Binding SaveEditedModifier}"
+                                        HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </TabItem>
+    </TabControl>
 </Window>
