@@ -9,12 +9,14 @@ const GREETING_MESSAGE = "HELODV3";
 const RECONNECT_ALARM = "dualview-web-reconnect";
 const RECONNECT_DELAY_MS = 500;
 const CONNECTION_CHECK_TIMEOUT_MS = 2500;
+const MAX_SERVER_REPLY_TIME_MS = 10000;
 
 let socket;
 let status = "disconnected";
 let statusDetail = "Not connected";
 let reconnectRequested = false;
 let pendingTabIds = new Set();
+let pendingRequests = new Map();
 let pongWaiter;
 
 browser.runtime.onInstalled.addListener(async () => {
@@ -51,6 +53,12 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
   }
 
   switch (info.menuItemId) {
+    case "send-tab":
+      await sendTab(tab);
+      break;
+    case "send-tab-group":
+      await sendTabGroup(tab.windowId);
+      break;
     case "send-page":
       await sendContextMessage(tab.id, {
         type: "sendPage",
@@ -73,6 +81,16 @@ browser.contextMenus.onClicked.addListener(async (info, tab) => {
       }, info.pageUrl);
       break;
   }
+});
+
+browser.contextMenus.onShown.addListener(async (info, tab) => {
+  if (tab?.windowId === undefined) {
+    return;
+  }
+
+  const selectedTabs = await browser.tabs.query({ windowId: tab.windowId, highlighted: true });
+  await browser.contextMenus.update("send-tab-group", { visible: selectedTabs.length > 1 });
+  await browser.contextMenus.refresh();
 });
 
 browser.runtime.onMessage.addListener(async message => {
@@ -107,6 +125,17 @@ browser.runtime.onMessage.addListener(async message => {
 function createContextMenus() {
   browser.contextMenus.removeAll().then(() => {
     browser.contextMenus.create({
+      id: "send-tab",
+      title: "Send to DualView",
+      contexts: ["tab"],
+    });
+    browser.contextMenus.create({
+      id: "send-tab-group",
+      title: "Send Tab Group to DualView",
+      contexts: ["tab"],
+      visible: false,
+    });
+    browser.contextMenus.create({
       id: "send-page",
       title: "Send to DualView",
       contexts: ["page"],
@@ -122,6 +151,40 @@ function createContextMenus() {
       contexts: ["link"],
     });
   });
+}
+
+async function sendTab(tab) {
+  if (!tab.url) {
+    await showTabToast(tab.id, "This tab does not have a sendable URL.", "error");
+    return;
+  }
+
+  await sendPage(tab, true);
+}
+
+async function sendTabGroup(windowId) {
+  const selectedTabs = (await browser.tabs.query({ windowId, highlighted: true }))
+    .sort((firstTab, secondTab) => firstTab.index - secondTab.index);
+
+  if (selectedTabs.length < 2) {
+    return;
+  }
+
+  for (const tab of selectedTabs) {
+    if (!await sendPage(tab, true)) {
+      return;
+    }
+  }
+}
+
+async function sendPage(tab, waitForAcknowledgement) {
+  const requestId = crypto.randomUUID();
+  return await sendContextMessage(tab.id, {
+    type: "sendPage",
+    pageUrl: tab.url,
+    title: tab.title ?? "",
+    requestId,
+  }, tab.url, requestId, waitForAcknowledgement);
 }
 
 async function getSettings() {
@@ -225,7 +288,12 @@ function handleSocketMessage(event, messageSocket) {
     }
   }
 
-  if (message?.type === "downloadQueued") {
+  if (message?.type === "downloadQueued" || message?.type === "scanAccepted") {
+    if (message.requestId && pendingRequests.has(message.requestId)) {
+      const resolveRequest = pendingRequests.get(message.requestId);
+      pendingRequests.delete(message.requestId);
+      resolveRequest(true);
+    }
     pendingTabIds.clear();
   }
 }
@@ -254,6 +322,11 @@ function handleSocketClosed(event, closedSocket) {
     console.warn("DualView websocket closed:", event.code, reason);
   }
 
+  for (const rejectRequest of pendingRequests.values()) {
+    rejectRequest(false);
+  }
+  pendingRequests.clear();
+
   if (reconnectRequested && closedSocket !== undefined && wasConnected) {
     window.setTimeout(() => connectIfConfigured(), RECONNECT_DELAY_MS);
   }
@@ -274,10 +347,10 @@ function sendPing() {
   }
 }
 
-async function sendContextMessage(tabId, message, pageUrl) {
+async function sendContextMessage(tabId, message, pageUrl, requestId, waitForAcknowledgement = false) {
   if (!await ensureConnection()) {
     await showTabToast(tabId, "DualView is not connected. Open the DualView Web toolbar menu to connect.", "error");
-    return;
+    return false;
   }
 
   const settings = await getSettings();
@@ -285,12 +358,52 @@ async function sendContextMessage(tabId, message, pageUrl) {
     message.cookies = await getRelevantCookies(pageUrl);
   }
 
+  const acknowledgement = waitForAcknowledgement ? waitForRequestAcknowledgement(requestId) : undefined;
   pendingTabIds.add(tabId);
   if (!sendProtocolMessage({ ...message, sentAt: new Date().toISOString() })) {
     pendingTabIds.delete(tabId);
+    if (acknowledgement) {
+      resolvePendingRequest(requestId, false);
+    }
     await showTabToast(tabId, "DualView connection changed. Please try again.", "error");
     await connectIfConfigured();
+    return false;
   }
+
+  if (!waitForAcknowledgement) {
+    return true;
+  }
+
+  const acknowledged = await acknowledgement;
+  if (!acknowledged) {
+    await showTabToast(tabId, "DualView did not accept the tab. The tab group was stopped.", "error");
+  }
+  return acknowledged;
+}
+
+function resolvePendingRequest(requestId, acknowledged) {
+  const resolveRequest = pendingRequests.get(requestId);
+  if (!resolveRequest) {
+    return;
+  }
+
+  pendingRequests.delete(requestId);
+  resolveRequest(acknowledged);
+}
+
+function waitForRequestAcknowledgement(requestId) {
+  return new Promise(resolve => {
+    const timeout = window.setTimeout(() => {
+      if (pendingRequests.delete(requestId)) {
+        resolve(false);
+      }
+    }, MAX_SERVER_REPLY_TIME_MS);
+
+    pendingRequests.set(requestId, acknowledged => {
+      window.clearTimeout(timeout);
+      resolve(acknowledged);
+    });
+  });
 }
 
 async function getRelevantCookies(pageUrl) {
