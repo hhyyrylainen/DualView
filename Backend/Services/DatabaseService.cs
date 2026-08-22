@@ -20,12 +20,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     private readonly IAppEvents appEvents;
     private readonly IDataFolderService dataFolderService;
     private readonly IMediaProcessingService mediaProcessingService;
+    private readonly IMissingTagService? missingTagService;
 
     private bool disposed;
 
     public DatabaseService(ILogger<DatabaseService> logger, AppDbContext dbContext,
         IEntityUpdateNotifier updateNotifier, IAppEvents appEvents, IDataFolderService dataFolderService,
-        IMediaProcessingService mediaProcessingService)
+        IMediaProcessingService mediaProcessingService, IMissingTagService? missingTagService = null)
     {
         this.logger = logger;
         this.dbContext = dbContext;
@@ -33,6 +34,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         this.appEvents = appEvents;
         this.dataFolderService = dataFolderService;
         this.mediaProcessingService = mediaProcessingService;
+        this.missingTagService = missingTagService;
     }
 
     public async Task InitializeDatabaseAsync()
@@ -2029,6 +2031,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.Tags.AddAsync(tag);
         await SaveAsync();
         await updateNotifier.NotifyTagsUpdated();
+        appEvents.NotifyTagCreated(tag.Name, tag.Id);
         logger.LogInformation("Created tag {TagId} '{TagName}'", tag.Id, tag.Name);
         return tag.Id;
     }
@@ -2655,7 +2658,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<DownloadGallery?> GetDownloadGalleryAsync(long id)
     {
-        return await dbContext.DownloadGalleries.FindAsync(id);
+        return await dbContext.DownloadGalleries
+            .Include(gallery => gallery.AssociatedImports)
+            .FirstOrDefaultAsync(gallery => gallery.Id == id);
     }
 
     public async Task<DownloadGallery?> GetDownloadGalleryByUrlAsync(string url)
@@ -2704,6 +2709,27 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         long second = Math.Max(mediaId1, mediaId2);
 
         return await dbContext.IgnoredDuplicates.AnyAsync(id => id.MediaFileId1 == first && id.MediaFileId2 == second);
+    }
+
+    public async Task<bool> IsIgnoredTagAsync(string tag)
+    {
+        var normalizedTag = tag.Trim().ToLowerInvariant();
+        return await dbContext.IgnoredTags.AnyAsync(item => item.Name == normalizedTag);
+    }
+
+    public async Task AddIgnoredTagAsync(string tag)
+    {
+        var normalizedTag = tag.Trim().ToLowerInvariant();
+        if (normalizedTag.Length == 0 || await IsIgnoredTagAsync(normalizedTag))
+            return;
+        dbContext.IgnoredTags.Add(new IgnoredTag(normalizedTag));
+        await SaveAsync();
+    }
+
+    public async Task ClearIgnoredTagsAsync()
+    {
+        dbContext.IgnoredTags.RemoveRange(await dbContext.IgnoredTags.ToListAsync());
+        await SaveAsync();
     }
 
     // Client-side DTO variants
@@ -3047,6 +3073,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (tag.Id == 0)
             await SaveAsync();
         return tag.Id;
+    }
+
+    async Task<List<MissingTagDTO>> IClientDatabaseService.GetMissingTagsAsync()
+    {
+        return await (missingTagService?.GetMissingTagsAsync() ?? Task.FromResult(new List<MissingTagDTO>()));
     }
 
     private static string NormalizeTagText(string value)

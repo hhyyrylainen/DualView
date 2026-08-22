@@ -780,8 +780,11 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         long? combinedWithAppliedTagId, string? combineWord)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/appliedTag",
-            new AddAppliedTagRequest { TagId = tagId, ModifierIds = modifierIds,
-                CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord });
+            new AddAppliedTagRequest
+            {
+                TagId = tagId, ModifierIds = modifierIds,
+                CombinedWithAppliedTagId = combinedWithAppliedTagId, CombineWord = combineWord
+            });
         response.EnsureSuccessStatusCode();
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
@@ -836,6 +839,23 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
     public async Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id)
     {
         return await HttpClient.GetFromJsonAsync<DownloadGalleryDTO?>($"api/v1/downloadGallery/{id}");
+    }
+
+    public async Task<List<MissingTagDTO>> GetMissingTagsAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<MissingTagDTO>>("api/v1/missingTag") ?? new();
+    }
+
+    public async Task AddIgnoredTagAsync(string tag)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/missingTag/ignore", tag);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task ClearIgnoredTagsAsync()
+    {
+        var response = await HttpClient.PostAsync("api/v1/missingTag/resetIgnored", null);
+        response.EnsureSuccessStatusCode();
     }
 
     private static async Task<string> ReadErrorDescriptionAsync(HttpResponseMessage response)

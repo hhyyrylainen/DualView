@@ -59,6 +59,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     public Task<CollectionMediaRemovalPreview> PreviewCollectionMediaRemovalAsync(long collectionId,
         List<long> mediaIds);
+
     public Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId, List<long> mediaIds);
     public Task UndoCollectionMediaRemovalAsync(CollectionMediaRemovalResult removal);
     public Task<CollectionMediaRemovalResult> DeleteCollectionAndImagesAsync(long collectionId);
@@ -151,4 +152,6 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2);
     public Task RemoveIgnoredDuplicateAsync(long mediaId1, long mediaId2);
     public Task<bool> IsIgnoredDuplicateAsync(long mediaId1, long mediaId2);
+
+    public Task<bool> IsIgnoredTagAsync(string tag);
 }

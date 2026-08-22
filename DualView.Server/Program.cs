@@ -147,6 +147,7 @@ builder.Services.AddSingleton<IOperationsStorage, OperationsStorage>();
 builder.Services.AddSingleton<ITemporaryFolderService, TemporaryFolderService>();
 builder.Services.AddSingleton<IRemoteScanService, RemoteScanService>();
 builder.Services.AddSingleton<IRemoteDownloadService, RemoteDownloadService>();
+builder.Services.AddSingleton<IMissingTagService, MissingTagService>();
 builder.Services.AddScoped<BrowserPluginWebSocketHandler>();
 builder.Services.AddSingleton<IPluginRegistry, PluginRegistry>();
 

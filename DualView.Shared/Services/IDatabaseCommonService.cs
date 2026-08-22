@@ -103,8 +103,10 @@ public interface IDatabaseCommonService
         long? combinedWithAppliedTagId, string? combineWord);
 
     public Task RemoveAppliedTagFromCollectionAsync(long collectionId, long appliedTagId);
+
     public Task<long> AddAppliedTagToUploadSectionAsync(long sectionId, long tagId, List<long>? modifierIds,
         long? combinedWithAppliedTagId, string? combineWord);
+
     public Task RemoveAppliedTagFromUploadSectionAsync(long sectionId, long appliedTagId);
     public Task<long> AddParsedAppliedTagToMediaAsync(long mediaId, AppliedTagDTO appliedTag);
     public Task<long> AddParsedAppliedTagToCollectionAsync(long collectionId, AppliedTagDTO appliedTag);
@@ -117,4 +119,7 @@ public interface IDatabaseCommonService
         string? tagsString);
 
     public Task DeleteDownloadGalleryAsync(long id);
+
+    public Task AddIgnoredTagAsync(string tag);
+    public Task ClearIgnoredTagsAsync();
 }
