@@ -33,6 +33,7 @@ public class AppDbContext : DbContext
 
     public DbSet<MediaImportInfo> MediaImportInfos { get; set; }
     public DbSet<IgnoredDuplicate> IgnoredDuplicates { get; set; }
+    public DbSet<IgnoredTag> IgnoredTags { get; set; }
     public DbSet<DownloadGallery> DownloadGalleries { get; set; }
     public DbSet<ScannedCollection> ScannedCollections { get; set; }
     public DbSet<FoundMedia> FoundMedia { get; set; }
