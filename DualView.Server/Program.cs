@@ -5,6 +5,7 @@ using DualView.Server.Services;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using Backend.Database;
+using Backend.Plugins;
 using Backend.Services;
 using ImageMagick;
 using Microsoft.Data.Sqlite;
@@ -147,6 +148,7 @@ builder.Services.AddSingleton<ITemporaryFolderService, TemporaryFolderService>()
 builder.Services.AddSingleton<IRemoteScanService, RemoteScanService>();
 builder.Services.AddSingleton<IRemoteDownloadService, RemoteDownloadService>();
 builder.Services.AddScoped<BrowserPluginWebSocketHandler>();
+builder.Services.AddSingleton<IPluginRegistry, PluginRegistry>();
 
 // Prerendering compatibility
 builder.Services.AddScoped<IClientDatabaseService, DatabaseService>();
@@ -212,6 +214,8 @@ app.MapHub<RealTimeDataHub>("/hubs/realtime");
 
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 
+var plugins = app.Services.GetRequiredService<IPluginRegistry>();
+
 Task? operationsStop = null;
 
 // Register shutdown actions before running
@@ -227,6 +231,8 @@ lifetime.ApplicationStopping.Register(() =>
         var operations = app.Services.GetRequiredService<IOperationsStorage>();
 
         operationsStop = Task.Run(() => operations.OnAppShutdown());
+
+        plugins.StopAllPlugins().Wait(TimeSpan.FromMinutes(1));
 
         backgroundJobs?.Stop(true, TimeSpan.FromMinutes(1));
         remoteDownloadService?.Stop(true, TimeSpan.FromMinutes(1));
@@ -276,6 +282,7 @@ var maintenanceJobs = app.Services.GetRequiredService<IMaintenanceService>();
 
 backgroundJobs.Start();
 remoteDownloadService.Start();
+plugins.InitializeAllPlugins(app.Services).Wait(TimeSpan.FromMinutes(1));
 
 //
 // Main start of the application

@@ -1,4 +1,5 @@
 using Backend.Models;
+using Backend.Plugins;
 using DualView.Shared.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -8,39 +9,117 @@ namespace Backend.Services;
 /// <summary>
 ///   Coordinates remote scan enrichment and stores remote processing events.
 /// </summary>
-public sealed class RemoteScanService : IRemoteScanService
+public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvider
 {
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly ILogger<RemoteScanService> logger;
+    private readonly IPluginRegistry pluginRegistry;
+
     private readonly SemaphoreSlim eventLock = new(1, 1);
     private readonly List<RemoteScanEvent> events = new();
 
-    public RemoteScanService(IServiceScopeFactory serviceScopeFactory, ILogger<RemoteScanService> logger)
+    private readonly HttpClient httpClient;
+
+    public RemoteScanService(IServiceScopeFactory serviceScopeFactory, ILogger<RemoteScanService> logger,
+        IPluginRegistry pluginRegistry)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
+        this.pluginRegistry = pluginRegistry;
+
+        httpClient = new HttpClient();
     }
 
     public async Task<RemoteDownloadRequest> EnrichDownloadAsync(RemoteDownloadRequest request,
         CancellationToken cancellationToken)
     {
-        // This is intentionally a no-op hook for now. A future scanner can use a fresh scope here
-        // to load site-specific services, fetch the referrer, add tags, or create a download gallery.
-        using var scope = serviceScopeFactory.CreateScope();
-        await RecordEventInternalAsync(new RemoteScanEvent
-        {
-            EventType = "download-enrichment-requested",
-            ImageUrl = request.ImageUrl,
+        var plugins = pluginRegistry.GetRemoteDownloadPlugins();
+        bool enriched = false;
 
-            // TODO: split remote scan events into "internal" and user-readable ones, and set a duration after which
-            // they get cleared
-        }, cancellationToken);
+        foreach (var remoteDownloadPlugin in plugins)
+        {
+            var pluginSupport = await remoteDownloadPlugin.InspectWebsiteRequest(request, this, cancellationToken);
+
+            if (pluginSupport == UrlInformation.Unknown)
+                continue;
+
+            var updatedRequest = await remoteDownloadPlugin.EnrichDownloadAsync(request, this, cancellationToken);
+
+            if (pluginSupport == UrlInformation.ContentLink)
+            {
+                // This is a direct image link!
+                var temporary = updatedRequest ?? request;
+
+                // Stop scan attempts
+                temporary.LinkUrl = "";
+                temporary.PageUrl = "";
+
+                return temporary;
+            }
+
+            if (updatedRequest != null)
+            {
+                request = updatedRequest;
+                enriched = true;
+                break;
+            }
+        }
+
+        if (enriched)
+        {
+            using var scope = serviceScopeFactory.CreateScope();
+            await RecordEventInternalAsync(new RemoteScanEvent
+            {
+                EventType = "download-enrichment-done",
+                ImageUrl = request.ImageUrl,
+
+                // TODO: split remote scan events into "internal" and user-readable ones, and set a duration after which
+                // they get cleared
+            }, cancellationToken);
+        }
+
         return request;
     }
 
     public async Task RecordEventAsync(RemoteScanEvent scanEvent, CancellationToken cancellationToken)
     {
         await RecordEventInternalAsync(scanEvent, cancellationToken);
+    }
+
+    public async Task<string> DownloadHtmlAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
+    {
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Get, request.HtmlUrl);
+
+        // Set impersonation headers if provided
+        if (request.ImpersonationHeaders is { Count: > 0 })
+        {
+            new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest);
+        }
+        else
+        {
+            // Set a default user agent
+            httpRequest.Headers.TryAddWithoutValidation("User-Agent",
+                "Mozilla/5.0 (X11; Linux x86_64; rv:154.0) Gecko/20100101 Firefox/153.0");
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Referrer) && Uri.TryCreate(request.Referrer, UriKind.Absolute,
+                out var referrer))
+        {
+            httpRequest.Headers.Referrer = referrer;
+        }
+
+        if (request.Cookies.Count > 0)
+        {
+            var cookieHeader = string.Join("; ", request.Cookies.Select(cookie =>
+                $"{cookie.Key}={cookie.Value}"));
+            httpRequest.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
+        }
+
+        using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
     // TODO: add filter parameter for user readable or all, and whether to clear user-readable events or not. These features will allow implementing a GUI.

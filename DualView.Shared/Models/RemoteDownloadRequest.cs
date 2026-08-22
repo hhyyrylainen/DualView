@@ -3,7 +3,8 @@ using System.Text.Json.Serialization;
 namespace DualView.Shared.Models;
 
 /// <summary>
-///   Describes media that should be downloaded and placed into an import section.
+///   Describes media that should be downloaded and placed into an import section. Or to be scanned before finding
+///   the content.
 /// </summary>
 public sealed class RemoteDownloadRequest
 {
@@ -12,6 +13,26 @@ public sealed class RemoteDownloadRequest
     /// </summary>
     [JsonPropertyName("imageUrl")]
     public string ImageUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    ///   Gets or sets the page URL.
+    /// </summary>
+    [JsonPropertyName("pageUrl")]
+    public string PageUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    ///   Gets or sets the page URL to scan for content and subpages.
+    /// </summary>
+    [JsonPropertyName("linkUrl")]
+    public string LinkUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    ///   Optional page title that may be known.
+    /// </summary>
+    [JsonPropertyName("title")]
+    public string PageTitle { get; set; } = string.Empty;
+
+    // TODO: add current page HTML if known
 
     /// <summary>
     ///   Gets or sets the page that referred to the image.
@@ -55,4 +76,31 @@ public sealed class RemoteDownloadRequest
     /// </summary>
     [JsonIgnore]
     public Dictionary<string, string> ImpersonationHeaders { get; set; } = new();
+
+    public bool Enriched { get; set; }
+
+    /// <summary>
+    ///   True if this is a scan request rathen than a direct image download.
+    /// </summary>
+    public bool IsScanRequest => (!string.IsNullOrEmpty(PageUrl) || !string.IsNullOrEmpty(LinkUrl)) &&
+                                 string.IsNullOrEmpty(ImageUrl);
+
+    public string HtmlUrl => !string.IsNullOrEmpty(LinkUrl) ? LinkUrl : PageUrl;
+
+    public RemoteDownloadRequest Clone()
+    {
+        return new RemoteDownloadRequest
+        {
+            ImageUrl = ImageUrl,
+            Cookies = Cookies,
+            ImpersonationHeaders = ImpersonationHeaders,
+            PageUrl = PageUrl,
+            LinkUrl = LinkUrl,
+            PageTitle = PageTitle,
+            DownloadGalleryId = DownloadGalleryId,
+            TargetImportSection = TargetImportSection,
+            OverrideName = OverrideName,
+            Enriched = Enriched,
+        };
+    }
 }
