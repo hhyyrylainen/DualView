@@ -3,6 +3,7 @@ using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Backend.Models;
 using DualView.Server.Models;
 using DualView.Shared.Models;
 using Backend.Services;
@@ -23,18 +24,20 @@ public sealed class BrowserPluginWebSocketHandler
     private readonly ILogger<BrowserPluginWebSocketHandler> logger;
     private readonly IHostApplicationLifetime applicationLifetime;
     private readonly IRemoteDownloadService remoteDownloadService;
+    private readonly IRemoteScanService remoteScanService;
 
     private BrowserImpersonationHeaders impersonationHeaders =
         new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
     public BrowserPluginWebSocketHandler(IServiceScopeFactory serviceScopeFactory,
         ILogger<BrowserPluginWebSocketHandler> logger, IHostApplicationLifetime applicationLifetime,
-        IRemoteDownloadService remoteDownloadService)
+        IRemoteDownloadService remoteDownloadService, IRemoteScanService remoteScanService)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
         this.applicationLifetime = applicationLifetime;
         this.remoteDownloadService = remoteDownloadService;
+        this.remoteScanService = remoteScanService;
     }
 
     // TODO: should we have some key already in the query parameters?
@@ -107,9 +110,10 @@ public sealed class BrowserPluginWebSocketHandler
     ///   Configures an HTTP request with the browser headers captured for this connection.
     /// </summary>
     /// <param name="request">The request to configure.</param>
-    public void ConfigureHttpRequest(HttpRequestMessage request)
+    /// <param name="html">Whether the request is for HTML content.</param>
+    public void ConfigureHttpRequest(HttpRequestMessage request, bool html)
     {
-        impersonationHeaders.ConfigureHttpRequest(request);
+        impersonationHeaders.ConfigureHttpRequest(request, html);
     }
 
     private async Task ProcessMessagesAsync(WebSocket socket, CancellationToken cancellation)
@@ -150,7 +154,7 @@ public sealed class BrowserPluginWebSocketHandler
                 case "sendImage":
                 {
                     var downloadRequest = JsonSerializer.Deserialize<RemoteDownloadRequest>(messageData) ??
-                                           throw new JsonException("The image download request was empty");
+                                          throw new JsonException("The image download request was empty");
                     if (string.IsNullOrWhiteSpace(downloadRequest.ImageUrl))
                         throw new JsonException("The image download request has no image URL");
 
@@ -168,11 +172,14 @@ public sealed class BrowserPluginWebSocketHandler
                 {
                     var pageUrl = GetRequiredString(message, "pageUrl", "page scan");
                     logger.LogInformation("Received page URL to scan from the browser plugin: {Url}", pageUrl);
-                    await SendMessageAsync(socket, new BrowserPluginMessage
-                    {
-                        Type = "scanAccepted",
-                        RequestId = message.RequestId,
-                    }, cancellation);
+
+                    var pageRequest = JsonSerializer.Deserialize<RemoteDownloadRequest>(messageData) ??
+                                      throw new JsonException("The scan request was empty");
+                    if (pageUrl != pageRequest.HtmlUrl)
+                        throw new InvalidOperationException("We failed to parse the page URL request");
+
+                    await HandleScanOrDownloadAsync(socket, cancellation, pageRequest, message);
+
                     break;
                 }
                 case "scanLink":
@@ -180,13 +187,12 @@ public sealed class BrowserPluginWebSocketHandler
                     var linkUrl = GetRequiredString(message, "linkUrl", "link scan");
                     logger.LogInformation("Received link URL to scan from the browser plugin: {Url}", linkUrl);
 
-                    // TODO: determine if it is a link to an image (from extension)
+                    var pageRequest = JsonSerializer.Deserialize<RemoteDownloadRequest>(messageData) ??
+                                      throw new JsonException("The scan request was empty");
+                    if (linkUrl != pageRequest.HtmlUrl)
+                        throw new InvalidOperationException("We failed to parse the page URL request");
 
-                    await SendMessageAsync(socket, new BrowserPluginMessage
-                    {
-                        Type = "scanAccepted",
-                        RequestId = message.RequestId,
-                    }, cancellation);
+                    await HandleScanOrDownloadAsync(socket, cancellation, pageRequest, message);
                     break;
                 }
                 default:
@@ -197,6 +203,98 @@ public sealed class BrowserPluginWebSocketHandler
                 }
             }
         }
+    }
+
+    private async Task HandleScanOrDownloadAsync(WebSocket socket, CancellationToken cancellation,
+        RemoteDownloadRequest pageRequest, BrowserPluginMessage message)
+    {
+        pageRequest.ImpersonationHeaders = impersonationHeaders.Headers.ToDictionary(
+            header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
+
+        using var cancellationSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        var linked =
+            CancellationTokenSource.CreateLinkedTokenSource(cancellationSource.Token, cancellation);
+
+        // Inspect URL to know what it is actually
+        var result = await remoteScanService.InspectUrlAsync(pageRequest, linked.Token);
+
+        if (result == UrlInformation.Unknown)
+        {
+            logger.LogWarning("Unknown URL attempted to be scanned: {Url}", pageRequest.HtmlUrl);
+            await SendMessageAsync(socket, new BrowserPluginMessage
+            {
+                Type = "error",
+                RequestId = message.RequestId,
+                Message = "Unsupported website",
+            }, cancellation);
+            return;
+        }
+
+        if (result == UrlInformation.ContentLink)
+        {
+            // A direct image!
+            logger.LogInformation("It is a direct image link, will scan it");
+            pageRequest.ImageUrl = pageRequest.HtmlUrl;
+            await remoteDownloadService.QueueDownloadAsync(pageRequest, cancellation);
+
+            await SendMessageAsync(socket, new BrowserPluginMessage
+            {
+                Type = "scanAccepted",
+                RequestId = message.RequestId,
+            }, cancellation);
+            return;
+        }
+
+        // It is something to scan, so start a scan operation
+
+        // If it is a single content, we want to scan it and then put the media into an import section immediately
+        if ((result & UrlInformation.ContentPage) == UrlInformation.ContentPage)
+        {
+            logger.LogInformation("It is a content page link, will scan it and add the result media immediately");
+
+            // This will scan immediately and throw on error. Though due to queueing, this might take a tiny bit
+            // of time to finish.
+            var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
+
+            if (scanResult.Content is { Count: > 0 })
+            {
+                foreach (var foundContent in scanResult.Content)
+                {
+                    await remoteDownloadService.QueueDownloadAsync(foundContent, cancellation);
+                }
+
+                await SendMessageAsync(socket, new BrowserPluginMessage
+                {
+                    Type = "scanAccepted",
+                    RequestId = message.RequestId,
+                }, cancellation);
+            }
+            else
+            {
+                logger.LogError("No content found from scanning page");
+                await SendMessageAsync(socket, new BrowserPluginMessage
+                {
+                    Type = "error",
+                    RequestId = message.RequestId,
+                    Message = "No content found from scanning page",
+                }, cancellation);
+            }
+
+            return;
+        }
+
+        logger.LogInformation("Will create a new scan operation for the link");
+
+        // If it is a full gallery, we want to create a scan operation and put it there
+
+        // TODO: implement scan operations!
+        // remoteScanService.
+
+        await SendMessageAsync(socket, new BrowserPluginMessage
+        {
+            Type = "scanAccepted",
+            RequestId = message.RequestId,
+        }, cancellation);
     }
 
     private static string GetRequiredString(BrowserPluginMessage message, string propertyName, string requestName)

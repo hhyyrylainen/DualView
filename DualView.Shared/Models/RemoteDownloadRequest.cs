@@ -15,6 +15,12 @@ public sealed class RemoteDownloadRequest
     public string ImageUrl { get; set; } = string.Empty;
 
     /// <summary>
+    ///  Used to deduplicate requests for the same thing but slightly different URL.
+    /// </summary>
+    [JsonPropertyName("canonicalUrl")]
+    public string? CanonicalUrl { get; set; }
+
+    /// <summary>
     ///   Gets or sets the page URL.
     /// </summary>
     [JsonPropertyName("pageUrl")]

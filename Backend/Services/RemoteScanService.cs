@@ -1,3 +1,4 @@
+using System.Net;
 using AsyncKeyedLock;
 using Backend.Models;
 using Backend.Plugins;
@@ -34,7 +35,22 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         this.logger = logger;
         this.pluginRegistry = pluginRegistry;
 
-        httpClient = new HttpClient();
+        var httpHandler = new SocketsHttpHandler
+        {
+            AutomaticDecompression = DecompressionMethods.All,
+            ConnectTimeout = TimeSpan.FromSeconds(30),
+            KeepAlivePingDelay = TimeSpan.FromMinutes(2),
+            KeepAlivePingPolicy = HttpKeepAlivePingPolicy.Always,
+            KeepAlivePingTimeout = TimeSpan.FromSeconds(10),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(10),
+            UseCookies = false,
+        };
+
+        httpClient = new HttpClient(httpHandler)
+        {
+            Timeout = TimeSpan.FromMinutes(1),
+        };
     }
 
     public async Task<RemoteDownloadRequest> EnrichDownloadAsync(RemoteDownloadRequest request,
@@ -137,9 +153,7 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
             // The first plugin that knows it will do the scan
             if ((result & UrlInformation.GalleryPageContent) != 0)
             {
-                var key = GetDomainForRequestScan(pageRequest);
-
-                using var scanLock = await domainScanLocks.LockAsync(key, cancellation);
+                // Scan lock is taken only when downloading content
 
                 return await plugin.ScanPageAsync(pageRequest, this, cancellation);
             }
@@ -177,7 +191,7 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         // Set impersonation headers if provided
         if (request.ImpersonationHeaders is { Count: > 0 })
         {
-            new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest);
+            new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest, true);
         }
         else
         {
@@ -192,6 +206,8 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
             httpRequest.Headers.Referrer = referrer;
         }
 
+        httpRequest.Headers.Host = new Uri(request.HtmlUrl).Host;
+
         if (request.Cookies.Count > 0)
         {
             var cookieHeader = string.Join("; ", request.Cookies.Select(cookie =>
@@ -199,7 +215,8 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
             httpRequest.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
         }
 
-        using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead,
+        // Read full content as HTML pages are assumed to be quite small
+        using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseContentRead,
             cancellationToken);
         response.EnsureSuccessStatusCode();
 
