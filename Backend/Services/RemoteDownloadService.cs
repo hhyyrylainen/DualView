@@ -2,6 +2,7 @@ using System.Net;
 using System.Threading.Channels;
 using Backend.Models;
 using DualView.Shared.Models;
+using DualView.Shared.Models.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -230,6 +231,8 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         using var scope = serviceScopeFactory.CreateScope();
         var databaseService = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
         var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
+        var tagParser = scope.ServiceProvider.GetRequiredService<ITagParser>();
+        var missingTagService = scope.ServiceProvider.GetRequiredService<IMissingTagService>();
         var section = await databaseService.GetOrCreateUploadSectionAsync(request.TargetImportSection);
 
         // Make sure there is an active upload section to avoid images bundling up as separate sections if we have
@@ -250,6 +253,19 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             ? request.DownloadGalleryId
             : null;
         await databaseService.SaveMediaImportInfoAsync(importInfo);
+
+        foreach (var tag in request.Tags)
+        {
+            var parsedTag = await tagParser.ParseTag(tag);
+            if (parsedTag != null)
+            {
+                await databaseService.AddParsedAppliedTagToMediaAsync(media.Id, parsedTag.GetDTO());
+            }
+            else
+            {
+                await missingTagService.ReportTagAsync(tag, MissingTagTarget.MediaFile, media.Id);
+            }
+        }
     }
 
     private static string GetImportFileName(RemoteDownloadRequest request)
