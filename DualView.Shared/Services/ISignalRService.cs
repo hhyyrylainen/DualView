@@ -18,6 +18,7 @@ public interface ISignalRService
     public event Action? OnUploadSectionsUpdated;
     public event Action<long>? OnUploadSectionUpdated;
     public event Action<long>? OnUploadSectionContentsUpdated;
+    public event Action? OnMissingTagsUpdated;
 
     // True = Connected, False = Disconnected
     public event Action<bool>? OnConnectionStatusChanged;

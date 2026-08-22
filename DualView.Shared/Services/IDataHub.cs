@@ -25,4 +25,5 @@ public interface IDataHub
     public Task UploadSectionsUpdated();
     public Task UploadSectionUpdated(long sectionId);
     public Task UploadSectionContentsUpdated(long sectionId);
+    public Task MissingTagsUpdated();
 }

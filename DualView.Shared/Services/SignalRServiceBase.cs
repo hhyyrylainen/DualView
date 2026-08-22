@@ -20,6 +20,7 @@ public abstract class SignalRServiceBase : ISignalRService
     public event Action? OnUploadSectionsUpdated;
     public event Action<long>? OnUploadSectionUpdated;
     public event Action<long>? OnUploadSectionContentsUpdated;
+    public event Action? OnMissingTagsUpdated;
 
     public event Action<OperationStatusUpdate>? OnBackgroundOperationStatusUpdate;
 
@@ -88,5 +89,7 @@ public abstract class SignalRServiceBase : ISignalRService
             Logger.LogInformation("Received upload section contents update");
             OnUploadSectionContentsUpdated?.Invoke(sectionId);
         });
+
+        hubConnection.On(nameof(IDataHub.MissingTagsUpdated), () => OnMissingTagsUpdated?.Invoke());
     }
 }

@@ -25,4 +25,5 @@ public interface IEntityUpdateNotifier
     public Task NotifyUploadSectionsUpdated();
     public Task NotifyUploadSectionUpdated(long sectionId);
     public Task NotifyUploadSectionContentsUpdated(long sectionId);
+    public Task NotifyMissingTagsUpdated();
 }

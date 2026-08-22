@@ -116,4 +116,10 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
         logger.LogDebug("Broadcasting upload section contents update to all clients");
         await hubContext.Clients.All.UploadSectionContentsUpdated(sectionId);
     }
+
+    public async Task NotifyMissingTagsUpdated()
+    {
+        logger.LogDebug("Broadcasting missing tags update to all clients");
+        await hubContext.Clients.All.MissingTagsUpdated();
+    }
 }
