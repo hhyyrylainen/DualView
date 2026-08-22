@@ -16,11 +16,17 @@ public sealed class BrowserImpersonationHeaders
         "Trailer",
         "Transfer-Encoding",
         "Upgrade",
+        "Origin",
         "Sec-WebSocket-Accept",
         "Sec-WebSocket-Extensions",
         "Sec-WebSocket-Key",
         "Sec-WebSocket-Protocol",
         "Sec-WebSocket-Version",
+        "Sec-Fetch-Mode",
+        "Sec-Fetch-Dest",
+        "Sec-Fetch-Site",
+        "Pragma",
+        "Cache-Control",
     };
 
     /// <summary>
@@ -42,13 +48,16 @@ public sealed class BrowserImpersonationHeaders
     ///   The captured user agent always replaces the request user agent.
     /// </summary>
     /// <param name="request">The request to configure.</param>
-    public void ConfigureHttpRequest(HttpRequestMessage request)
+    /// <param name="htmlRequest">If this is a request for HTML</param>
+    public void ConfigureHttpRequest(HttpRequestMessage request, bool htmlRequest)
     {
         foreach (var header in Headers)
         {
             if (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase) ||
                 HeadersNotSuitableForReplay.Contains(header.Key))
+            {
                 continue;
+            }
 
             if (header.Key.Equals("User-Agent", StringComparison.OrdinalIgnoreCase))
             {
@@ -62,5 +71,21 @@ public sealed class BrowserImpersonationHeaders
 
             request.Headers.TryAddWithoutValidation(header.Key, header.Value);
         }
+
+        // Set some specific headers
+        if (htmlRequest)
+        {
+            request.Headers.Accept.Clear();
+            request.Headers.TryAddWithoutValidation("Accept",
+                "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
+            request.Headers.TryAddWithoutValidation("Priority", "u=0, i");
+            request.Headers.TryAddWithoutValidation("Sec-Fetch-Dest", "document");
+            request.Headers.TryAddWithoutValidation("Sec-Fetch-Mode", "navigate");
+            request.Headers.TryAddWithoutValidation("Sec-Fetch-Site", "none");
+            request.Headers.TryAddWithoutValidation("Sec-Fetch-User", "?1");
+        }
+
+        request.Headers.Connection.ParseAdd("keep-alive");
+        request.Headers.TryAddWithoutValidation("Upgrade-Insecure-Requests", "1");
     }
 }
