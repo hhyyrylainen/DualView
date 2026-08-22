@@ -1,4 +1,5 @@
 using Backend.Models;
+using Backend.Plugins;
 using DualView.Shared.Models;
 
 namespace Backend.Services;
@@ -21,6 +22,16 @@ public interface IRemoteScanService
     /// <param name="cancellationToken">Cancellation</param>
     /// <returns>Info on the URL. If this returns unknown, then nothing can be done</returns>
     public Task<UrlInformation> InspectUrlAsync(RemoteDownloadRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///   Scans a content page.
+    /// </summary>
+    /// <param name="pageRequest">URLs and settings</param>
+    /// <param name="highPriority">True if high-priority / realtime user request</param>
+    /// <param name="cancellation">Cancellation</param>
+    /// <returns>Scan result. Throws on error.</returns>
+    public Task<PageScanResult> ScanContentPage(RemoteDownloadRequest pageRequest, bool highPriority,
+        CancellationToken cancellation);
 
     /// <summary>
     ///   Records a remote scan/download event.

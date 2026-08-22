@@ -4,7 +4,7 @@ using DualView.Shared.Models.DTO;
 
 namespace Backend.Plugins;
 
-public interface IRemoteDownloadPlugin
+public interface IRemoteDownloadPlugin : IPlugin
 {
     /// <summary>
     ///   Checks if this plugin can handle the given request and returns some info.

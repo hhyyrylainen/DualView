@@ -1,3 +1,4 @@
+using AsyncKeyedLock;
 using Backend.Models;
 using Backend.Plugins;
 using DualView.Shared.Models;
@@ -20,6 +21,11 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
     private readonly List<RemoteScanEvent> events = new();
 
     private readonly HttpClient httpClient;
+
+    /// <summary>
+    ///   Used to limit concurrent scans of the same domain.
+    /// </summary>
+    private readonly AsyncKeyedLocker<string> domainScanLocks = new();
 
     public RemoteScanService(IServiceScopeFactory serviceScopeFactory, ILogger<RemoteScanService> logger,
         IPluginRegistry pluginRegistry)
@@ -119,6 +125,43 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         return UrlInformation.Unknown;
     }
 
+    public async Task<PageScanResult> ScanContentPage(RemoteDownloadRequest pageRequest, bool highPriority,
+        CancellationToken cancellation)
+    {
+        var plugins = pluginRegistry.GetRemoteDownloadPlugins();
+
+        foreach (var plugin in plugins)
+        {
+            var result = await plugin.InspectWebsiteRequest(pageRequest, this, cancellation);
+
+            // The first plugin that knows it will do the scan
+            if ((result & UrlInformation.GalleryPageContent) != 0)
+            {
+                var key = GetDomainForRequestScan(pageRequest);
+
+                using var scanLock = await domainScanLocks.LockAsync(key, cancellation);
+
+                return await plugin.ScanPageAsync(pageRequest, this, cancellation);
+            }
+        }
+
+        throw new InvalidOperationException("No plugin found that accepted the scan request");
+    }
+
+    public string GetDomainForRequestScan(RemoteDownloadRequest request)
+    {
+        var target = request.HtmlUrl;
+        if (string.IsNullOrEmpty(target))
+            target = request.ImageUrl;
+
+        return GetDomainForRequestScan(target);
+    }
+
+    public string GetDomainForRequestScan(string url)
+    {
+        return new Uri(url).Host;
+    }
+
     public async Task RecordEventAsync(RemoteScanEvent scanEvent, CancellationToken cancellationToken)
     {
         await RecordEventInternalAsync(scanEvent, cancellationToken);
@@ -126,6 +169,9 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
 
     public async Task<string> DownloadHtmlAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
     {
+        using var scanLock =
+            await domainScanLocks.LockAsync(GetDomainForRequestScan(request.HtmlUrl), cancellationToken);
+
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, request.HtmlUrl);
 
         // Set impersonation headers if provided
