@@ -15,6 +15,11 @@ public abstract class BaseMediaSource(IServiceProvider serviceProvider) : IDispo
 
     protected readonly SemaphoreSlim LoadActionLock = new(1, 1);
 
+    /// <summary>
+    ///   Limits concurrent media decoding to avoid overwhelming the client when many media sources load together
+    /// </summary>
+    protected static readonly SemaphoreSlim ImageDecodingLock = new(4, 4);
+
     protected bool UseAlphaForVideos = true;
 
     protected MagickImage? CurrentFrame;

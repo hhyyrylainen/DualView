@@ -20,11 +20,6 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
         Timeout = TimeSpan.FromSeconds(120),
     };
 
-    /// <summary>
-    ///   Limit concurrency of image decoding to make the overall process not stall for a really long time
-    /// </summary>
-    protected static readonly SemaphoreSlim ImageDecodingLock = new(4, 4);
-
     protected readonly IConfiguredMediaInfo MediaInfo;
 
     public IConfiguredMediaInfo Info => MediaInfo;

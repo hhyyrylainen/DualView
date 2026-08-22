@@ -35,32 +35,40 @@ public class LocalMediaSource : BaseMediaSource, IVisualMediaSource
 
             PrepareForNewMedia();
 
-            if (MediaType.IsImage())
+            await ImageDecodingLock.WaitAsync();
+            try
             {
-                if (MediaType.IsAnimated())
+                if (MediaType.IsImage())
                 {
-                    var collection = new MagickImageCollection();
-                    await collection.ReadAsync(path);
-
-                    foreach (var frame in collection)
+                    if (MediaType.IsAnimated())
                     {
-                        // Apply orientation if the image is rotated by metadata for consistent display
-                        frame.AutoOrient();
-                    }
+                        var collection = new MagickImageCollection();
+                        await collection.ReadAsync(path);
 
-                    LoadImage(null, collection);
+                        foreach (var frame in collection)
+                        {
+                            // Apply orientation if the image is rotated by metadata for consistent display
+                            frame.AutoOrient();
+                        }
+
+                        LoadImage(null, collection);
+                    }
+                    else
+                    {
+                        var image = new MagickImage();
+                        await image.ReadAsync(path);
+                        image.AutoOrient();
+                        LoadImage(image, null);
+                    }
                 }
                 else
                 {
-                    var image = new MagickImage();
-                    await image.ReadAsync(path);
-                    image.AutoOrient();
-                    LoadImage(image, null);
+                    await StartVideo(File.OpenRead(path));
                 }
             }
-            else
+            finally
             {
-                await StartVideo(File.OpenRead(path));
+                ImageDecodingLock.Release();
             }
 
             LoadStatus = IVisualMediaSource.LoadType.FullSize;
@@ -82,39 +90,47 @@ public class LocalMediaSource : BaseMediaSource, IVisualMediaSource
 
             PrepareForNewMedia();
 
-            if (MediaType.IsImage())
+            await ImageDecodingLock.WaitAsync();
+            try
             {
-                if (MediaType.IsAnimated())
+                if (MediaType.IsImage())
                 {
-                    var collection = new MagickImageCollection();
-                    await collection.ReadAsync(path);
-
-                    foreach (var frame in collection)
+                    if (MediaType.IsAnimated())
                     {
-                        frame.AutoOrient();
+                        var collection = new MagickImageCollection();
+                        await collection.ReadAsync(path);
+
+                        foreach (var frame in collection)
+                        {
+                            frame.AutoOrient();
+                        }
+
+                        // When animated, we would need to coalesce to get a smaller size for the thumbnail, so we kind of
+                        // can't resize
+
+                        LoadImage(null, collection);
                     }
+                    else
+                    {
+                        var image = new MagickImage();
+                        await image.ReadAsync(path);
 
-                    // When animated, we would need to coalesce to get a smaller size for the thumbnail, so we kind of
-                    // can't resize
+                        image.AutoOrient();
 
-                    LoadImage(null, collection);
+                        // Make a smaller size for the thumbnail
+                        MediaProcessingService.ResizeWithDivisibleByTwoDimensions(image);
+
+                        LoadImage(image, null);
+                    }
                 }
                 else
                 {
-                    var image = new MagickImage();
-                    await image.ReadAsync(path);
-
-                    image.AutoOrient();
-
-                    // Make a smaller size for the thumbnail
-                    MediaProcessingService.ResizeWithDivisibleByTwoDimensions(image);
-
-                    LoadImage(image, null);
+                    await StartVideo(File.OpenRead(path), true);
                 }
             }
-            else
+            finally
             {
-                await StartVideo(File.OpenRead(path), true);
+                ImageDecodingLock.Release();
             }
 
             LoadStatus = IVisualMediaSource.LoadType.Thumbnail;
