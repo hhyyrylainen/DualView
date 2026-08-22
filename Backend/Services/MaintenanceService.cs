@@ -12,7 +12,7 @@ public class MaintenanceService : IMaintenanceService
     private static readonly TimeSpan OldProcessedFileTime = TimeSpan.FromDays(60);
     private static readonly TimeSpan DeletedImageTime = TimeSpan.FromDays(60);
     private static readonly TimeSpan DeletedCollectionTime = TimeSpan.FromHours(48);
-    private static readonly TimeSpan TemporaryMediaTime = TimeSpan.FromHours(24);
+    private static readonly TimeSpan TemporaryMediaTime = TimeSpan.FromHours(72);
 
     private readonly ILogger<MaintenanceService> logger;
     private readonly IServiceScopeFactory scopeFactory;
