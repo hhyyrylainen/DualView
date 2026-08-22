@@ -201,7 +201,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
     private async Task DownloadAndImportAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
     {
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, request.ImageUrl);
-        new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest);
+        new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest, false);
 
         if (!string.IsNullOrWhiteSpace(request.Referrer) && Uri.TryCreate(request.Referrer, UriKind.Absolute,
                 out var referrer))
@@ -215,6 +215,8 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                 $"{cookie.Key}={cookie.Value}"));
             httpRequest.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
         }
+
+        httpRequest.Headers.Host = new Uri(request.ImageUrl).Host;
 
         using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
