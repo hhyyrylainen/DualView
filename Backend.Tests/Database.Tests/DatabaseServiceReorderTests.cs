@@ -63,6 +63,39 @@ public class DatabaseServiceReorderTests
     }
 
     [Fact]
+    public async Task ReorderUploadSection_IncludesDeletedItemsInOrder()
+    {
+        // Arrange
+        using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+
+        var section = new UploadSection("Test");
+        var media1 = new MediaFile("p1", "h1") { Id = 10 };
+        var deletedMedia = new MediaFile("p2", "h2") { Id = 20 };
+        var media3 = new MediaFile("p3", "h3") { Id = 30 };
+        await context.UploadSections.AddAsync(section);
+        await context.MediaFiles.AddRangeAsync(media1, deletedMedia, media3);
+        await context.UploadSectionItems.AddRangeAsync(
+            new UploadSectionItem { UploadSection = section, MediaFile = media1, Index = 0 },
+            new UploadSectionItem { UploadSection = section, MediaFile = deletedMedia, Index = 1 },
+            new UploadSectionItem { UploadSection = section, MediaFile = media3, Index = 2 });
+        await context.SaveChangesAsync();
+        await service.DeleteMediaAsync(deletedMedia.Id);
+
+        // Act
+        await service.ReorderUploadSectionAsync(section.Id, new List<long> { 30, 10 });
+
+        // Assert
+        var items = await context.UploadSectionItems
+            .IgnoreQueryFilters()
+            .Where(item => item.UploadSectionId == section.Id)
+            .OrderBy(item => item.Index)
+            .ToListAsync();
+        Assert.Equal([30, 10, 20], items.Select(item => item.MediaFileId));
+    }
+
+    [Fact]
     public async Task GetCollectionContents_DefaultsToCollectionOrder()
     {
         // Arrange

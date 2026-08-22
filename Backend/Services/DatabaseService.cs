@@ -1630,6 +1630,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var items = await dbContext.UploadSectionItems
             .Where(item => item.UploadSectionId == sectionId)
+            .IgnoreQueryFilters()
             .ToListAsync();
         var itemsById = items.ToDictionary(item => item.MediaFileId);
 
