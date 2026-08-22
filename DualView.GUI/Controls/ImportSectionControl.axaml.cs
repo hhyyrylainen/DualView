@@ -13,6 +13,8 @@ namespace DualView.GUI.Controls;
 
 public partial class ImportSectionControl : UserControl
 {
+    private const double DragStartThreshold = 8;
+
     private static readonly DataFormat<ImportMediaDragData> MediaDragFormat =
         DataFormat.CreateInProcessFormat<ImportMediaDragData>("DualView.ImportMedia");
 
@@ -134,8 +136,11 @@ public partial class ImportSectionControl : UserControl
             return;
 
         var currentPoint = e.GetPosition(this);
-        if (Math.Abs(currentPoint.X - dragStartPoint.X) < 4 && Math.Abs(currentPoint.Y - dragStartPoint.Y) < 4)
+        if (Math.Abs(currentPoint.X - dragStartPoint.X) < DragStartThreshold &&
+            Math.Abs(currentPoint.Y - dragStartPoint.Y) < DragStartThreshold)
+        {
             return;
+        }
 
         if (dragSource.DataContext is not MediaViewerViewModel mediaViewModel ||
             mediaViewModel.MediaToShow is not ServerMediaSource source)
@@ -184,6 +189,16 @@ public partial class ImportSectionControl : UserControl
         }
 
         var target = FindMediaViewer(e.Source as Control);
+        if (target?.DataContext is MediaViewerViewModel dropTargetViewModel &&
+            ReferenceEquals(dragData.SourceSection, viewModel) &&
+            dropTargetViewModel.MediaToShow is ServerMediaSource targetSource &&
+            dragData.MediaIds.Contains(targetSource.ServerId))
+        {
+            // This should trigger when drag tries to drop onto the same items that are being dragged
+            e.Handled = true;
+            return;
+        }
+
         var index = target?.DataContext is MediaViewerViewModel targetViewModel
             ? viewModel.Media.IndexOf(targetViewModel)
             : viewModel.Media.Count;
