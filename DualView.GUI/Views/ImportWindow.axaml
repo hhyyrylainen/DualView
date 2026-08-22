@@ -47,6 +47,8 @@
                 <ToggleButton IsChecked="{Binding ImportTabSelected}" Command="{Binding SelectImportTab}">Import</ToggleButton>
                 <ToggleButton IsChecked="{Binding ScanTabSelected}" Command="{Binding SelectScanTab}">Scan</ToggleButton>
                 <ToggleButton IsChecked="{Binding StatusTabSelected}" Command="{Binding SelectStatusTab}">Status</ToggleButton>
+                <ToggleButton IsChecked="{Binding MissingTagsTabSelected}" Command="{Binding SelectMissingTagsTab}"
+                              Content="{Binding MissingTagsHeader}" />
                 <Button Command="{Binding OpenUploadWindow}">Upload media</Button>
             </StackPanel>
             <!-- This extra padding is room for the scrollbar -->
@@ -66,6 +68,21 @@
             <TextBlock Grid.Row="1" IsVisible="{Binding StatusTabSelected}"
                        Text="Import status will appear here."
                        Margin="12" />
+            <Grid Grid.Row="1" IsVisible="{Binding MissingTagsTabSelected}" RowDefinitions="Auto,*" Margin="12">
+                <Button Grid.Row="0" Content="Reset ignored tags" Command="{Binding ResetIgnoredTagsAsync}"
+                        HorizontalAlignment="Right" />
+                <ListBox Grid.Row="1" ItemsSource="{Binding MissingTags}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:MissingTagViewModel}">
+                            <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,4">
+                                <TextBlock Text="{Binding Tag}" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Content="Ignore" Command="{Binding Ignore}" Margin="8,0" />
+                                <Button Grid.Column="2" Content="Create" Command="{Binding Create}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
         </Grid>
     </Grid>
 </Window>
