@@ -15,6 +15,14 @@ public interface IRemoteScanService
         CancellationToken cancellationToken);
 
     /// <summary>
+    ///   Inspects a URL and returns information about it. Used to determine what to do with the URL.
+    /// </summary>
+    /// <param name="request">Request with the URL and other info to inspect</param>
+    /// <param name="cancellationToken">Cancellation</param>
+    /// <returns>Info on the URL. If this returns unknown, then nothing can be done</returns>
+    public Task<UrlInformation> InspectUrlAsync(RemoteDownloadRequest request, CancellationToken cancellationToken);
+
+    /// <summary>
     ///   Records a remote scan/download event.
     /// </summary>
     public Task RecordEventAsync(RemoteScanEvent scanEvent, CancellationToken cancellationToken);

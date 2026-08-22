@@ -1,6 +1,7 @@
 using Backend.Models;
 using Backend.Plugins;
 using DualView.Shared.Models;
+using DualView.Shared.Models.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -79,6 +80,43 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         }
 
         return request;
+    }
+
+    public async Task<UrlInformation> InspectUrlAsync(RemoteDownloadRequest request,
+        CancellationToken cancellationToken)
+    {
+        var plugins = pluginRegistry.GetRemoteDownloadPlugins();
+
+        foreach (var plugin in plugins)
+        {
+            var result = await plugin.InspectWebsiteRequest(request, this, cancellationToken);
+            if (result != UrlInformation.Unknown)
+            {
+                // First plugin that knows it returns its info
+                return result;
+            }
+        }
+
+        // No plugin knows this, but we can check if the URL ends with a media extension, and if so, we can assume
+        // it to be a direct download
+        var parsed = new Uri(string.IsNullOrEmpty(request.HtmlUrl) ? request.ImageUrl : request.HtmlUrl);
+        var extension = Uri.UnescapeDataString(parsed.Segments.LastOrDefault() ?? "");
+
+        if (!string.IsNullOrEmpty(extension) && extension.StartsWith("."))
+        {
+            try
+            {
+                _ = MediaTypeExtensions.TypeFromExtension(extension);
+                return UrlInformation.ContentLink;
+            }
+            catch (Exception e)
+            {
+                logger.LogWarning(e, "Unsupported content extension: {Extension}", extension);
+            }
+        }
+
+        logger.LogInformation("URL we can do nothing about: {Url}", request.HtmlUrl);
+        return UrlInformation.Unknown;
     }
 
     public async Task RecordEventAsync(RemoteScanEvent scanEvent, CancellationToken cancellationToken)
