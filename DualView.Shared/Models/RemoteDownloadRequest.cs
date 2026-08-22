@@ -103,4 +103,16 @@ public sealed class RemoteDownloadRequest
             Enriched = Enriched,
         };
     }
+
+    public RemoteDownloadRequest OverrideForScan(string targetScan)
+    {
+        return new RemoteDownloadRequest
+        {
+            Cookies = Cookies,
+            ImpersonationHeaders = ImpersonationHeaders,
+            PageUrl = targetScan,
+            DownloadGalleryId = DownloadGalleryId,
+            TargetImportSection = TargetImportSection,
+        };
+    }
 }
