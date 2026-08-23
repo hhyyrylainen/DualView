@@ -33,6 +33,7 @@
             <Menu Grid.Column="1">
                 <MenuItem Header="File">
                     <MenuItem Header="Export..." Command="{Binding SaveMedia}" />
+                    <MenuItem Header="Refresh" Command="{Binding Refresh}" />
                     <Separator />
                     <MenuItem Header="Close" Click="CloseItem_OnClick" />
                 </MenuItem>

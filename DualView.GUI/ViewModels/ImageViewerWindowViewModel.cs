@@ -218,6 +218,17 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         _ = SendToImportAsync();
     }
 
+    public void Refresh()
+    {
+        var currentMedia = Media.MediaToShow;
+        if (currentMedia == null)
+            return;
+
+        var refreshedMedia = currentMedia.Clone();
+        currentMedia.Dispose();
+        ShowMedia(refreshedMedia, Media.MediaOpenResources, collectionBrowse);
+    }
+
     public void GoToFirstPage()
     {
         if (collectionBrowse == null)
