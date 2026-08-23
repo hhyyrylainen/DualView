@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
@@ -2440,6 +2441,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task AddParsedAppliedTagsToMediaAsync(List<long> mediaIds, List<AppliedTagDTO> appliedTags)
     {
+        var stopWatch = Stopwatch.StartNew();
+
         var distinctMediaIds = mediaIds.Distinct().ToList();
         if (distinctMediaIds.Count == 0 || appliedTags.Count == 0)
         {
@@ -2448,13 +2451,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
 
         var mediaFiles = await dbContext.MediaFiles
-            .Include(media => media.AppliedTags)
             .Where(media => distinctMediaIds.Contains(media.Id))
             .ToListAsync();
         if (mediaFiles.Count != distinctMediaIds.Count)
             throw new ArgumentException("One or more media files were not found");
-
-        int appliedTagCount = 0;
 
         var storedTags = new List<AppliedTag>();
         foreach (var appliedTag in appliedTags)
@@ -2464,11 +2464,26 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                 storedTags.Add(storedTag);
         }
 
+        var storedTagIds = storedTags.Where(tag => tag.Id != 0).Select(tag => tag.Id).ToList();
+        var existingLinkSet = new HashSet<(long MediaId, long AppliedTagId)>();
+        foreach (var storedTagId in storedTagIds)
+        {
+            var mediaIdsWithTag = await dbContext.MediaFiles
+                .Where(media => distinctMediaIds.Contains(media.Id) &&
+                                media.AppliedTags.Any(tag => tag.Id == storedTagId))
+                .Select(media => media.Id)
+                .ToListAsync();
+            foreach (var mediaId in mediaIdsWithTag)
+                existingLinkSet.Add((mediaId, storedTagId));
+        }
+
+        int appliedTagCount = 0;
+
         foreach (var media in mediaFiles)
         {
             foreach (var storedTag in storedTags)
             {
-                if (media.AppliedTags.All(tag => tag.Id != storedTag.Id))
+                if (storedTag.Id == 0 || existingLinkSet.Add((media.Id, storedTag.Id)))
                 {
                     media.AppliedTags.Add(storedTag);
                     ++appliedTagCount;
@@ -2476,8 +2491,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             }
         }
 
-        logger.LogInformation("Bulk applied {appliedTagCount} tags to {mediaCount} media files", appliedTagCount,
-            mediaFiles.Count);
+        logger.LogInformation("Bulk applied {appliedTagCount} tags to {mediaCount} media files in {Duration} ms",
+            appliedTagCount, mediaFiles.Count, stopWatch.ElapsedMilliseconds);
 
         await SaveAsync();
     }
