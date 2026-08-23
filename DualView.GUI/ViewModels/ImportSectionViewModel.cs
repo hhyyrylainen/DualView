@@ -52,6 +52,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
         FolderPicker = new FolderPickerViewModel();
         TagEditor = new TagEditorViewModel();
+        ImageTagEditor = new TagEditorViewModel();
         RemoveAfterImport = true;
         id = -1;
         IsActive = true;
@@ -76,12 +77,14 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         if (windowService != null)
         {
             TagEditor = new TagEditorViewModel(databaseService, windowService);
+            ImageTagEditor = new TagEditorViewModel(databaseService, windowService);
             TagEditor.ConfigureUploadSections([section.Id]);
         }
         else
         {
             // Dummy
             TagEditor = new TagEditorViewModel();
+            ImageTagEditor = new TagEditorViewModel();
         }
 
         id = section.Id;
@@ -93,7 +96,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
         // If one service is given, assume all are available
         FolderPicker = folderPickerLogger != null
-            ? new FolderPickerViewModel(folderPickerLogger, databaseService, windowService, serviceProvider!)
+            ? new FolderPickerViewModel(folderPickerLogger, databaseService, windowService!, serviceProvider!)
             : new FolderPickerViewModel();
         FolderPicker.PropertyChanged += OnFolderPickerPropertyChanged;
         _ = InitializeFolderPathAsync(section.TargetFolderId);
@@ -128,6 +131,13 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     public ObservableCollection<MediaViewerViewModel> Media { get; } = new();
     public FolderPickerViewModel FolderPicker { get; }
     public TagEditorViewModel TagEditor { get; }
+    public TagEditorViewModel ImageTagEditor { get; }
+
+    public MediaViewerViewModel? SelectedImageViewer
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
 
     public long Id => id;
 
@@ -232,11 +242,33 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         ? NormalPreviewScrollViewerHeight * PreviewScrollViewerBigHeightScale
         : NormalPreviewScrollViewerHeight;
 
-    // TODO: implement this (once tag editor works)
     public bool ShowImageTagEditor
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (!SetProperty(ref field, value))
+                return;
+
+            OnPropertyChanged(nameof(ImageListColumnSpan));
+            UpdateSelectedImageViewer();
+        }
+    }
+
+    public int ImageListColumnSpan => ShowImageTagEditor ? 1 : 2;
+
+    public string SelectedMediaText
+    {
+        get
+        {
+            var selected = Media.Where(item => item.Selected).ToList();
+            return selected.Count switch
+            {
+                0 => "No media selected",
+                1 => $"Selected media with ID {((ServerMediaSource)selected[0].MediaToShow!).ServerId}",
+                _ => $"{selected.Count} media selected",
+            };
+        }
     }
 
     public bool AutoDeselectAfterImport
@@ -401,12 +433,15 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
         OnPropertyChanged(nameof(ImageCount));
         OnPropertyChanged(nameof(SelectedCount));
+        UpdateSelectedImageViewer();
     }
 
     public void DeselectAll()
     {
         foreach (var item in Media)
             item.Selected = false;
+
+        UpdateSelectedImageViewer();
     }
 
     public async Task ReverseImagesAsync()
@@ -578,6 +613,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
         FolderPicker.PropertyChanged -= OnFolderPickerPropertyChanged;
         FolderPicker.Dispose();
+        DisposeSelectedImageViewer();
         CancelNameSave();
 
         try
@@ -741,6 +777,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
         OnPropertyChanged(nameof(ImageCount));
         OnPropertyChanged(nameof(SelectedCount));
+        UpdateSelectedImageViewer();
     }
 
     private MediaViewerViewModel CreateMediaViewer(MediaFileDTO media)
@@ -850,6 +887,50 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     private void OnMediaSelectionChanged(object? sender, EventArgs e)
     {
         OnPropertyChanged(nameof(SelectedCount));
+        UpdateSelectedImageViewer();
+    }
+
+    private void UpdateSelectedImageViewer()
+    {
+        OnPropertyChanged(nameof(SelectedMediaText));
+
+        var selected = Media.Where(item => item.Selected).ToList();
+
+        if (!ShowImageTagEditor || selected.Count == 0)
+        {
+            ImageTagEditor.ConfigureMedia([]);
+            DisposeSelectedImageViewer();
+            return;
+        }
+
+        ImageTagEditor.ConfigureMedia(selected.Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId));
+
+        var media = (ServerMediaSource)selected[0].MediaToShow!;
+        if (SelectedImageViewer?.MediaToShow is ServerMediaSource current && current.ServerId == media.ServerId)
+            return;
+
+        DisposeSelectedImageViewer();
+        var viewer = new MediaViewerViewModel(logger ?? NullLogger.Instance, windowService!)
+        {
+            Name = selected[0].Name,
+            MediaToShow = new ServerMediaSource(media.Info, serviceProvider ?? Program.ServiceProvider!),
+            MediaOpenResources = new ShowMediaInSeparateWindow(windowService!, collectionBrowse),
+            ShowingThumbnail = false,
+            AllowPanning = true,
+            CustomWidth = double.NaN,
+            CustomHeight = double.NaN,
+        };
+        SelectedImageViewer = viewer;
+    }
+
+    private void DisposeSelectedImageViewer()
+    {
+        var viewer = SelectedImageViewer;
+        if (viewer == null)
+            return;
+
+        SelectedImageViewer = null;
+        viewer.Dispose();
     }
 
     private double GetPreviewImageWidth() => BigPreviewImages
