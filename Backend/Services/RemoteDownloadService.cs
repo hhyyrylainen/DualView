@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Threading.Channels;
 using Backend.Models;
 using DualView.Shared.Models;
@@ -93,6 +94,9 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
     {
         if (string.IsNullOrWhiteSpace(request.ImageUrl))
             throw new ArgumentException("A remote download requires an image URL", nameof(request));
+
+        if (request.ImageUrl.Equals(request.Referrer, StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException("A remote download cannot have the same URL as the referrer", nameof(request));
 
         await remoteScanService.RecordEventAsync(new RemoteScanEvent
         {

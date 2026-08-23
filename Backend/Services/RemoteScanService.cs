@@ -30,6 +30,7 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
     ///   Used to limit concurrent scans of the same domain.
     /// </summary>
     private readonly AsyncKeyedLocker<string> domainScanLocks = new();
+
     private readonly Channel<ScanWorkItem> scanQueue = Channel.CreateUnbounded<ScanWorkItem>();
 
     private readonly Task scanWorkerTask;
@@ -330,6 +331,7 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
     {
         public RemoteDownloadRequest PageRequest { get; }
         public CancellationToken Cancellation { get; }
+
         public TaskCompletionSource<PageScanResult> Completion { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
 

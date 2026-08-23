@@ -158,6 +158,10 @@ public sealed class BrowserPluginWebSocketHandler
                     if (string.IsNullOrWhiteSpace(downloadRequest.ImageUrl))
                         throw new JsonException("The image download request has no image URL");
 
+                    // Image referrer may not be the same as the image itself. So unset if we didn't get good data.
+                    if (downloadRequest.ImageUrl.Equals(downloadRequest.Referrer, StringComparison.OrdinalIgnoreCase))
+                        downloadRequest.Referrer = null;
+
                     downloadRequest.ImpersonationHeaders = impersonationHeaders.Headers.ToDictionary(
                         header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
                     await remoteDownloadService.QueueDownloadAsync(downloadRequest, cancellation);
