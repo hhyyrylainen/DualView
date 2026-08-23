@@ -47,6 +47,9 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
             UseCookies = false,
         };
 
+        // TODO: determine if this should also disable SSL checking like downloads
+        // httpHandler.SslOptions.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
+
         httpClient = new HttpClient(httpHandler)
         {
             Timeout = TimeSpan.FromMinutes(1),

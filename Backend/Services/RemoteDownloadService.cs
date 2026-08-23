@@ -45,6 +45,10 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             UseCookies = false,
         };
+
+        // Disable HTTPS checking as we basically want files always
+        httpHandler.SslOptions.RemoteCertificateValidationCallback = static (_, _, _, _) => true;
+
         httpClient = new HttpClient(httpHandler)
         {
             Timeout = TimeSpan.FromMinutes(15),
