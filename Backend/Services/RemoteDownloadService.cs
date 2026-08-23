@@ -15,6 +15,7 @@ namespace Backend.Services;
 public sealed class RemoteDownloadService : IRemoteDownloadService
 {
     private const int MaximumAttempts = 10;
+    private const int MaximumCachedUrls = 1000;
 
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly IRemoteScanService remoteScanService;
@@ -22,6 +23,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
     private readonly SemaphoreSlim processingLock = new(1, 1);
     private readonly Channel<RemoteDownloadRequest> downloadQueue = Channel.CreateUnbounded<RemoteDownloadRequest>();
     private readonly HttpClient httpClient;
+    private readonly Dictionary<string, long> recentDownloadUrls = new(StringComparer.Ordinal);
 
     private CancellationTokenSource? cancellationTokenSource;
     private Task? processingTask;
@@ -206,6 +208,31 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
 
     private async Task DownloadAndImportAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
     {
+        using var scope = serviceScopeFactory.CreateScope();
+        var databaseService = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var tagParser = scope.ServiceProvider.GetRequiredService<ITagParser>();
+        var missingTagService = scope.ServiceProvider.GetRequiredService<IMissingTagService>();
+        var section = await databaseService.GetOrCreateUploadSectionAsync(request.TargetImportSection);
+
+        var cachedMediaId = GetCachedMediaId(request);
+        if (cachedMediaId.HasValue)
+        {
+            var cachedMedia = await databaseService.GetMediaByIdIncludingDeletedAsync(cachedMediaId.Value);
+            if (cachedMedia != null)
+            {
+                if (cachedMedia.IsDeleted)
+                    await databaseService.RestoreMediaAsync(cachedMedia.Id);
+
+                await databaseService.SetUploadSectionActiveAsync(section.Id);
+                await databaseService.AddMediaToUploadSectionAsync(cachedMedia.Id, section.Id,
+                    await databaseService.GetNextUploadSectionIndexAsync(section.Id));
+                await ApplyDownloadMetadataAsync(cachedMedia, request, databaseService, tagParser, missingTagService);
+                return;
+            }
+
+            RemoveCachedUrl(request);
+        }
+
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, request.ImageUrl);
         new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest, false);
 
@@ -233,12 +260,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         await responseStream.CopyToAsync(mediaStream, cancellationToken);
         mediaStream.Position = 0;
 
-        using var scope = serviceScopeFactory.CreateScope();
-        var databaseService = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
         var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
-        var tagParser = scope.ServiceProvider.GetRequiredService<ITagParser>();
-        var missingTagService = scope.ServiceProvider.GetRequiredService<IMissingTagService>();
-        var section = await databaseService.GetOrCreateUploadSectionAsync(request.TargetImportSection);
 
         // Make sure there is an active upload section to avoid images bundling up as separate sections if we have
         // a long queue
@@ -246,9 +268,16 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
 
         var media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, section.Name);
 
-        // Image is imported successfully, next update the download source information
+        await ApplyDownloadMetadataAsync(media, request, databaseService, tagParser, missingTagService);
+        AddCachedUrl(request, media.Id);
+    }
+
+    private static async Task ApplyDownloadMetadataAsync(MediaFile media, RemoteDownloadRequest request,
+        IDatabaseService databaseService, ITagParser tagParser, IMissingTagService missingTagService)
+    {
         var importInfo = await databaseService.GetMediaImportInfoAsync(media.Id) ?? new MediaImportInfo(media.Id);
-        importInfo.SourceUrl = request.ImageUrl;
+        if (string.IsNullOrWhiteSpace(importInfo.SourceUrl))
+            importInfo.SourceUrl = request.ImageUrl;
         importInfo.Referrer = request.Referrer;
         importInfo.PreferredName = request.OverrideName;
         importInfo.TagsString = string.Join(", ", request.Tags);
@@ -274,6 +303,39 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         }
 
         await databaseService.AddParsedAppliedTagsToMediaAsync([media.Id], parsedTags);
+    }
+
+    private long? GetCachedMediaId(RemoteDownloadRequest request)
+    {
+        if (recentDownloadUrls.TryGetValue(request.ImageUrl, out var mediaId))
+            return mediaId;
+
+        return !string.IsNullOrWhiteSpace(request.CanonicalUrl) &&
+               recentDownloadUrls.TryGetValue(request.CanonicalUrl, out mediaId)
+            ? mediaId
+            : null;
+    }
+
+    private void AddCachedUrl(RemoteDownloadRequest request, long mediaId)
+    {
+        AddCachedUrl(request.ImageUrl, mediaId);
+        if (!string.IsNullOrWhiteSpace(request.CanonicalUrl))
+            AddCachedUrl(request.CanonicalUrl, mediaId);
+    }
+
+    private void AddCachedUrl(string url, long mediaId)
+    {
+        recentDownloadUrls.Remove(url);
+        recentDownloadUrls[url] = mediaId;
+        while (recentDownloadUrls.Count > MaximumCachedUrls)
+            recentDownloadUrls.Remove(recentDownloadUrls.First().Key);
+    }
+
+    private void RemoveCachedUrl(RemoteDownloadRequest request)
+    {
+        recentDownloadUrls.Remove(request.ImageUrl);
+        if (!string.IsNullOrWhiteSpace(request.CanonicalUrl))
+            recentDownloadUrls.Remove(request.CanonicalUrl);
     }
 
     private static string GetImportFileName(RemoteDownloadRequest request)
