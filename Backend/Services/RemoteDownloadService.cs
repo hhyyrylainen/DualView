@@ -270,7 +270,26 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         // a long queue
         await databaseService.SetUploadSectionActiveAsync(section.Id);
 
-        var media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, section.Name);
+        MediaFile media;
+        try
+        {
+            media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, section.Name);
+        }
+        catch (Exception)
+        {
+            // Try to read the first 200 characters as text from the stream
+            mediaStream.Position = 0;
+
+            using var reader = new StreamReader(mediaStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true,
+                bufferSize: 1024, leaveOpen: true);
+
+            var buffer = new char[200];
+            var charsRead = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
+            var startOfResponse = new string(buffer, 0, charsRead);
+
+            logger.LogError("Cannot decode downloaded data as an image: {StartOfResponse}", startOfResponse);
+            throw;
+        }
 
         await ApplyDownloadMetadataAsync(media, request, databaseService, tagParser, missingTagService);
         AddCachedUrl(request, media.Id);
