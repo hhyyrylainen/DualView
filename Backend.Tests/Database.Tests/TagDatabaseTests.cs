@@ -1,6 +1,7 @@
 using Backend.Database;
 using Backend.Models;
 using Backend.Services;
+using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using DualView.Shared.Utils;
 using Microsoft.EntityFrameworkCore;
@@ -219,5 +220,40 @@ public class TagDatabaseTests
         Assert.Contains(returnedId, new[] { firstAppliedTag.Id, secondAppliedTag.Id });
         Assert.Single(sectionTags);
         Assert.Equal(2, await context.AppliedTags.CountAsync());
+    }
+
+    [Fact]
+    public async Task BulkMediaTagging_ReusesAppliedTagForOverlappingMedia()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var tagId = await service.CreateTagAsync("bulk tag", TagCategory.DescribeCharacterObject);
+
+        var firstMedia = new MediaFile("first.jpg", "bulk-hash-1");
+        var secondMedia = new MediaFile("second.jpg", "bulk-hash-2");
+        var thirdMedia = new MediaFile("third.jpg", "bulk-hash-3");
+        context.MediaFiles.AddRange(firstMedia, secondMedia, thirdMedia);
+        await context.SaveChangesAsync();
+
+        var tag = new AppliedTagDTO(0, tagId);
+        await service.AddParsedAppliedTagsToMediaAsync(
+            [firstMedia.Id, secondMedia.Id], [tag]);
+
+        Assert.Equal(1, await context.AppliedTags.CountAsync());
+        Assert.All(new[] { firstMedia.Id, secondMedia.Id }, mediaId =>
+            Assert.Single(context.MediaFiles
+                .Where(media => media.Id == mediaId)
+                .SelectMany(media => media.AppliedTags)));
+
+        await service.AddParsedAppliedTagsToMediaAsync(
+            [firstMedia.Id, secondMedia.Id, thirdMedia.Id], [tag]);
+
+        Assert.Equal(1, await context.AppliedTags.CountAsync());
+        foreach (var mediaId in new[] { firstMedia.Id, secondMedia.Id, thirdMedia.Id })
+        {
+            var mediaTags = await service.GetMediaAppliedTagsAsync(mediaId);
+            Assert.Single(mediaTags);
+            Assert.Equal(tagId, mediaTags[0].TagId);
+        }
     }
 }
