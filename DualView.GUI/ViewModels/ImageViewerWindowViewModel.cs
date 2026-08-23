@@ -401,14 +401,19 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
                 return;
             }
 
-            currentConfiguredMediaId = media.Id;
-            currentMediaFileId = media.MediaFile.Id;
-            HasServerMedia = true;
-            IsDeleted = media.MediaFile.IsDeleted;
-            IsTemporary = media.MediaFile.IsTemporary;
+            var mediaFileId = media.MediaFile.Id;
+            var tags = await clientDatabaseService.GetMediaAppliedTagsAsync(mediaFileId);
+            var tagsString = string.Join(", ", tags.Select(AppliedTagText.ToText));
 
-            var tags = await clientDatabaseService.GetMediaAppliedTagsAsync(currentMediaFileId);
-            TagsString = string.Join(", ", tags.Select(AppliedTagText.ToText));
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                currentConfiguredMediaId = media.Id;
+                currentMediaFileId = mediaFileId;
+                HasServerMedia = true;
+                IsDeleted = media.MediaFile.IsDeleted;
+                IsTemporary = media.MediaFile.IsTemporary;
+                TagsString = tagsString;
+            });
         }
         catch (Exception e)
         {

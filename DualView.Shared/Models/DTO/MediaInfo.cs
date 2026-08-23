@@ -61,6 +61,7 @@ public class ConfiguredMediaDTO(string name, string hash)
         CropBottom = media.CropBottom;
         ParentMediaId = media.ParentMediaId;
         ImportedAt = media.ImportedAt;
+        IsTemporary = media.IsTemporary;
     }
 
     public void RefreshDerivedStatistics()
