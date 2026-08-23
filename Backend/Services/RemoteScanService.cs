@@ -142,7 +142,9 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         // No plugin knows this, but we can check if the URL ends with a media extension, and if so, we can assume
         // it to be a direct download
         var parsed = new Uri(string.IsNullOrEmpty(request.HtmlUrl) ? request.ImageUrl : request.HtmlUrl);
-        var extension = Uri.UnescapeDataString(parsed.Segments.LastOrDefault() ?? "");
+        var extension = Path.GetExtension(Uri.UnescapeDataString(parsed.Segments.LastOrDefault() ?? ""));
+
+        logger.LogInformation("Checking URL extension: {Extension}", extension);
 
         if (!string.IsNullOrEmpty(extension) && extension.StartsWith("."))
         {
