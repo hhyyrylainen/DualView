@@ -38,6 +38,7 @@
                     <MenuItem Header="Close" Click="CloseItem_OnClick" />
                 </MenuItem>
                 <MenuItem Header="Image">
+                    <MenuItem Header="Copy ID" Command="{Binding RequestIDCopy}" />
                     <MenuItem Header="Send to import" Command="{Binding SendToImport}" />
                     <MenuItem Header="Show collections this is in" Command="{Binding FinCollectionsThisIsIn}" />
                     <Separator />

@@ -84,6 +84,7 @@ public interface IWindowService
 
     public void ShowEditMediaFolders(long mediaConfigurationId);
 
+    // TODO: this no longer makes sense in DualView 3 as media cannot be in folders directly, they must be in a collection (and collection is in a folder)
     public void ShowEditMediaFolders(IConfiguredMediaInfo item);
 
     /// <summary>

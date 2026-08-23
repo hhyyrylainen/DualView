@@ -618,9 +618,6 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Export...", Command = new RelayCommand(SaveMedia) });
 
-        Hamburger.MenuItems.Add(new HamburgerMenuItem
-            { Title = "Edit Contained Folders...", Command = new RelayCommand(EditContainedFolders) });
-
         MainWindowViewModel.AddTrailingMenuItems(Hamburger, windowService);
     }
 
@@ -649,17 +646,5 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         {
             windowService?.ShowErrorWindow(IsDeleted ? "Failed to restore media" : "Failed to delete media", e);
         }
-    }
-
-    private void EditContainedFolders()
-    {
-        var source = Media.MediaToShow;
-        if (source is not ServerMediaSource serverMediaSource)
-        {
-            windowService?.ShowNoticeWindow("Only server media can edit folders.");
-            return;
-        }
-
-        windowService?.ShowEditMediaFolders(serverMediaSource.Info);
     }
 }
