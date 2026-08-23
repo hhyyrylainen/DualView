@@ -1,4 +1,6 @@
 using System;
+using DualView.GUI.Services;
+using DualView.Shared.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace DualView.GUI.ViewModels;
@@ -13,9 +15,9 @@ public sealed class TagEditorWindowViewModel : ViewModelBase, IDisposable
     }
 
     [ActivatorUtilitiesConstructor]
-    public TagEditorWindowViewModel(TagEditorViewModel tagEditor)
+    public TagEditorWindowViewModel(IClientDatabaseService databaseService, IWindowService windowService)
     {
-        TagEditor = tagEditor;
+        TagEditor = new TagEditorViewModel(databaseService, windowService);
     }
 
     public TagEditorViewModel TagEditor { get; }
