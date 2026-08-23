@@ -23,7 +23,7 @@
             </ListBox.ItemTemplate>
         </ListBox>
         <Grid Grid.Row="2" RowDefinitions="Auto,Auto" Margin="2">
-            <StackPanel Orientation="Horizontal" Spacing="4">
+            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
                 <Button Content="Delete selected" Command="{Binding DeleteSelected}" />
                 <Button Content="Tag manager" Command="{Binding OpenTagManager}" />
             </StackPanel>
