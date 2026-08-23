@@ -79,6 +79,7 @@ public interface IDatabaseCommonService
         long? exampleMediaId);
 
     public Task DeleteTagAsync(long id);
+    public Task MergeTagAsync(long id, long targetTagId);
 
     public Task<long> CreateTagModifierAsync(string name);
     public Task UpdateTagModifierAsync(long id, string? name, string? description);

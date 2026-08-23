@@ -179,6 +179,18 @@ public class TagManagerWindowViewModel : ViewModelBase
 
     public bool IsEditing => SelectedTag != null;
 
+    public bool IsMergingTag
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
+
+    public string MergeIntoTagName
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "";
+
     public bool IsEditingModifier => SelectedModifier != null;
 
     public bool IsEditingSuperAlias => SelectedSuperAlias != null;
@@ -380,6 +392,35 @@ public class TagManagerWindowViewModel : ViewModelBase
         catch (Exception e)
         {
             windowService?.ShowErrorWindow("Failed to save tag", e);
+        }
+    }
+
+    public void BeginMergeTag()
+    {
+        MergeIntoTagName = "";
+        IsMergingTag = true;
+    }
+
+    public async Task MergeSelectedTag()
+    {
+        if (databaseService == null || SelectedTag == null)
+            return;
+
+        try
+        {
+            var targetTag = await databaseService.GetTagByNameAsync(MergeIntoTagName.Trim());
+            if (targetTag == null)
+                throw new ArgumentException("The target tag was not found.");
+
+            await databaseService.MergeTagAsync(SelectedTag.Id, targetTag.Id);
+            IsMergingTag = false;
+            MergeIntoTagName = "";
+            SelectedTag = null;
+            await UpdateSearch();
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to merge tag", e);
         }
     }
 

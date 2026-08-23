@@ -2070,6 +2070,115 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         logger.LogInformation("Deleted tag {TagId}", id);
     }
 
+    public async Task MergeTagAsync(long id, long targetTagId)
+    {
+        if (id == targetTagId)
+            throw new ArgumentException("A tag cannot be merged into itself");
+
+        var sourceTag = await dbContext.Tags.IgnoreQueryFilters().FirstOrDefaultAsync(tag => tag.Id == id) ??
+                        throw new ArgumentException("Source tag not found");
+        var targetTag = await dbContext.Tags.FirstOrDefaultAsync(tag => tag.Id == targetTagId) ??
+                        throw new ArgumentException("Target tag not found");
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
+        var targetAliases = await dbContext.TagAliases.IgnoreQueryFilters()
+            .Where(alias => alias.TagId == targetTagId)
+            .Select(alias => alias.Name)
+            .ToListAsync();
+        var sourceAliases = await dbContext.TagAliases.IgnoreQueryFilters()
+            .Where(alias => alias.TagId == id)
+            .ToListAsync();
+        foreach (var alias in sourceAliases)
+        {
+            if (alias.Name == targetTag.Name || targetAliases.Contains(alias.Name))
+            {
+                dbContext.TagAliases.Remove(alias);
+            }
+            else
+            {
+                alias.TagId = targetTagId;
+            }
+        }
+
+        var implications = await dbContext.TagImplies.IgnoreQueryFilters()
+            .Where(imply => imply.PrimaryTagId == id || imply.ToApplyTagId == id)
+            .ToListAsync();
+        var existingImplicationKeys = await dbContext.TagImplies.IgnoreQueryFilters()
+            .Where(imply => imply.PrimaryTagId != id && imply.ToApplyTagId != id)
+            .Select(imply => new { imply.PrimaryTagId, imply.ToApplyTagId })
+            .ToListAsync();
+        var replacementImplicationKeys = new HashSet<(long PrimaryTagId, long ToApplyTagId)>();
+        var replacementImplications = new List<TagImply>();
+        foreach (var implication in implications)
+        {
+            var replacementKey = (
+                implication.PrimaryTagId == id ? targetTagId : implication.PrimaryTagId,
+                implication.ToApplyTagId == id ? targetTagId : implication.ToApplyTagId);
+
+            if (replacementKey.Item1 == replacementKey.Item2 ||
+                existingImplicationKeys.Any(key => key.PrimaryTagId == replacementKey.Item1 &&
+                                                   key.ToApplyTagId == replacementKey.Item2) ||
+                !replacementImplicationKeys.Add(replacementKey))
+            {
+                continue;
+            }
+
+            replacementImplications.Add(new TagImply(replacementKey.Item1, replacementKey.Item2));
+        }
+        dbContext.TagImplies.RemoveRange(implications);
+        await dbContext.TagImplies.AddRangeAsync(replacementImplications);
+
+        var appliedTags = await dbContext.AppliedTags.IgnoreQueryFilters()
+            .Where(appliedTag => appliedTag.TagId == id || appliedTag.TagId == targetTagId)
+            .Include(appliedTag => appliedTag.Modifiers)
+            .Include(appliedTag => appliedTag.MediaFiles)
+            .Include(appliedTag => appliedTag.Collections)
+            .Include(appliedTag => appliedTag.UploadSections)
+            .Include(appliedTag => appliedTag.ScannedCollections)
+            .Include(appliedTag => appliedTag.FoundMedia)
+            .AsSplitQuery()
+            .ToListAsync();
+        var targetAppliedTags = appliedTags.Where(appliedTag => appliedTag.TagId == targetTagId).ToList();
+        foreach (var sourceAppliedTag in appliedTags.Where(appliedTag => appliedTag.TagId == id).ToList())
+        {
+            var targetAppliedTag = targetAppliedTags.FirstOrDefault(target =>
+                target.CombinedWithId == sourceAppliedTag.CombinedWithId &&
+                target.CombineWord == sourceAppliedTag.CombineWord &&
+                target.Modifiers.Select(modifier => modifier.Id).Order()
+                    .SequenceEqual(sourceAppliedTag.Modifiers.Select(modifier => modifier.Id).Order()));
+
+            if (targetAppliedTag == null)
+            {
+                sourceAppliedTag.TagId = targetTagId;
+                targetAppliedTags.Add(sourceAppliedTag);
+                continue;
+            }
+
+            MergeAppliedTagReferences(sourceAppliedTag.MediaFiles, targetAppliedTag.MediaFiles);
+            MergeAppliedTagReferences(sourceAppliedTag.Collections, targetAppliedTag.Collections);
+            MergeAppliedTagReferences(sourceAppliedTag.UploadSections, targetAppliedTag.UploadSections);
+            MergeAppliedTagReferences(sourceAppliedTag.ScannedCollections, targetAppliedTag.ScannedCollections);
+            MergeAppliedTagReferences(sourceAppliedTag.FoundMedia, targetAppliedTag.FoundMedia);
+            dbContext.AppliedTags.Remove(sourceAppliedTag);
+        }
+
+        var breakRules = await dbContext.TagBreakRules.IgnoreQueryFilters()
+            .Where(rule => rule.ActualTagId == id)
+            .ToListAsync();
+        foreach (var breakRule in breakRules)
+            breakRule.ActualTagId = targetTagId;
+
+        sourceTag.IsDeleted = true;
+        sourceTag.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync();
+        await transaction.CommitAsync();
+
+        await updateNotifier.NotifyTagUpdated(targetTagId);
+        await updateNotifier.NotifyTagsUpdated();
+        logger.LogInformation("Merged tag {SourceTagId} into tag {TargetTagId}", id, targetTagId);
+    }
+
     public async Task<long> CreateTagModifierAsync(string name)
     {
         var modifier = new TagModifier(NormalizeTagText(name));
@@ -3123,6 +3232,17 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         // Saving just once here at the end to save on some DB writes
         await SaveAsync();
+    }
+
+    private static void MergeAppliedTagReferences<TEntity>(ICollection<TEntity> sourceReferences,
+        ICollection<TEntity> targetReferences)
+    {
+        foreach (var reference in sourceReferences.ToList())
+        {
+            sourceReferences.Remove(reference);
+            if (!targetReferences.Contains(reference))
+                targetReferences.Add(reference);
+        }
     }
 
     private async Task<AppliedTag> GetOrCreateAppliedTagAsync(long tagId, List<long>? modifierIds,

@@ -31,3 +31,9 @@ public class AddImplicationRequest
     [Required]
     public long ImpliedTagId { get; set; }
 }
+
+public class MergeTagRequest
+{
+    [Required]
+    public long TargetTagId { get; set; }
+}

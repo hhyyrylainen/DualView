@@ -93,7 +93,16 @@
 
                         </Grid>
 
-                        <Button Content="Save Changes" Command="{Binding SaveEditedTag}" HorizontalAlignment="Right" />
+                        <StackPanel HorizontalAlignment="Right" Spacing="5">
+                            <StackPanel Orientation="Horizontal" Spacing="5">
+                                <Button Content="Save Changes" Command="{Binding SaveEditedTag}" />
+                                <Button Content="Merge Into" Command="{Binding BeginMergeTag}" />
+                            </StackPanel>
+                            <StackPanel IsVisible="{Binding IsMergingTag}" Spacing="5">
+                                <TextBox Text="{Binding MergeIntoTagName}" PlaceholderText="Target tag name..." />
+                                <Button Content="Merge Tag" Command="{Binding MergeSelectedTag}" />
+                            </StackPanel>
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </StackPanel>

@@ -256,4 +256,26 @@ public class TagDatabaseTests
             Assert.Equal(tagId, mediaTags[0].TagId);
         }
     }
+
+    [Fact]
+    public async Task MergeTag_DoesNotDuplicateAppliedTagWhenMediaHasBothTags()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var sourceTagId = await service.CreateTagAsync("source tag", TagCategory.DescribeCharacterObject);
+        var targetTagId = await service.CreateTagAsync("target tag", TagCategory.DescribeCharacterObject);
+        var media = new MediaFile("merge.jpg", "merge-hash");
+        context.MediaFiles.Add(media);
+        await context.SaveChangesAsync();
+
+        await service.AddParsedAppliedTagToMediaAsync(media.Id, new AppliedTagDTO(0, sourceTagId));
+        await service.AddParsedAppliedTagToMediaAsync(media.Id, new AppliedTagDTO(0, targetTagId));
+
+        await service.MergeTagAsync(sourceTagId, targetTagId);
+
+        var mediaTags = await service.GetMediaAppliedTagsAsync(media.Id);
+        Assert.Single(mediaTags);
+        Assert.Equal(targetTagId, mediaTags[0].TagId);
+        Assert.Equal(1, await context.AppliedTags.CountAsync());
+    }
 }

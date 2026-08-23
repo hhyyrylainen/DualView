@@ -599,6 +599,13 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task MergeTagAsync(long id, long targetTagId)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/tag/{id}/merge",
+            new MergeTagRequest { TargetTagId = targetTagId });
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<List<TagDTO>> GetAllTagsAsync()
     {
         return await HttpClient.GetFromJsonAsync<List<TagDTO>>("api/v1/tag") ?? new List<TagDTO>();

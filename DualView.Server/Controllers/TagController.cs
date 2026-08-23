@@ -81,6 +81,13 @@ public class TagController : Controller
         return Ok();
     }
 
+    [HttpPost("{id:long}/merge")]
+    public async Task<IActionResult> Merge([Required] long id, [FromBody] MergeTagRequest request)
+    {
+        await databaseService.MergeTagAsync(id, request.TargetTagId);
+        return Ok();
+    }
+
     [HttpGet("{id:long}/alias")]
     public async Task<ActionResult<List<string>>> GetAliases([Required] long id)
     {
