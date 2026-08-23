@@ -75,8 +75,8 @@
                     <WrapPanel Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2" ItemSpacing="5">
                         <CheckBox IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
                         <CheckBox IsChecked="{Binding BigPreviewImages}">Big Previews</CheckBox>
-                        <CheckBox IsChecked="{Binding ShowImageTagEditor}">Edit Image Tags</CheckBox>
                         <CheckBox IsChecked="{Binding AutoDeselectAfterImport}">Auto deselect after import</CheckBox>
+                        <CheckBox IsChecked="{Binding ShowImageTagEditor}">Edit Image Tags</CheckBox>
                     </WrapPanel>
                     <ScrollViewer Grid.Column="0" x:Name="ImagesScrollViewer" Grid.Row="2"
                                   Grid.ColumnSpan="{Binding ImageListColumnSpan}">

@@ -22,6 +22,8 @@ public sealed class TagEditorViewModel : ViewModelBase
 
     public delegate Task RemoveTagDelegate(long targetId, long appliedTagId);
 
+    public delegate Task AddTagsToMediaDelegate(List<long> targetIds, List<AppliedTagDTO> tags);
+
     private readonly IClientDatabaseService? databaseService;
     private readonly IWindowService? windowService;
     private readonly List<long> targetIds = new();
@@ -29,6 +31,7 @@ public sealed class TagEditorViewModel : ViewModelBase
     private LoadTagsDelegate? loadTags;
     private AddTagDelegate? addTag;
     private RemoveTagDelegate? removeTag;
+    private AddTagsToMediaDelegate? addTagsToMedia;
 
     private int suggestionVersion;
     private int refreshVersion;
@@ -104,6 +107,7 @@ public sealed class TagEditorViewModel : ViewModelBase
         loadTags = load;
         addTag = add;
         removeTag = remove;
+        addTagsToMedia = null;
         IsEnabled = targetIds.Count > 0;
         _ = RefreshAsync();
     }
@@ -124,6 +128,7 @@ public sealed class TagEditorViewModel : ViewModelBase
 
         Configure(ids, databaseService.GetMediaAppliedTagsAsync, AddMediaTagAsync,
             databaseService.RemoveAppliedTagFromMediaAsync);
+        addTagsToMedia = databaseService.AddParsedAppliedTagsToMediaAsync;
     }
 
     public void ConfigureUploadSections(IEnumerable<long> ids)
@@ -151,10 +156,12 @@ public sealed class TagEditorViewModel : ViewModelBase
             return;
         }
 
+        var tagsByTarget = await Task.WhenAll(targetIds.Select(async targetId =>
+            (TargetId: targetId, Tags: await loadTags(targetId))));
         var allTags = new List<(AppliedTagDTO Tag, string Text, int Count)>();
-        foreach (var targetId in targetIds)
+        foreach (var target in tagsByTarget)
         {
-            foreach (var tag in await loadTags(targetId))
+            foreach (var tag in target.Tags)
             {
                 var text = AppliedTagText.ToText(tag);
                 var index = allTags.FindIndex(item => string.Equals(item.Text, text,
@@ -230,9 +237,17 @@ public sealed class TagEditorViewModel : ViewModelBase
 
             var appliedText = AppliedTagText.ToText(appliedTag);
 
+            if (addTagsToMedia != null)
+            {
+                await addTagsToMedia(targetIds, [appliedTag]);
+                TagText = string.Empty;
+                SelectedSuggestion = null;
+                await RefreshAsync();
+                return;
+            }
+
             foreach (var targetId in targetIds)
             {
-                // TODO: this might be too slow to reload all tags for everything
                 var existingTags = loadTags == null ? [] : await loadTags(targetId);
                 if (existingTags.All(existingTag => !string.Equals(AppliedTagText.ToText(existingTag),
                         appliedText, StringComparison.OrdinalIgnoreCase)))
