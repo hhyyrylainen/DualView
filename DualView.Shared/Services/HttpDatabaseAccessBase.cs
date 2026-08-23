@@ -676,6 +676,27 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return await HttpClient.GetFromJsonAsync<TagModifierDTO?>($"api/v1/tagModifier/{id}");
     }
 
+    public async Task<List<TagSuperAliasDTO>> GetAllTagSuperAliasesAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<TagSuperAliasDTO>>("api/v1/tagSuperAlias") ??
+               new List<TagSuperAliasDTO>();
+    }
+
+    public async Task CreateTagSuperAliasAsync(string alias, string expanded)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/tagSuperAlias",
+            new CreateTagSuperAliasRequest { Alias = alias, Expanded = expanded });
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task UpdateTagSuperAliasAsync(string originalAlias, string alias, string expanded)
+    {
+        var response = await HttpClient.PutAsJsonAsync(
+            $"api/v1/tagSuperAlias/{Uri.EscapeDataString(originalAlias)}",
+            new UpdateTagSuperAliasRequest { Alias = alias, Expanded = expanded });
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task CreateTagAliasAsync(long tagId, string alias)
     {
         var response =

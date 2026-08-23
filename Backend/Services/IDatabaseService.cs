@@ -122,6 +122,9 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<TagModifier>> GetTagModifiersAsync();
     public Task<TagModifier?> GetTagModifierAsync(long id);
     public Task<TagModifier?> GetTagModifierByNameAsync(string name);
+    public Task<List<TagSuperAlias>> GetTagSuperAliasesAsync();
+    public Task CreateTagSuperAliasAsync(string alias, string expanded);
+    public Task UpdateTagSuperAliasAsync(string originalAlias, string alias, string expanded);
 
     // Applied Tags
     public Task<List<AppliedTag>> GetMediaAppliedTagsAsync(long mediaId);

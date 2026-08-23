@@ -21,12 +21,14 @@ public class TagManagerWindowViewModel : ViewModelBase
     private readonly IWindowService? windowService;
     private CancellationTokenSource? searchCts;
     private CancellationTokenSource? modifierSearchCts;
+    private CancellationTokenSource? superAliasSearchCts;
 
     public TagManagerWindowViewModel()
     {
         // Design time
         FoundTags.Add(new TagDTO("Test Tag") { Id = 1, Category = TagCategory.DescribeCharacterObject });
         FoundModifiers.Add(new TagModifierDTO("Test modifier") { Id = 1 });
+        FoundSuperAliases.Add(new TagSuperAliasDTO("test alias", "test tag"));
     }
 
     [ActivatorUtilitiesConstructor]
@@ -39,11 +41,14 @@ public class TagManagerWindowViewModel : ViewModelBase
 
         TagCategories = Enum.GetValues<TagCategory>().ToList();
         _ = UpdateModifierSearch();
+        _ = UpdateSuperAliasSearch();
     }
 
     public ObservableCollection<TagDTO> FoundTags { get; } = new();
 
     public ObservableCollection<TagModifierDTO> FoundModifiers { get; } = new();
+
+    public ObservableCollection<TagSuperAliasDTO> FoundSuperAliases { get; } = new();
 
     public List<TagCategory> TagCategories { get; } = new();
 
@@ -66,6 +71,16 @@ public class TagManagerWindowViewModel : ViewModelBase
         {
             if (SetProperty(ref field, value))
                 TriggerModifierSearch();
+        }
+    } = "";
+
+    public string SuperAliasSearchString
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+                TriggerSuperAliasSearch();
         }
     } = "";
 
@@ -166,6 +181,8 @@ public class TagManagerWindowViewModel : ViewModelBase
 
     public bool IsEditingModifier => SelectedModifier != null;
 
+    public bool IsEditingSuperAlias => SelectedSuperAlias != null;
+
     // New Modifier Properties
     public string NewModifierName
     {
@@ -187,6 +204,40 @@ public class TagManagerWindowViewModel : ViewModelBase
     } = "";
 
     public string EditModifierDescription
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "";
+
+    public TagSuperAliasDTO? SelectedSuperAlias
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+                LoadEditedSuperAlias(value);
+        }
+    }
+
+    public string NewSuperAlias
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "";
+
+    public string NewSuperAliasExpanded
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "";
+
+    public string EditSuperAlias
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = "";
+
+    public string EditSuperAliasExpanded
     {
         get;
         set => SetProperty(ref field, value);
@@ -361,6 +412,70 @@ public class TagManagerWindowViewModel : ViewModelBase
         }
     }
 
+    public async Task UpdateSuperAliasSearch()
+    {
+        if (databaseService == null)
+            return;
+
+        try
+        {
+            var search = SuperAliasSearchString.Trim();
+            var aliases = await databaseService.GetAllTagSuperAliasesAsync();
+            var matchingAliases = aliases
+                .Where(alias => alias.Alias.Contains(search, StringComparison.OrdinalIgnoreCase))
+                .OrderBy(alias => alias.Alias.StartsWith(search, StringComparison.OrdinalIgnoreCase) ? 0 : 1)
+                .ThenBy(alias => alias.Alias.IndexOf(search, StringComparison.OrdinalIgnoreCase))
+                .ThenBy(alias => alias.Alias, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                FoundSuperAliases.Clear();
+                foreach (var alias in matchingAliases)
+                    FoundSuperAliases.Add(alias);
+            });
+        }
+        catch (Exception e)
+        {
+            logger?.LogError(e, "Failed to update tag super alias search");
+        }
+    }
+
+    public async Task CreateNewSuperAlias()
+    {
+        if (databaseService == null)
+            return;
+
+        try
+        {
+            await databaseService.CreateTagSuperAliasAsync(NewSuperAlias, NewSuperAliasExpanded);
+            ClearNewSuperAliasEntry();
+            await UpdateSuperAliasSearch();
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to create tag super alias", e);
+        }
+    }
+
+    public async Task SaveEditedSuperAlias()
+    {
+        if (databaseService == null || SelectedSuperAlias == null)
+            return;
+
+        try
+        {
+            await databaseService.UpdateTagSuperAliasAsync(SelectedSuperAlias.Alias, EditSuperAlias,
+                EditSuperAliasExpanded);
+            SelectedSuperAlias = null;
+            await UpdateSuperAliasSearch();
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to save tag super alias", e);
+        }
+    }
+
     public async Task SaveEditedModifier()
     {
         if (databaseService == null || SelectedModifier == null)
@@ -391,6 +506,12 @@ public class TagManagerWindowViewModel : ViewModelBase
     {
         NewModifierName = "";
         NewModifierDescription = "";
+    }
+
+    private void ClearNewSuperAliasEntry()
+    {
+        NewSuperAlias = "";
+        NewSuperAliasExpanded = "";
     }
 
     private void TriggerSearch()
@@ -424,6 +545,25 @@ public class TagManagerWindowViewModel : ViewModelBase
             {
                 await Task.Delay(300, token);
                 await UpdateModifierSearch();
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, token);
+    }
+
+    private void TriggerSuperAliasSearch()
+    {
+        superAliasSearchCts?.Cancel();
+        superAliasSearchCts = new CancellationTokenSource();
+        var token = superAliasSearchCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(300, token);
+                await UpdateSuperAliasSearch();
             }
             catch (OperationCanceledException)
             {
@@ -472,5 +612,12 @@ public class TagManagerWindowViewModel : ViewModelBase
         EditModifierName = modifier?.Name ?? "";
         EditModifierDescription = modifier?.Description ?? "";
         OnPropertyChanged(nameof(IsEditingModifier));
+    }
+
+    private void LoadEditedSuperAlias(TagSuperAliasDTO? alias)
+    {
+        EditSuperAlias = alias?.Alias ?? "";
+        EditSuperAliasExpanded = alias?.Expanded ?? "";
+        OnPropertyChanged(nameof(IsEditingSuperAlias));
     }
 }

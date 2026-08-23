@@ -101,6 +101,66 @@
             </Grid>
         </TabItem>
 
+        <TabItem Header="Super Aliases">
+            <Grid ColumnDefinitions="*, 2*">
+                <Grid RowDefinitions="Auto, *" Margin="10">
+                    <StackPanel Grid.Row="0" Spacing="5">
+                        <TextBlock Text="Search Super Aliases" FontWeight="Bold" />
+                        <TextBox Text="{Binding SuperAliasSearchString, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Enter super alias..." />
+                    </StackPanel>
+
+                    <ListBox Grid.Row="1" ItemsSource="{Binding FoundSuperAliases}"
+                             SelectedItem="{Binding SelectedSuperAlias}" Margin="0,10,0,0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Alias}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+
+                <ScrollViewer Grid.Column="1" Margin="10">
+                    <StackPanel Spacing="20">
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Create New Super Alias" FontWeight="Bold" FontSize="16" />
+                                <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Alias:" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NewSuperAlias}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Expands to:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding NewSuperAliasExpanded}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+                                </Grid>
+                                <Button Content="Create Super Alias" Command="{Binding CreateNewSuperAlias}"
+                                        HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10"
+                                IsVisible="{Binding IsEditingSuperAlias}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Edit Super Alias" FontWeight="Bold" FontSize="16" />
+                                <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Alias:" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditSuperAlias}" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Expands to:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding EditSuperAliasExpanded}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+                                </Grid>
+                                <Button Content="Save Changes" Command="{Binding SaveEditedSuperAlias}"
+                                        HorizontalAlignment="Right" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </TabItem>
+
         <TabItem Header="Modifiers">
             <Grid ColumnDefinitions="*, 2*">
                 <Grid RowDefinitions="Auto, *" Margin="10">

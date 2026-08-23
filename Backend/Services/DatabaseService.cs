@@ -2348,6 +2348,50 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.TagModifiers.FirstOrDefaultAsync(m => m.Name == name);
     }
 
+    public async Task<List<TagSuperAlias>> GetTagSuperAliasesAsync()
+    {
+        return await dbContext.TagSuperAliases.OrderBy(item => item.Alias).ToListAsync();
+    }
+
+    public async Task CreateTagSuperAliasAsync(string alias, string expanded)
+    {
+        var normalizedAlias = NormalizeTagText(alias);
+        var trimmedExpanded = expanded.Trim();
+        if (trimmedExpanded.Length == 0)
+            throw new ArgumentException("Expanded tag cannot be empty");
+
+        await dbContext.TagSuperAliases.AddAsync(new TagSuperAlias(normalizedAlias, trimmedExpanded));
+        await SaveAsync();
+        logger.LogInformation("Created tag super alias '{Alias}'", normalizedAlias);
+    }
+
+    public async Task UpdateTagSuperAliasAsync(string originalAlias, string alias, string expanded)
+    {
+        var existing = await dbContext.TagSuperAliases.FindAsync(originalAlias.ToLowerInvariant()) ??
+                        throw new ArgumentException("Super alias not found");
+        var normalizedAlias = NormalizeTagText(alias);
+        var trimmedExpanded = expanded.Trim();
+        if (trimmedExpanded.Length == 0)
+            throw new ArgumentException("Expanded tag cannot be empty");
+
+        if (existing.Alias != normalizedAlias)
+        {
+            if (await dbContext.TagSuperAliases.AnyAsync(item => item.Alias == normalizedAlias))
+                throw new InvalidOperationException("A super alias with that name already exists");
+
+            dbContext.TagSuperAliases.Remove(existing);
+            await SaveAsync();
+            await dbContext.TagSuperAliases.AddAsync(new TagSuperAlias(normalizedAlias, trimmedExpanded));
+        }
+        else
+        {
+            existing.Expanded = trimmedExpanded;
+        }
+
+        await SaveAsync();
+        logger.LogInformation("Updated tag super alias '{Alias}'", normalizedAlias);
+    }
+
     public async Task<List<AppliedTag>> GetMediaAppliedTagsAsync(long mediaId)
     {
         return await dbContext.AppliedTags
@@ -2820,6 +2864,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     async Task<TagModifierDTO?> IClientDatabaseService.GetTagModifierAsync(long id)
     {
         return (await GetTagModifierAsync(id))?.GetDTO();
+    }
+
+    async Task<List<TagSuperAliasDTO>> IClientDatabaseService.GetAllTagSuperAliasesAsync()
+    {
+        return (await GetTagSuperAliasesAsync())
+            .Select(item => new TagSuperAliasDTO(item.Alias, item.Expanded)).ToList();
     }
 
     async Task<List<AppliedTagDTO>> IClientDatabaseService.GetMediaAppliedTagsAsync(long mediaId)

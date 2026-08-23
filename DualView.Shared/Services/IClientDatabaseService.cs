@@ -54,6 +54,9 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<TagDTO?> GetTagAsync(long id);
     public Task<List<TagModifierDTO>> GetAllTagModifiersAsync();
     public Task<TagModifierDTO?> GetTagModifierAsync(long id);
+    public Task<List<TagSuperAliasDTO>> GetAllTagSuperAliasesAsync();
+    public Task CreateTagSuperAliasAsync(string alias, string expanded);
+    public Task UpdateTagSuperAliasAsync(string originalAlias, string alias, string expanded);
 
     // Applied Tags
     public Task<List<AppliedTagDTO>> GetMediaAppliedTagsAsync(long mediaId);
