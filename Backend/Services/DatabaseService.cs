@@ -2438,6 +2438,39 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return storedTag.Id;
     }
 
+    public async Task AddParsedAppliedTagsToMediaAsync(List<long> mediaIds, List<AppliedTagDTO> appliedTags)
+    {
+        var distinctMediaIds = mediaIds.Distinct().ToList();
+        if (distinctMediaIds.Count == 0 || appliedTags.Count == 0)
+            return;
+
+        var mediaFiles = await dbContext.MediaFiles
+            .Include(media => media.AppliedTags)
+            .Where(media => distinctMediaIds.Contains(media.Id))
+            .ToListAsync();
+        if (mediaFiles.Count != distinctMediaIds.Count)
+            throw new ArgumentException("One or more media files were not found");
+
+        var storedTags = new List<AppliedTag>();
+        foreach (var appliedTag in appliedTags)
+        {
+            var storedTag = await GetOrCreateAppliedTagAsync(appliedTag);
+            if (storedTags.All(tag => !AreEquivalentAppliedTags(tag, storedTag)))
+                storedTags.Add(storedTag);
+        }
+
+        foreach (var media in mediaFiles)
+        {
+            foreach (var storedTag in storedTags)
+            {
+                if (media.AppliedTags.All(tag => tag.Id != storedTag.Id))
+                    media.AppliedTags.Add(storedTag);
+            }
+        }
+
+        await SaveAsync();
+    }
+
     public async Task<long> AddParsedAppliedTagToCollectionAsync(long collectionId, AppliedTagDTO appliedTag)
     {
         var collection = await dbContext.Collections.Include(item => item.AppliedTags)
@@ -2766,6 +2799,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     async Task<List<AppliedTagDTO>> IClientDatabaseService.GetMediaAppliedTagsAsync(long mediaId)
     {
         return (await GetMediaAppliedTagsAsync(mediaId)).Select(t => t.GetDTO()).ToList();
+    }
+
+    async Task IClientDatabaseService.AddParsedAppliedTagsToMediaAsync(List<long> mediaIds,
+        List<AppliedTagDTO> appliedTags)
+    {
+        await AddParsedAppliedTagsToMediaAsync(mediaIds, appliedTags);
     }
 
     async Task<List<AppliedTagDTO>> IClientDatabaseService.GetCollectionAppliedTagsAsync(long collectionId)

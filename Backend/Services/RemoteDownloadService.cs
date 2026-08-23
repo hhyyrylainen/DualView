@@ -2,6 +2,7 @@ using System.Net;
 using System.Threading.Channels;
 using Backend.Models;
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -254,18 +255,21 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             : null;
         await databaseService.SaveMediaImportInfoAsync(importInfo);
 
+        var parsedTags = new List<AppliedTagDTO>();
         foreach (var tag in request.Tags)
         {
             var parsedTag = await tagParser.ParseTag(tag);
             if (parsedTag != null)
             {
-                await databaseService.AddParsedAppliedTagToMediaAsync(media.Id, parsedTag.GetDTO());
+                parsedTags.Add(parsedTag.GetDTO());
             }
             else
             {
                 await missingTagService.ReportTagAsync(tag, MissingTagTarget.MediaFile, media.Id);
             }
         }
+
+        await databaseService.AddParsedAppliedTagsToMediaAsync([media.Id], parsedTags);
     }
 
     private static string GetImportFileName(RemoteDownloadRequest request)

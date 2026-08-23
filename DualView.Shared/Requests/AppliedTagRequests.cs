@@ -17,3 +17,12 @@ public class AddAppliedTagRequest
     /// </summary>
     public AppliedTagDTO? ParsedTag { get; set; }
 }
+
+public class AddParsedAppliedTagsToMediaRequest
+{
+    [Required]
+    public List<long> MediaIds { get; set; } = new();
+
+    [Required]
+    public List<AppliedTagDTO> AppliedTags { get; set; } = new();
+}

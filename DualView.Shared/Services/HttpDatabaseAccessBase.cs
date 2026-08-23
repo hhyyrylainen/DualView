@@ -725,6 +725,13 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return long.Parse(await response.Content.ReadAsStringAsync());
     }
 
+    public async Task AddParsedAppliedTagsToMediaAsync(List<long> mediaIds, List<AppliedTagDTO> appliedTags)
+    {
+        var response = await HttpClient.PostAsJsonAsync("api/v1/media/appliedTag/bulk",
+            new AddParsedAppliedTagsToMediaRequest { MediaIds = mediaIds, AppliedTags = appliedTags });
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task RemoveAppliedTagFromMediaAsync(long mediaId, long appliedTagId)
     {
         var response = await HttpClient.DeleteAsync($"api/v1/media/{mediaId}/appliedTag/{appliedTagId}");

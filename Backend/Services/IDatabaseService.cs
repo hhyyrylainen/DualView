@@ -125,6 +125,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
 
     // Applied Tags
     public Task<List<AppliedTag>> GetMediaAppliedTagsAsync(long mediaId);
+    public Task AddParsedAppliedTagsToMediaAsync(List<long> mediaIds, List<AppliedTagDTO> appliedTags);
     public Task<List<AppliedTag>> GetCollectionAppliedTagsAsync(long collectionId);
     public Task<List<AppliedTag>> GetUploadSectionAppliedTagsAsync(long sectionId);
     public Task<AppliedTag?> GetAppliedTagAsync(long id);

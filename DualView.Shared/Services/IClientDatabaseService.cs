@@ -57,6 +57,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
 
     // Applied Tags
     public Task<List<AppliedTagDTO>> GetMediaAppliedTagsAsync(long mediaId);
+    public Task AddParsedAppliedTagsToMediaAsync(List<long> mediaIds, List<AppliedTagDTO> appliedTags);
     public Task<List<AppliedTagDTO>> GetCollectionAppliedTagsAsync(long collectionId);
     public Task<List<AppliedTagDTO>> GetUploadSectionAppliedTagsAsync(long sectionId);
     public Task<AppliedTagDTO?> ParseTagAsync(string tag);

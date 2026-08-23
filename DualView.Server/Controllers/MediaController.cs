@@ -64,6 +64,16 @@ public class MediaController : Controller
         return media.GetDTO();
     }
 
+    [HttpPost("appliedTag/bulk")]
+    public async Task<IActionResult> AddAppliedTagsToMedia([FromBody] AddParsedAppliedTagsToMediaRequest request)
+    {
+        if (request.MediaIds.Count == 0 || request.AppliedTags.Count == 0)
+            return BadRequest("Media IDs and applied tags cannot be empty");
+
+        await databaseService.AddParsedAppliedTagsToMediaAsync(request.MediaIds, request.AppliedTags);
+        return Ok();
+    }
+
     [HttpGet("{mediaId:long}/collections")]
     public async Task<ActionResult<List<long>>> GetCollectionsMediaIsIn([Required] long mediaId)
     {
