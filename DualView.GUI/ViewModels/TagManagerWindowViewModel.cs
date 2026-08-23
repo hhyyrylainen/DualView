@@ -310,6 +310,7 @@ public class TagManagerWindowViewModel : ViewModelBase
 
         try
         {
+            var impliedTagIds = await ParseImpliedTagIdsAsync(NewTagImplies);
             var tagId = await databaseService.CreateTagAsync(NewTagName, NewTagCategory);
             await databaseService.UpdateTagAsync(tagId, NewTagName, NewTagDescription, NewTagCategory, null);
 
@@ -321,15 +322,9 @@ public class TagManagerWindowViewModel : ViewModelBase
                 await databaseService.CreateTagAliasAsync(tagId, alias);
             }
 
-            var implies = NewTagImplies.Split('\n',
-                StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            foreach (var imply in implies)
+            foreach (var impliedTagId in impliedTagIds)
             {
-                var targetTag = await databaseService.GetTagByNameAsync(imply);
-                if (targetTag != null)
-                {
-                    await databaseService.AddTagImplicationAsync(tagId, targetTag.Id);
-                }
+                await databaseService.AddTagImplicationAsync(tagId, impliedTagId);
             }
 
             ClearNewTagEntry();
@@ -347,11 +342,14 @@ public class TagManagerWindowViewModel : ViewModelBase
 
         try
         {
+            var newImpliedTagIds = await ParseImpliedTagIdsAsync(EditTagImplies);
+            var currentAliases = await databaseService.GetTagAliasesAsync(SelectedTag.Id);
+            var currentImplies = await databaseService.GetTagImpliesAsync(SelectedTag.Id);
+
             await databaseService.UpdateTagAsync(SelectedTag.Id, EditTagName, EditTagDescription, EditTagCategory,
                 null);
 
             // Handle aliases diff
-            var currentAliases = await databaseService.GetTagAliasesAsync(SelectedTag.Id);
             var newAliases = EditTagAliases
                 .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Select(a => a.ToLowerInvariant()).Distinct().ToList();
@@ -367,21 +365,12 @@ public class TagManagerWindowViewModel : ViewModelBase
             }
 
             // Handle implies diff
-            var currentImplies = await databaseService.GetTagImpliesAsync(SelectedTag.Id);
-            var newImplyNames = EditTagImplies
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Select(i => i.ToLowerInvariant()).Distinct().ToList();
-
-            foreach (var name in newImplyNames.Where(n => currentImplies.All(ci => ci.Name != n)))
+            foreach (var impliedTagId in newImpliedTagIds.Where(id => currentImplies.All(tag => tag.Id != id)))
             {
-                var targetTag = await databaseService.GetTagByNameAsync(name);
-                if (targetTag != null)
-                {
-                    await databaseService.AddTagImplicationAsync(SelectedTag.Id, targetTag.Id);
-                }
+                await databaseService.AddTagImplicationAsync(SelectedTag.Id, impliedTagId);
             }
 
-            foreach (var imply in currentImplies.Where(ci => !newImplyNames.Contains(ci.Name)))
+            foreach (var imply in currentImplies.Where(tag => !newImpliedTagIds.Contains(tag.Id)))
             {
                 await databaseService.RemoveTagImplicationAsync(SelectedTag.Id, imply.Id);
             }
@@ -500,6 +489,28 @@ public class TagManagerWindowViewModel : ViewModelBase
         NewTagCategory = TagCategory.DescribeCharacterObject;
         NewTagAliases = "";
         NewTagImplies = "";
+    }
+
+    private async Task<List<long>> ParseImpliedTagIdsAsync(string text)
+    {
+        var implies = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var impliedTagIds = new List<long>();
+
+        foreach (var imply in implies)
+        {
+            var parsedTag = await databaseService!.ParseTagAsync(imply);
+            if (parsedTag == null)
+            {
+                throw new ArgumentException($"Could not parse implied tag '{imply}'.");
+            }
+
+            if (!impliedTagIds.Contains(parsedTag.TagId))
+            {
+                impliedTagIds.Add(parsedTag.TagId);
+            }
+        }
+
+        return impliedTagIds;
     }
 
     private void ClearNewModifierEntry()
