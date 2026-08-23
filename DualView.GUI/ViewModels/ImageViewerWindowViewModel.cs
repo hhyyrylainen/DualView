@@ -1,11 +1,13 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using DualView.GUI.Models;
 using DualView.GUI.Services;
 using DualView.Shared.Services;
+using DualView.Shared.Utils;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.Extensions.DependencyInjection;
@@ -102,7 +104,12 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         get;
         private set
         {
-            if (SetProperty(ref field, value) && deleteMediaMenuItem != null)
+            if (!SetProperty(ref field, value))
+                return;
+
+            OnPropertyChanged(nameof(DeleteMediaMenuHeader));
+
+            if (deleteMediaMenuItem != null)
             {
                 deleteMediaMenuItem.Title = value ? "Restore" : "Delete";
                 ImageInfo = value ? "DELETED" : "Loading...";
@@ -114,11 +121,21 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public string DeleteMediaMenuHeader => IsDeleted ? "Restore this" : "Delete this";
+
+    public bool HasBrowsing => collectionBrowse != null;
+
     public string ImageInfo
     {
         get;
         set => SetProperty(ref field, value);
     } = "Loading...";
+
+    public string TagsString
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    } = string.Empty;
 
     public string BrowsePosition
     {
@@ -152,6 +169,8 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         {
             HasServerMedia = false;
             IsDeleted = false;
+            IsTemporary = false;
+            TagsString = string.Empty;
             currentConfiguredMediaId = 0;
             currentMediaFileId = 0;
             _ = LoadMediaFileStatus(serverMediaSource.ServerId);
@@ -161,6 +180,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             HasServerMedia = false;
             IsDeleted = false;
             IsTemporary = false;
+            TagsString = string.Empty;
             currentConfiguredMediaId = 0;
             currentMediaFileId = 0;
         }
@@ -187,9 +207,52 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         _ = NavigateToAdjacentMediaAsync(offset);
     }
 
-    public void OpenMediaWindow()
+    public void SendToImport()
     {
-        // TODO: open a picker that shows all collections this image is in
+        if (clientDatabaseService == null || !HasServerMedia || currentMediaFileId == 0)
+        {
+            windowService?.ShowNoticeWindow("Only server media can be sent to import.");
+            return;
+        }
+
+        _ = SendToImportAsync();
+    }
+
+    public void GoToFirstPage()
+    {
+        if (collectionBrowse == null)
+            return;
+
+        _ = NavigateToBrowseIndexAsync(0);
+    }
+
+    public void GoToLastPage()
+    {
+        if (collectionBrowse == null)
+            return;
+
+        _ = GoToLastPageAsync();
+    }
+
+    public void ShowTagEditor()
+    {
+        throw new NotImplementedException();
+    }
+
+    public void ShowImageInfo()
+    {
+        if (clientDatabaseService == null || !HasServerMedia || currentMediaFileId == 0)
+        {
+            windowService?.ShowNoticeWindow("Detailed information is only available for server media.");
+            return;
+        }
+
+        _ = ShowImageInfoAsync();
+    }
+
+    public void FinCollectionsThisIsIn()
+    {
+        // TODO: open a window that shows all collections this image is in and allows double clicking to open those collections.
         // windowService?.
     }
 
@@ -343,10 +406,91 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             HasServerMedia = true;
             IsDeleted = media.MediaFile.IsDeleted;
             IsTemporary = media.MediaFile.IsTemporary;
+
+            var tags = await clientDatabaseService.GetMediaAppliedTagsAsync(currentMediaFileId);
+            TagsString = string.Join(", ", tags.Select(AppliedTagText.ToText));
         }
         catch (Exception e)
         {
             windowService?.ShowErrorWindow("Failed to get media status", e);
+        }
+    }
+
+    private async Task SendToImportAsync()
+    {
+        if (clientDatabaseService == null)
+            return;
+
+        try
+        {
+            await clientDatabaseService.AddMediaToActiveUploadSectionAsync([currentMediaFileId]);
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to send media to import", e);
+        }
+    }
+
+    private async Task GoToLastPageAsync()
+    {
+        try
+        {
+            var browseInfo = await collectionBrowse!.GetBrowseInfoAsync(null);
+            if (browseInfo.Count > 0)
+                await NavigateToBrowseIndexAsync(browseInfo.Count - 1);
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to browse collection", e);
+        }
+    }
+
+    private async Task NavigateToBrowseIndexAsync(int index)
+    {
+        if (collectionBrowse == null)
+            return;
+
+        try
+        {
+            var media = await collectionBrowse.GetMediaAsync(index);
+            if (media == null)
+                return;
+
+            Media.MediaToShow?.Dispose();
+            ShowMedia(media, Media.MediaOpenResources, collectionBrowse);
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to browse collection", e);
+        }
+    }
+
+    private async Task ShowImageInfoAsync()
+    {
+        if (clientDatabaseService == null)
+            return;
+
+        try
+        {
+            var media = await clientDatabaseService.GetMediaFileAsync(currentMediaFileId);
+            if (media == null)
+            {
+                windowService?.ShowNoticeWindow("Media was not found.", "Media information");
+                return;
+            }
+
+            windowService?.ShowNoticeWindow(
+                $"Id: {media.Id}\nName: {media.OriginalFileName}\nHash: {media.Hash}\n" +
+                $"Imported: {media.ImportedAt.ToLocalTime():g}\nUpdated: {media.UpdatedAt.ToLocalTime():g}\n" +
+                $"Last viewed: {media.LastViewed?.ToLocalTime().ToString("g") ?? "Never"}\n" +
+                $"{(media.ParentMediaId != null ? $"Parent: {media.ParentMediaId}" : "No parent")}\n" +
+                $"Type: {media.MediaType.ToString()} Favourite: {media.IsFavorited} Stars: {media.Stars}\n" +
+                $"Dimensions: {media.Width}x{media.Height}\nTemporary: {media.IsTemporary}\nDeleted: {media.IsDeleted}",
+                "Media information");
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to get media information", e);
         }
     }
 
@@ -441,9 +585,6 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     private void InitializeMenu()
     {
         MainWindowViewModel.AddDefaultMenuItems(Hamburger);
-
-        Hamburger.MenuItems.Add(new HamburgerMenuItem
-            { Title = "Open Media Collection", Command = new RelayCommand(OpenMediaWindow) });
 
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Edit This...", Command = new RelayCommand(OpenMediaEditorSetup) });

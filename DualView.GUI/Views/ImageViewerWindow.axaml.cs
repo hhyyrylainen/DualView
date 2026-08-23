@@ -15,7 +15,6 @@ public partial class ImageViewerWindow : Window
     {
         InitializeComponent();
 
-        CloseButton.Click += (_, _) => Close();
         Opened += (_, _) => Focus();
         AddHandler(KeyDownEvent, OnKeyDown, RoutingStrategies.Tunnel, true);
 
@@ -45,6 +44,11 @@ public partial class ImageViewerWindow : Window
             viewModel.NavigateToAdjacentMedia(1);
             e.Handled = true;
         }
+    }
+
+    private void CloseItem_OnClick(object? sender, RoutedEventArgs e)
+    {
+        Close();
     }
 
     private async Task<string?> AskForSaveFolder(string suggestedName)

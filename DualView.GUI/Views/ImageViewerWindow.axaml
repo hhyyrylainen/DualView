@@ -18,14 +18,10 @@
         <vm:ImageViewerWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="*,40" DragDrop.AllowDrop="True" Background="Transparent">
+    <Grid RowDefinitions="40,*" DragDrop.AllowDrop="True" Background="Transparent">
 
-        <ContentControl Grid.Row="0" Grid.Column="0" DataContext="{Binding Media}">
-            <controls:MediaViewer />
-        </ContentControl>
-
-        <!-- Bottom bar -->
-        <Grid Grid.Row="1"
+        <!-- Top bar -->
+        <Grid Grid.Row="0"
               ColumnDefinitions="Auto, Auto, *, Auto, Auto, Auto"
               Background="#F0F0F0">
 
@@ -34,29 +30,61 @@
                 <controls:HamburgerMenuControl />
             </ContentControl>
 
+            <Menu Grid.Column="1">
+                <MenuItem Header="File">
+                    <MenuItem Header="Export..." Command="{Binding SaveMedia}" />
+                    <Separator />
+                    <MenuItem Header="Close" Click="CloseItem_OnClick" />
+                </MenuItem>
+                <MenuItem Header="Image">
+                    <MenuItem Header="Send to import" Command="{Binding SendToImport}" />
+                    <MenuItem Header="Show collections this is in" Command="{Binding FinCollectionsThisIsIn}" />
+                    <Separator />
+                    <MenuItem Header="{Binding DeleteMediaMenuHeader}" Command="{Binding ToggleDeleteMedia}" />
+                </MenuItem>
+                <MenuItem Header="View">
+                    <MenuItem Header="Go to first page" Command="{Binding GoToFirstPage}"
+                              IsEnabled="{Binding HasBrowsing}" />
+                    <MenuItem Header="Go to last page" Command="{Binding GoToLastPage}"
+                              IsEnabled="{Binding HasBrowsing}" />
+                </MenuItem>
+                <MenuItem Header="Tools">
+                    <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />
+                    <MenuItem Header="Get Info" Command="{Binding ShowImageInfo}" />
+                </MenuItem>
+            </Menu>
+
             <TextBlock Grid.Column="2"
+                       Text="{Binding TagsString}"
+                       TextWrapping="Wrap"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center"
+                       HorizontalAlignment="Center"
+                       MaxLines="2"
+                       Margin="10,0,0,0"
+                       MaxHeight="40" />
+
+            <TextBlock Grid.Column="3"
                        Text="{Binding ImageInfo}"
                        VerticalAlignment="Center"
                        HorizontalAlignment="Center"
                        Margin="10,0,0,0" />
 
-            <CheckBox Grid.Column="3" IsChecked="{Binding Media.PlayAudio}"
+            <CheckBox Grid.Column="4" IsChecked="{Binding Media.PlayAudio}"
                       IsVisible="{Binding Media.HasAudio}"
                       Margin="5,0"
                       ToolTip.Tip="Enable audio playback for this video">
                 Sound
             </CheckBox>
 
-            <TextBox Grid.Column="4" IsVisible="{Binding IsTemporary}"
-                      ToolTip.Tip="Use the Import window to import this media to a collection to make it permanent; otherwise it will be deleted after a while">
-                Temporary Import
-            </TextBox>
-
-            <Button Grid.Column="5"
-                    Content="Close"
-                    Margin="5,0"
-                    VerticalAlignment="Center"
-                    Name="CloseButton" />
+            <TextBlock Grid.Column="5" VerticalAlignment="Center" IsVisible="{Binding IsTemporary}"
+                       ToolTip.Tip="Use the Import window to import this media to a collection to make it permanent; otherwise it will be deleted after a while">
+                TEMPORARY Import
+            </TextBlock>
         </Grid>
+
+        <ContentControl Grid.Row="1" Grid.Column="0" DataContext="{Binding Media}">
+            <controls:MediaViewer />
+        </ContentControl>
     </Grid>
 </Window>
