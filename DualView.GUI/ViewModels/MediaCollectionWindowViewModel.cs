@@ -333,7 +333,12 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 
     public void ShowTagEditor()
     {
-        // TODO: Implement tag editor
+        if (windowService == null || Collection == null)
+            return;
+
+        var id = Collection.Id;
+        windowService.ShowWindow<TagEditorWindowViewModel>(tagEditor =>
+            tagEditor.InitializeCollection(id, () => _ = LoadCollectionTagsAsync(id)));
     }
 
     public void SetPairedImageMode(bool enabled)
@@ -474,7 +479,11 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
             return;
 
         var appliedTags = await databaseService.GetCollectionAppliedTagsAsync(id);
-        CollectionTags = string.Join(", ", appliedTags.Select(AppliedTagText.ToText));
+
+        await Dispatcher.UIThread.InvokeAsync(() =>
+        {
+            CollectionTags = string.Join(", ", appliedTags.Select(AppliedTagText.ToText));
+        });
     }
 
     private void SetSelection(bool selected)

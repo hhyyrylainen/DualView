@@ -247,7 +247,15 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
     public void ShowTagEditor()
     {
-        throw new NotImplementedException();
+        if (windowService == null || !HasServerMedia || currentMediaFileId == 0)
+        {
+            windowService?.ShowNoticeWindow("Only server media can edit tags.");
+            return;
+        }
+
+        var mediaId = currentMediaFileId;
+        windowService.ShowWindow<TagEditorWindowViewModel>(tagEditor =>
+            tagEditor.InitializeMedia(mediaId, RefreshMediaTags));
     }
 
     public void ShowImageInfo()
@@ -445,6 +453,12 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         {
             windowService?.ShowErrorWindow("Failed to send media to import", e);
         }
+    }
+
+    private void RefreshMediaTags()
+    {
+        if (currentConfiguredMediaId != 0)
+            _ = LoadMediaFileStatus(currentConfiguredMediaId);
     }
 
     private async Task GoToLastPageAsync()

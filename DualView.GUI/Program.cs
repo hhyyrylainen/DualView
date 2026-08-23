@@ -236,6 +236,8 @@ sealed class Program
         services.AddTransient<FolderPickerViewModel>();
         services.AddTransient<EditMediaFoldersWindowViewModel>();
         services.AddTransient<TagManagerWindowViewModel>();
+        services.AddTransient<TagEditorViewModel>();
+        services.AddTransient<TagEditorWindowViewModel>();
         services.AddTransient<MaintenanceToolsWindowViewModel>();
         services.AddTransient<RenameWindowViewModel>();
         services.AddTransient<ReorderWindowViewModel>();

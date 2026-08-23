@@ -1,0 +1,19 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:DualView.GUI.Controls"
+        xmlns:vm="using:DualView.GUI.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="450"
+        Width="400" Height="450" MinWidth="300" MinHeight="250"
+        x:Class="DualView.GUI.Views.TagEditorWindow"
+        x:DataType="vm:TagEditorWindowViewModel"
+        Icon="/Assets/logo.ico"
+        Title="{Binding Title}">
+
+    <Design.DataContext>
+        <vm:TagEditorWindowViewModel />
+    </Design.DataContext>
+
+    <controls:TagEditor DataContext="{Binding TagEditor}" />
+</Window>
