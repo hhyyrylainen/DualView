@@ -42,7 +42,8 @@
                 <Button Grid.Column="5" Margin="4,0" Command="{Binding ImportAsync}" Background="#2878D0">Import</Button>
             </Grid>
 
-            <Grid x:Name="CollectionLayout" Grid.Row="1" RowDefinitions="Auto,Auto" IsVisible="{Binding CollectionTabSelected}"
+            <Grid x:Name="CollectionLayout" Grid.Row="1" RowDefinitions="Auto,Auto"
+                  IsVisible="{Binding CollectionTabSelected}"
                   VerticalAlignment="Top">
                 <WrapPanel Grid.Row="0">
                     <CheckBox Margin="2" IsChecked="{Binding KeepEvenWhenEmpty}">Keep even when empty</CheckBox>
@@ -61,26 +62,24 @@
                     <controls:TagEditor Grid.Row="1" Grid.Column="1" DataContext="{Binding TagEditor}" />
                 </Grid>
             </Grid>
-            <Grid x:Name="ImagesLayout" Grid.Row="1" IsVisible="{Binding ImagesTabSelected}" VerticalAlignment="Top">
-                <Grid x:Name="ImageContentLayout" RowDefinitions="Auto,Auto,*" VerticalAlignment="Stretch">
-                    <WrapPanel ItemSpacing="5">
+            <Grid x:Name="ImagesLayout" Grid.Row="1" IsVisible="{Binding ImagesTabSelected}"
+                  VerticalAlignment="Stretch">
+                <Grid x:Name="ImageContentLayout" ColumnDefinitions="7*,3*" RowDefinitions="Auto,Auto,*"
+                      VerticalAlignment="Stretch">
+                    <WrapPanel Grid.ColumnSpan="2" ItemSpacing="5">
                         <Button Command="{Binding RemoveSelectedAsync}" Background="#C62828">Remove Selected</Button>
                         <Button Command="{Binding ReverseImagesAsync}">Reverse Images</Button>
                         <Button Command="{Binding DeselectAll}">Deselect All</Button>
                         <Button Command="{Binding SortByVisualSimilarityAsync}">Sort by visual similarity</Button>
-
                     </WrapPanel>
-                    <WrapPanel Grid.Row="1" ItemSpacing="5">
+                    <WrapPanel Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="2" ItemSpacing="5">
                         <CheckBox IsChecked="{Binding RemoveAfterImport}">Remove items after adding</CheckBox>
                         <CheckBox IsChecked="{Binding BigPreviewImages}">Big Previews</CheckBox>
-                        <CheckBox IsChecked="{Binding ShowImageTagEditor}" IsEnabled="False">
-                            Edit Image Tags
-                        </CheckBox>
-                        <CheckBox IsChecked="{Binding AutoDeselectAfterImport}">
-                            Auto deselect after import
-                        </CheckBox>
+                        <CheckBox IsChecked="{Binding ShowImageTagEditor}">Edit Image Tags</CheckBox>
+                        <CheckBox IsChecked="{Binding AutoDeselectAfterImport}">Auto deselect after import</CheckBox>
                     </WrapPanel>
-                    <ScrollViewer x:Name="ImagesScrollViewer" Grid.Row="2">
+                    <ScrollViewer Grid.Column="0" x:Name="ImagesScrollViewer" Grid.Row="2"
+                                  Grid.ColumnSpan="{Binding ImageListColumnSpan}">
                         <ItemsControl ItemsSource="{Binding Media}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
@@ -89,13 +88,20 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <controls:MediaViewer Width="{Binding CustomWidth}"
-                                                          Height="{Binding CustomHeight}"
+                                    <controls:MediaViewer Width="{Binding CustomWidth}" Height="{Binding CustomHeight}"
                                                           Margin="2" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </ScrollViewer>
+                    <Grid Grid.Row="2" Grid.Column="1" RowDefinitions="2.5*,Auto,*" Margin="4,0,0,0"
+                          IsVisible="{Binding ShowImageTagEditor}">
+                        <ContentControl Grid.Row="0" DataContext="{Binding SelectedImageViewer}">
+                            <controls:MediaViewer />
+                        </ContentControl>
+                        <TextBlock Grid.Row="1" Text="{Binding SelectedMediaText}" Margin="2" TextWrapping="Wrap" />
+                        <controls:TagEditor Grid.Row="2" DataContext="{Binding ImageTagEditor}" />
+                    </Grid>
                 </Grid>
             </Grid>
 
