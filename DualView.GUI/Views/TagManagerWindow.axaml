@@ -16,97 +16,116 @@
     <TabControl TabStripPlacement="Top">
         <TabItem Header="Tags">
             <Grid ColumnDefinitions="*, 2*">
-        <!-- Left: Search and List -->
-        <Grid RowDefinitions="Auto, *" Margin="10">
-            <StackPanel Grid.Row="0" Spacing="5">
-                <TextBlock Text="Search Tags" FontWeight="Bold" />
-                <TextBox Text="{Binding SearchString, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Enter tag name..." />
-            </StackPanel>
-
-            <ListBox Grid.Row="1" ItemsSource="{Binding FoundTags}" SelectedItem="{Binding SelectedTag}" Margin="0,10,0,0">
-                <ListBox.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Name}" />
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
-        </Grid>
-
-        <!-- Right: Create/Edit -->
-        <ScrollViewer Grid.Column="1" Margin="10">
-            <StackPanel Spacing="20">
-                <!-- Create New Tag -->
-                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Create New Tag" FontWeight="Bold" FontSize="16" />
-                        
-                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding NewTagName, UpdateSourceTrigger=PropertyChanged}" />
-
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Category:" VerticalAlignment="Center" Margin="0,10,10,0" />
-                            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding TagCategories}" 
-                                      SelectedItem="{Binding NewTagCategory}" Margin="0,10,0,0" HorizontalAlignment="Stretch" />
-
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" VerticalAlignment="Top" Margin="0,10,10,0" />
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding NewTagDescription}" 
-                                     AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
-
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Aliases:" VerticalAlignment="Top" Margin="0,10,10,0" />
-                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding NewTagAliases}" 
-                                     AcceptsReturn="True" Height="60" PlaceholderText="One per line" Margin="0,10,0,0" />
-
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Implies:" VerticalAlignment="Top" Margin="0,10,10,0" />
-                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding NewTagImplies}" 
-                                     AcceptsReturn="True" Height="60" PlaceholderText="One per line" Margin="0,10,0,0" />
-
-                        </Grid>
-
-                        <Button Content="Create Tag" Command="{Binding CreateNewTag}" HorizontalAlignment="Right" />
+                <!-- Left: Search and List -->
+                <Grid RowDefinitions="Auto, *" Margin="10">
+                    <StackPanel Grid.Row="0" Spacing="5">
+                        <TextBlock Text="Search Tags" FontWeight="Bold" />
+                        <TextBox Text="{Binding SearchString, UpdateSourceTrigger=PropertyChanged}"
+                                 PlaceholderText="Enter tag name..." />
                     </StackPanel>
-                </Border>
 
-                <!-- Edit Selected Tag -->
-                <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10" IsVisible="{Binding IsEditing}">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="Edit Tag" FontWeight="Bold" FontSize="16" />
+                    <ListBox Grid.Row="1" ItemsSource="{Binding FoundTags}" SelectedItem="{Binding SelectedTag}"
+                             Margin="0,10,0,0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
 
-                        <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto">
-                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center" Margin="0,0,10,0" />
-                            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditTagName}" />
+                <!-- Right: Create/Edit -->
+                <ScrollViewer Grid.Column="1" Margin="10">
+                    <StackPanel Spacing="20">
+                        <!-- Create New Tag -->
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Create New Tag" FontWeight="Bold" FontSize="16" />
 
-                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Category:" VerticalAlignment="Center" Margin="0,10,10,0" />
-                            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding TagCategories}" 
-                                      SelectedItem="{Binding EditTagCategory}" Margin="0,10,0,0" HorizontalAlignment="Stretch" />
+                                <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" />
+                                    <TextBox Grid.Row="0" Grid.Column="1"
+                                             Text="{Binding NewTagName, UpdateSourceTrigger=PropertyChanged}" />
 
-                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" VerticalAlignment="Top" Margin="0,10,10,0" />
-                            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EditTagDescription}" 
-                                     AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Category:" VerticalAlignment="Center"
+                                               Margin="0,10,10,0" />
+                                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding TagCategories}"
+                                              SelectedItem="{Binding NewTagCategory}" Margin="0,10,0,0"
+                                              HorizontalAlignment="Stretch" />
 
-                            <TextBlock Grid.Row="3" Grid.Column="0" Text="Aliases:" VerticalAlignment="Top" Margin="0,10,10,0" />
-                            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding EditTagAliases}" 
-                                     AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding NewTagDescription}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
 
-                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Implies:" VerticalAlignment="Top" Margin="0,10,10,0" />
-                            <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditTagImplies}" 
-                                     AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Aliases:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding NewTagAliases}"
+                                             AcceptsReturn="True" Height="60" PlaceholderText="One per line"
+                                             Margin="0,10,0,0" />
 
-                        </Grid>
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Implies:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding NewTagImplies}"
+                                             AcceptsReturn="True" Height="60" PlaceholderText="One per line"
+                                             Margin="0,10,0,0" />
 
-                        <StackPanel HorizontalAlignment="Right" Spacing="5">
-                            <StackPanel Orientation="Horizontal" Spacing="5">
-                                <Button Content="Save Changes" Command="{Binding SaveEditedTag}" />
-                                <Button Content="Merge Into" Command="{Binding BeginMergeTag}" />
+                                </Grid>
+
+                                <Button Content="Create Tag" Command="{Binding CreateNewTag}"
+                                        HorizontalAlignment="Right" />
                             </StackPanel>
-                            <StackPanel IsVisible="{Binding IsMergingTag}" Spacing="5">
-                                <TextBox Text="{Binding MergeIntoTagName}" PlaceholderText="Target tag name..." />
-                                <Button Content="Merge Tag" Command="{Binding MergeSelectedTag}" />
+                        </Border>
+
+                        <!-- Edit Selected Tag -->
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="5" Padding="10"
+                                IsVisible="{Binding IsEditing}">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Edit Tag" FontWeight="Bold" FontSize="16" />
+
+                                <Grid ColumnDefinitions="Auto, *" RowDefinitions="Auto, Auto, Auto, Auto, Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Name:" VerticalAlignment="Center"
+                                               Margin="0,0,10,0" />
+                                    <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding EditTagName}" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Category:" VerticalAlignment="Center"
+                                               Margin="0,10,10,0" />
+                                    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding TagCategories}"
+                                              SelectedItem="{Binding EditTagCategory}" Margin="0,10,0,0"
+                                              HorizontalAlignment="Stretch" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Description:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding EditTagDescription}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Aliases:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding EditTagAliases}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="Implies:" VerticalAlignment="Top"
+                                               Margin="0,10,10,0" />
+                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding EditTagImplies}"
+                                             AcceptsReturn="True" Height="60" Margin="0,10,0,0" />
+
+                                </Grid>
+
+                                <StackPanel HorizontalAlignment="Right" Spacing="5">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <Button Content="Merge Into" Command="{Binding BeginMergeTag}" />
+                                        <Button Content="Save Changes" Command="{Binding SaveEditedTag}" />
+                                    </StackPanel>
+                                    <StackPanel IsVisible="{Binding IsMergingTag}" Spacing="5">
+                                        <TextBox Text="{Binding MergeIntoTagName}" PlaceholderText="Target tag name..." />
+                                        <Button Content="Merge Tag" Command="{Binding MergeSelectedTag}" />
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
-                        </StackPanel>
+                        </Border>
                     </StackPanel>
-                </Border>
-            </StackPanel>
-        </ScrollViewer>
+                </ScrollViewer>
             </Grid>
         </TabItem>
 
