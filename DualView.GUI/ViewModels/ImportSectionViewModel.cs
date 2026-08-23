@@ -859,7 +859,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     private async Task SaveCurrentValuesAsync()
     {
-        if (id < 0)
+        if (id < 0 || databaseService == null)
             return;
 
         await saveLock.WaitAsync();
