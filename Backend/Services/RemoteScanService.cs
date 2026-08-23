@@ -1,4 +1,5 @@
 using System.Net;
+using System.Threading.Channels;
 using AsyncKeyedLock;
 using Backend.Models;
 using Backend.Plugins;
@@ -14,6 +15,8 @@ namespace Backend.Services;
 /// </summary>
 public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvider
 {
+    private const int MaximumScanAttempts = 5;
+
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly ILogger<RemoteScanService> logger;
     private readonly IPluginRegistry pluginRegistry;
@@ -27,6 +30,10 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
     ///   Used to limit concurrent scans of the same domain.
     /// </summary>
     private readonly AsyncKeyedLocker<string> domainScanLocks = new();
+    private readonly Channel<ScanWorkItem> scanQueue = Channel.CreateUnbounded<ScanWorkItem>();
+
+    private readonly Task scanWorkerTask;
+    private readonly CancellationTokenSource shutdownCancellationSource = new();
 
     public RemoteScanService(IServiceScopeFactory serviceScopeFactory, ILogger<RemoteScanService> logger,
         IPluginRegistry pluginRegistry)
@@ -54,6 +61,8 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         {
             Timeout = TimeSpan.FromMinutes(1),
         };
+
+        scanWorkerTask = Task.Run(ProcessScanQueueAsync);
     }
 
     public async Task<RemoteDownloadRequest> EnrichDownloadAsync(RemoteDownloadRequest request,
@@ -107,6 +116,13 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         return request;
     }
 
+    public void OnShutdown()
+    {
+        scanQueue.Writer.TryComplete();
+        shutdownCancellationSource.Cancel();
+        scanWorkerTask.GetAwaiter().GetResult();
+    }
+
     public async Task<UrlInformation> InspectUrlAsync(RemoteDownloadRequest request,
         CancellationToken cancellationToken)
     {
@@ -147,22 +163,9 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
     public async Task<PageScanResult> ScanContentPage(RemoteDownloadRequest pageRequest, bool highPriority,
         CancellationToken cancellation)
     {
-        var plugins = pluginRegistry.GetRemoteDownloadPlugins();
-
-        foreach (var plugin in plugins)
-        {
-            var result = await plugin.InspectWebsiteRequest(pageRequest, this, cancellation);
-
-            // The first plugin that knows it will do the scan
-            if ((result & UrlInformation.GalleryPageContent) != 0)
-            {
-                // Scan lock is taken only when downloading content
-
-                return await plugin.ScanPageAsync(pageRequest, this, cancellation);
-            }
-        }
-
-        throw new InvalidOperationException("No plugin found that accepted the scan request");
+        var workItem = new ScanWorkItem(pageRequest, cancellation);
+        await scanQueue.Writer.WriteAsync(workItem, cancellation);
+        return await workItem.Completion.Task.WaitAsync(cancellation);
     }
 
     public string GetDomainForRequestScan(RemoteDownloadRequest request)
@@ -252,6 +255,88 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         finally
         {
             eventLock.Release();
+        }
+    }
+
+    private async Task ProcessScanQueueAsync()
+    {
+        while (await scanQueue.Reader.WaitToReadAsync())
+        {
+            while (scanQueue.Reader.TryRead(out var workItem))
+            {
+                try
+                {
+                    var result = await ScanContentPageWithRetryAsync(workItem.PageRequest, workItem.Cancellation);
+                    workItem.Completion.TrySetResult(result);
+                }
+                catch (Exception ex)
+                {
+                    workItem.Completion.TrySetException(ex);
+                }
+
+                if (shutdownCancellationSource.IsCancellationRequested)
+                {
+                    while (scanQueue.Reader.TryRead(out var queuedWorkItem))
+                        queuedWorkItem.Completion.TrySetCanceled();
+
+                    return;
+                }
+            }
+        }
+    }
+
+    private async Task<PageScanResult> ScanContentPageWithRetryAsync(RemoteDownloadRequest pageRequest,
+        CancellationToken cancellation)
+    {
+        for (var attempt = 1; attempt <= MaximumScanAttempts; ++attempt)
+        {
+            try
+            {
+                var plugins = pluginRegistry.GetRemoteDownloadPlugins();
+                foreach (var plugin in plugins)
+                {
+                    var result = await plugin.InspectWebsiteRequest(pageRequest, this, cancellation);
+                    if ((result & UrlInformation.GalleryPageContent) != 0)
+                        return await plugin.ScanPageAsync(pageRequest, this, cancellation);
+                }
+
+                throw new InvalidOperationException("No plugin found that accepted the scan request");
+            }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await RecordEventAsync(new RemoteScanEvent
+                {
+                    EventType = attempt == MaximumScanAttempts ? "scan-failed" : "scan-retry",
+                    ImageUrl = pageRequest.HtmlUrl,
+                    Detail = ex.Message,
+                    Attempt = attempt,
+                }, cancellation);
+
+                if (attempt == MaximumScanAttempts)
+                    throw;
+
+                await Task.Delay(TimeSpan.FromSeconds(3), cancellation);
+            }
+        }
+
+        throw new InvalidOperationException("Scan retry loop ended unexpectedly");
+    }
+
+    private sealed class ScanWorkItem
+    {
+        public RemoteDownloadRequest PageRequest { get; }
+        public CancellationToken Cancellation { get; }
+        public TaskCompletionSource<PageScanResult> Completion { get; } =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public ScanWorkItem(RemoteDownloadRequest pageRequest, CancellationToken cancellation)
+        {
+            PageRequest = pageRequest;
+            Cancellation = cancellation;
         }
     }
 }

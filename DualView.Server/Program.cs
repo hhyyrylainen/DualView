@@ -229,6 +229,7 @@ lifetime.ApplicationStopping.Register(() =>
     {
         var backgroundJobs = services.GetService<IBackgroundJobs>();
         var remoteDownloadService = services.GetService<IRemoteDownloadService>();
+        var remoteScanService = services.GetService<IRemoteScanService>();
         var operations = app.Services.GetRequiredService<IOperationsStorage>();
 
         operationsStop = Task.Run(() => operations.OnAppShutdown());
@@ -237,6 +238,7 @@ lifetime.ApplicationStopping.Register(() =>
 
         backgroundJobs?.Stop(true, TimeSpan.FromMinutes(1));
         remoteDownloadService?.Stop(true, TimeSpan.FromMinutes(1));
+        remoteScanService?.OnShutdown();
     }
     catch (Exception e)
     {

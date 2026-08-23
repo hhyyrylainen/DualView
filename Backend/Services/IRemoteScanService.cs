@@ -10,6 +10,11 @@ namespace Backend.Services;
 public interface IRemoteScanService
 {
     /// <summary>
+    ///   Stops accepting scans and waits for the currently running scan to finish.
+    /// </summary>
+    public void OnShutdown();
+
+    /// <summary>
     ///   Enriches a download request before it is downloaded.
     /// </summary>
     public Task<RemoteDownloadRequest> EnrichDownloadAsync(RemoteDownloadRequest request,
