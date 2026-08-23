@@ -200,6 +200,32 @@ public class TagDatabaseTests
     }
 
     [Fact]
+    public async Task Parser_ResolvesMultiWordModifierBeforeTag()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var modifierId = await service.CreateTagModifierAsync("very long");
+        var tagId = await service.CreateTagAsync("hair", TagCategory.DescribeCharacterObject);
+        var parser = new TagParser(service);
+        var media = new MediaFile("hair.jpg", "hair-hash");
+        context.MediaFiles.Add(media);
+        await context.SaveChangesAsync();
+
+        var parsed = await parser.ParseTag("very long hair");
+
+        Assert.NotNull(parsed);
+        Assert.Equal(tagId, parsed.TagId);
+        Assert.Contains(parsed.Modifiers, modifier => modifier.Id == modifierId);
+
+        await service.AddParsedAppliedTagToMediaAsync(media.Id, parsed.GetDTO());
+
+        var mediaTags = await service.GetMediaAppliedTagsAsync(media.Id);
+        var appliedTag = Assert.Single(mediaTags);
+        Assert.Equal(tagId, appliedTag.TagId);
+        Assert.Contains(appliedTag.Modifiers, modifier => modifier.Id == modifierId);
+    }
+
+    [Fact]
     public async Task UploadSection_DoesNotAddEquivalentAppliedTagTwice()
     {
         await using var context = SqliteTestHelpers.CreateContext(seed: true);

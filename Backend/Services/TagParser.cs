@@ -248,34 +248,16 @@ public class TagParser : ITagParser
             return null;
 
         // Try to find a tag in the words
-        for (int i = 0; i < words.Length; ++i)
+        for (var tagStart = 1; tagStart < words.Length; ++tagStart)
         {
-            // Tag can be multiple words? 
-            // The bug in C++ was probably that it split by space and then didn't handle multi-word tags correctly.
-            // To fix it, we should try combining words.
-
             // Let's try matching the suffix as a tag and the prefix as modifiers
-            var tagCandidate = string.Join(' ', words.Skip(i));
+            var tagCandidate = string.Join(' ', words.Skip(tagStart));
             var tag = await databaseService.GetTagByNameOrAliasAsync(tagCandidate);
 
             if (tag != null)
             {
-                var modifiers = new List<TagModifier>();
-                var allModifiersValid = true;
-
-                for (int j = 0; j < i; ++j)
-                {
-                    var modifier = await databaseService.GetTagModifierByNameAsync(words[j]);
-                    if (modifier == null)
-                    {
-                        allModifiersValid = false;
-                        break;
-                    }
-
-                    modifiers.Add(modifier);
-                }
-
-                if (allModifiersValid)
+                var modifiers = await ParseModifierSequenceAsync(words, 0, tagStart);
+                if (modifiers != null)
                 {
                     var applied = new AppliedTag(tag.Id)
                     {
@@ -288,27 +270,14 @@ public class TagParser : ITagParser
             }
 
             // Also try prefix as tag and suffix as modifiers
-            tagCandidate = string.Join(' ', words.Take(i + 1));
+            var tagEnd = tagStart + 1;
+            tagCandidate = string.Join(' ', words.Take(tagEnd));
             tag = await databaseService.GetTagByNameOrAliasAsync(tagCandidate);
 
             if (tag != null)
             {
-                var modifiers = new List<TagModifier>();
-                var allModifiersValid = true;
-
-                for (int j = i + 1; j < words.Length; ++j)
-                {
-                    var modifier = await databaseService.GetTagModifierByNameAsync(words[j]);
-                    if (modifier == null)
-                    {
-                        allModifiersValid = false;
-                        break;
-                    }
-
-                    modifiers.Add(modifier);
-                }
-
-                if (allModifiersValid)
+                var modifiers = await ParseModifierSequenceAsync(words, tagEnd, words.Length - tagEnd);
+                if (modifiers != null)
                 {
                     var applied = new AppliedTag(tag.Id)
                     {
@@ -319,6 +288,31 @@ public class TagParser : ITagParser
                     return applied;
                 }
             }
+        }
+
+        return null;
+    }
+
+    private async Task<List<TagModifier>?> ParseModifierSequenceAsync(IReadOnlyList<string> words, int start,
+        int count)
+    {
+        if (count == 0)
+            return [];
+
+        for (var modifierWordCount = count; modifierWordCount > 0; --modifierWordCount)
+        {
+            var modifierName = string.Join(' ', words.Skip(start).Take(modifierWordCount));
+            var modifier = await databaseService.GetTagModifierByNameAsync(modifierName);
+            if (modifier == null)
+                continue;
+
+            var remainingModifiers = await ParseModifierSequenceAsync(words, start + modifierWordCount,
+                count - modifierWordCount);
+            if (remainingModifiers == null)
+                continue;
+
+            remainingModifiers.Insert(0, modifier);
+            return remainingModifiers;
         }
 
         return null;
