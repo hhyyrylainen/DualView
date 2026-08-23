@@ -2442,7 +2442,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var distinctMediaIds = mediaIds.Distinct().ToList();
         if (distinctMediaIds.Count == 0 || appliedTags.Count == 0)
+        {
+            logger.LogWarning("No media files or applied tags provided to add bulk tags");
             return;
+        }
 
         var mediaFiles = await dbContext.MediaFiles
             .Include(media => media.AppliedTags)
@@ -2450,6 +2453,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
         if (mediaFiles.Count != distinctMediaIds.Count)
             throw new ArgumentException("One or more media files were not found");
+
+        int appliedTagCount = 0;
 
         var storedTags = new List<AppliedTag>();
         foreach (var appliedTag in appliedTags)
@@ -2464,9 +2469,15 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             foreach (var storedTag in storedTags)
             {
                 if (media.AppliedTags.All(tag => tag.Id != storedTag.Id))
+                {
                     media.AppliedTags.Add(storedTag);
+                    ++appliedTagCount;
+                }
             }
         }
+
+        logger.LogInformation("Bulk applied {appliedTagCount} tags to {mediaCount} media files", appliedTagCount,
+            mediaFiles.Count);
 
         await SaveAsync();
     }
@@ -2491,10 +2502,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<long> AddParsedAppliedTagToUploadSectionAsync(long sectionId, AppliedTagDTO appliedTag)
     {
         var section = await dbContext.UploadSections.Include(item => item.AppliedTags)
-            .ThenInclude(tag => tag.Modifiers)
-            .AsSplitQuery()
-            .FirstOrDefaultAsync(item => item.Id == sectionId) ??
-            throw new ArgumentException("Upload section not found");
+                          .ThenInclude(tag => tag.Modifiers)
+                          .AsSplitQuery()
+                          .FirstOrDefaultAsync(item => item.Id == sectionId) ??
+                      throw new ArgumentException("Upload section not found");
         var storedTag = await GetOrCreateAppliedTagAsync(appliedTag);
         if (section.AppliedTags.All(tag => !AreEquivalentAppliedTags(tag, storedTag)))
         {
