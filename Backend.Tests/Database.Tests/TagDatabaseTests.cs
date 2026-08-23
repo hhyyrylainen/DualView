@@ -140,6 +140,21 @@ public class TagDatabaseTests
     }
 
     [Fact]
+    public async Task CreateTag_DisallowsExistingAliasName()
+    {
+        await using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var existingTagId = await service.CreateTagAsync("existing tag", TagCategory.DescribeCharacterObject);
+        await service.CreateTagAliasAsync(existingTagId, "conflicting name");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.CreateTagAsync("Conflicting Name", TagCategory.DescribeCharacterObject));
+
+        Assert.Null(await context.Tags.FirstOrDefaultAsync(tag => tag.Name == "conflicting name"));
+    }
+
+    [Fact]
     public async Task ParsedAppliedTags_AreSharedAndRenderCompleteText()
     {
         await using var context = SqliteTestHelpers.CreateContext(seed: true);

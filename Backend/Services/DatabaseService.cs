@@ -2029,6 +2029,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<long> CreateTagAsync(string name, TagCategory category)
     {
         var tag = new Tag(NormalizeTagText(name), category);
+        if (await dbContext.TagAliases.IgnoreQueryFilters().AnyAsync(alias => alias.Name == tag.Name))
+            throw new InvalidOperationException($"A tag alias with the name '{tag.Name}' already exists");
+
         await dbContext.Tags.AddAsync(tag);
         await SaveAsync();
         await updateNotifier.NotifyTagsUpdated();
