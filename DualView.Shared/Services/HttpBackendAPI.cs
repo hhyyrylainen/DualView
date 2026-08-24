@@ -77,6 +77,12 @@ public class HttpBackendAPI : IBackendAPI
         return response.IsSuccessStatusCode;
     }
 
+    public async Task ClearCurrentMissingTagDetections()
+    {
+        var response = await HttpClient.PostAsync("api/v1/missingTag/clearCurrent", null);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<long> StartCollectionVisualSimilaritySort(long collectionId)
     {
         var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/sortByVisualSimilarity", null);

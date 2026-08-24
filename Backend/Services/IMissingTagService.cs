@@ -8,5 +8,6 @@ public interface IMissingTagService
     public Task ReportTagAsync(string tag, MissingTagTarget target, long targetId);
     public Task<List<MissingTagDTO>> GetMissingTagsAsync();
     public Task IgnoreTagAsync(string tag);
+    public Task ClearCurrentDetectionsAsync();
     public Task ResetIgnoredTagsAsync();
 }

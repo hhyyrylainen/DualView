@@ -74,6 +74,16 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
         await NotifyChangedAsync();
     }
 
+    public async Task ClearCurrentDetectionsAsync()
+    {
+        lock (lockObject)
+        {
+            missingTags.Clear();
+        }
+
+        await NotifyChangedAsync();
+    }
+
     public async Task ResetIgnoredTagsAsync()
     {
         using var scope = scopeFactory.CreateScope();

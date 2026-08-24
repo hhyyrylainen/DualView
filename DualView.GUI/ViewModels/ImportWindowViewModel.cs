@@ -168,6 +168,15 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         await ReloadMissingTagsAsync();
     }
 
+    public async Task ClearCurrentMissingTagDetectionsAsync()
+    {
+        if (backendAPI == null)
+            return;
+
+        await backendAPI.ClearCurrentMissingTagDetections();
+        await ReloadMissingTagsAsync();
+    }
+
     private void CreateMissingTag(string tag)
     {
         var manager = windowService?.ShowSingletonWindow<TagManagerWindowViewModel>();

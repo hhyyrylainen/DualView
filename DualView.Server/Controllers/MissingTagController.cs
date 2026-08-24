@@ -28,6 +28,13 @@ public class MissingTagController : Controller
         return Ok();
     }
 
+    [HttpPost("clearCurrent")]
+    public async Task<IActionResult> ClearCurrent()
+    {
+        await missingTagService.ClearCurrentDetectionsAsync();
+        return Ok();
+    }
+
     [HttpPost("resetIgnored")]
     public async Task<IActionResult> ResetIgnored()
     {
