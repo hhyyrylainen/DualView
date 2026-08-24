@@ -32,6 +32,7 @@ public partial class ImportSectionControl : UserControl
         DataContextChanged += OnDataContextChanged;
 
         AddHandler(PointerPressedEvent, OnDragPointerPressed, RoutingStrategies.Bubble, true);
+        AddHandler(PointerPressedEvent, OnSelectionPointerPressed, RoutingStrategies.Bubble, true);
         AddHandler(PointerMovedEvent, OnDragPointerMoved, RoutingStrategies.Bubble, true);
         AddHandler(PointerReleasedEvent, OnDragPointerReleased, RoutingStrategies.Bubble, true);
         AddHandler(DragDrop.DragOverEvent, OnDragOver, RoutingStrategies.Bubble, true);
@@ -113,6 +114,26 @@ public partial class ImportSectionControl : UserControl
         {
             _ = viewModel.LoadTargetNameSuggestionsAsync(text ?? string.Empty);
         }
+    }
+
+    private void OnSelectionPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.KeyModifiers.HasFlag(KeyModifiers.Shift) ||
+            DataContext is not ImportSectionViewModel viewModel)
+            return;
+
+        var mediaViewer = FindMediaViewer(e.Source as Control);
+        if (mediaViewer?.DataContext is not MediaViewerViewModel item || !item.Selected)
+            return;
+
+        var itemIndex = viewModel.Media.IndexOf(item);
+        var startIndex = itemIndex - 1;
+        while (startIndex >= 0 && !viewModel.Media[startIndex].Selected)
+            --startIndex;
+
+        ++startIndex;
+        for (var index = startIndex; index <= itemIndex; ++index)
+            viewModel.Media[index].Selected = true;
     }
 
     private void OnDragPointerPressed(object? sender, PointerPressedEventArgs e)
