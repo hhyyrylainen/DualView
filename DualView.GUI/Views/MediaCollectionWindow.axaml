@@ -47,6 +47,7 @@
                           IsEnabled="{Binding !IsVisualSimilarityMode}" />
             </MenuItem>
             <MenuItem Header="Tools">
+                <MenuItem Header="Reorder Collection" Command="{Binding OpenReorderWindow}" />
                 <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />
                 <MenuItem Header="Get Info" Command="{Binding ShowCollectionInfo}" />
                 <Separator />

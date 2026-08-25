@@ -288,6 +288,15 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public void DeleteCollection() => _ = DeleteCollectionAsync();
     public void DeleteCollectionAndImages() => _ = DeleteCollectionAndImagesAsync();
 
+    public void OpenReorderWindow()
+    {
+        if (collectionId == null || windowService == null)
+            return;
+
+        var id = collectionId.Value;
+        windowService.ShowWindow<ReorderWindowViewModel>(reorder => _ = reorder.Initialize(id));
+    }
+
     public void Export()
     {
         if (Collection == null || windowService == null)
