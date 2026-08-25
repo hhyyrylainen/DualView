@@ -86,10 +86,27 @@ public class ReorderWindowViewModel : ViewModelBase, IDisposable
     public void MoveFromWorkspace()
     {
         var selected = Workspace.Where(i => i.Selected).ToList();
+        if (selected.Count == 0)
+        {
+            windowService?.ShowNoticeWindow("Select something in the main view to insert in front of first");
+            return;
+        }
+
+        var insertionIndex = MainList.Count;
+        for (var index = 0; index < MainList.Count; ++index)
+        {
+            if (MainList[index].Selected)
+            {
+                insertionIndex = index;
+                break;
+            }
+        }
+
         foreach (var item in selected)
         {
             Workspace.Remove(item);
-            MainList.Add(item);
+            MainList.Insert(insertionIndex, item);
+            ++insertionIndex;
             item.Selected = false;
         }
     }
