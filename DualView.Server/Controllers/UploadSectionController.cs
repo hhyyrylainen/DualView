@@ -130,8 +130,15 @@ public class UploadSectionController : Controller
     [HttpPost("active")]
     public async Task<ActionResult> SetActive([FromBody] long? sectionId)
     {
-        await databaseService.SetUploadSectionActiveAsync(sectionId);
-        return Ok();
+        try
+        {
+            await databaseService.SetUploadSectionActiveAsync(sectionId);
+            return Ok();
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(ex.Message);
+        }
     }
 
     [HttpPost("active/addMedia")]

@@ -114,16 +114,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         set
         {
             if (SetProperty(ref field, value) && value)
-            {
-                try
-                {
-                    _ = databaseService?.SetUploadSectionActiveAsync(null);
-                }
-                catch (Exception e)
-                {
-                    windowService?.ShowErrorWindow("Failed to set upload section active", e);
-                }
-            }
+                _ = SetTargetNewSectionAsync();
         }
     }
 
@@ -287,6 +278,19 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         foreach (var section in Sections)
             section.Dispose();
         Hamburger.Dispose();
+    }
+
+    private async Task SetTargetNewSectionAsync()
+    {
+        try
+        {
+            if (databaseService != null)
+                await databaseService.SetUploadSectionActiveAsync(null);
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to set upload section active", ex);
+        }
     }
 
     private void SelectTab(int tab)
