@@ -85,7 +85,7 @@ public sealed class BrowserImpersonationHeaders
             request.Headers.TryAddWithoutValidation("Sec-Fetch-User", "?1");
         }
 
-        request.Headers.Connection.ParseAdd("keep-alive");
+        // request.Headers.Connection.ParseAdd("keep-alive");
         request.Headers.TryAddWithoutValidation("Upgrade-Insecure-Requests", "1");
     }
 }
