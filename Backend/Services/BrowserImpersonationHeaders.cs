@@ -88,4 +88,24 @@ public sealed class BrowserImpersonationHeaders
         // request.Headers.Connection.ParseAdd("keep-alive");
         request.Headers.TryAddWithoutValidation("Upgrade-Insecure-Requests", "1");
     }
+
+    /// <summary>
+    ///   Headers to pass to cURL download.
+    /// </summary>
+    /// <returns>Headers for cURL to do this impersonation</returns>
+    public IEnumerable<KeyValuePair<string, string>> PassedHeaders()
+    {
+        foreach (var header in Headers)
+        {
+            if (header.Key.Equals("Cookie", StringComparison.OrdinalIgnoreCase) ||
+                HeadersNotSuitableForReplay.Contains(header.Key))
+            {
+                continue;
+            }
+
+            yield return header;
+        }
+
+        yield return new KeyValuePair<string, string>("Upgrade-Insecure-Requests", "1");
+    }
 }
