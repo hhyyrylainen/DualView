@@ -26,6 +26,8 @@ public class DualViewSettings
 
     public bool HoldPurge { get; set; }
 
+    public bool UseCurlForRemoteDownloads { get; set; }
+
     public void UpdateFromClient(DualViewSettings newSettings)
     {
         if (newSettings.LocalMediaStorageLocation != null)
@@ -36,5 +38,6 @@ public class DualViewSettings
 
         AudioBufferingMs = newSettings.AudioBufferingMs;
         HoldPurge = newSettings.HoldPurge;
+        UseCurlForRemoteDownloads = newSettings.UseCurlForRemoteDownloads;
     }
 }

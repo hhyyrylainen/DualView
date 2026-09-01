@@ -80,7 +80,7 @@
                 </ScrollViewer>
                 <ScrollViewer IsVisible="{Binding TabIsMisc}" Grid.Row="1">
                     <Grid Margin="0 0 4 0" ColumnDefinitions="Auto, *, Auto"
-                          RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto">
+                          RowDefinitions="Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto, Auto">
                         <TextBlock Text="Miscellaneous" Grid.ColumnSpan="3"
                                    FontSize="20"
                                    HorizontalAlignment="Center" />
@@ -132,6 +132,12 @@
                                   IsChecked="{Binding HoldPurge}"
                                   ToolTip.Tip="Prevents maintenance jobs from permanently deleting deleted items until this is turned on.">
                             Hold purge
+                        </CheckBox>
+
+                        <CheckBox Grid.Column="1" Grid.Row="15" Grid.ColumnSpan="2"
+                                  IsChecked="{Binding UseCurlForRemoteDownloads}"
+                                  ToolTip.Tip="Uses the curl command line program for remote downloads instead of .NET HttpClient.">
+                            Use curl for remote downloads
                         </CheckBox>
                     </Grid>
                 </ScrollViewer>

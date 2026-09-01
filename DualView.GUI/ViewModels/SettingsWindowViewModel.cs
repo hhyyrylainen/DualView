@@ -195,6 +195,20 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public bool UseCurlForRemoteDownloads
+    {
+        get => generalSettings?.UseCurlForRemoteDownloads ?? false;
+        set
+        {
+            if (generalSettings == null || generalSettings.UseCurlForRemoteDownloads == value)
+                return;
+
+            generalSettings.UseCurlForRemoteDownloads = value;
+            UnsavedMainSettings = true;
+            OnPropertyChanged();
+        }
+    }
+
     // Other properties
 
     public HamburgerMenuViewModel Hamburger { get; }
@@ -319,6 +333,7 @@ public class SettingsWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(BrowserPluginAccessKey));
         OnPropertyChanged(nameof(AudioBufferingMs));
         OnPropertyChanged(nameof(AudioBufferingMsText));
+        OnPropertyChanged(nameof(UseCurlForRemoteDownloads));
         OnPropertyChanged(nameof(HoldPurge));
     }
 
