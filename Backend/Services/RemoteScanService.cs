@@ -215,7 +215,8 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
             httpRequest.Headers.Referrer = referrer;
         }
 
-        httpRequest.Headers.Host = new Uri(request.HtmlUrl).Host;
+        // Host should be automatic
+        // httpRequest.Headers.Host = new Uri(request.HtmlUrl).Host;
 
         if (request.Cookies.Count > 0)
         {

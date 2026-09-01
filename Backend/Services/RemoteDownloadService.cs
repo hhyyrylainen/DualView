@@ -253,15 +253,29 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             httpRequest.Headers.TryAddWithoutValidation("Cookie", cookieHeader);
         }
 
-        httpRequest.Headers.Host = new Uri(request.ImageUrl).Host;
+        // Host should be automatic, so don't set it manually (which would break redirects)
+        // httpRequest.Headers.Host = new Uri(request.ImageUrl).Host;
+
+        // If we want to always close the connections:
+        // httpRequest.Headers.ConnectionClose = true;
 
         using var response = await httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var mediaStream = new MemoryStream();
-        await responseStream.CopyToAsync(mediaStream, cancellationToken);
+        try
+        {
+            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            await responseStream.CopyToAsync(mediaStream, cancellationToken);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Failed to read response stream, reported length: {Length}",
+                response.Content.Headers.ContentLength);
+            throw;
+        }
+
         mediaStream.Position = 0;
 
         var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
