@@ -21,6 +21,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly IRemoteScanService remoteScanService;
     private readonly ILogger<RemoteDownloadService> logger;
+    private readonly ICurlDownloadService curlDownloadService;
     private readonly SemaphoreSlim processingLock = new(1, 1);
     private readonly Channel<RemoteDownloadRequest> downloadQueue = Channel.CreateUnbounded<RemoteDownloadRequest>();
     private readonly HttpClient httpClient;
@@ -31,11 +32,13 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
     private bool running;
 
     public RemoteDownloadService(IServiceScopeFactory serviceScopeFactory,
-        IRemoteScanService remoteScanService, ILogger<RemoteDownloadService> logger)
+        IRemoteScanService remoteScanService, ILogger<RemoteDownloadService> logger,
+        ICurlDownloadService curlDownloadService)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.remoteScanService = remoteScanService;
         this.logger = logger;
+        this.curlDownloadService = curlDownloadService;
 
         var httpHandler = new SocketsHttpHandler
         {
@@ -237,6 +240,79 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             RemoveCachedUrl(request);
         }
 
+        var settings = await databaseService.GetAppSettingsAsync();
+        string? curlOutputPath = null;
+        try
+        {
+            Stream mediaStream;
+            if (settings.UseCurlForRemoteDownloads)
+            {
+                var referrer = Uri.TryCreate(request.Referrer, UriKind.Absolute, out var parsedReferrer)
+                    ? parsedReferrer.ToString()
+                    : null;
+                curlOutputPath = await curlDownloadService.DownloadAsync(request.ImageUrl,
+                    new BrowserImpersonationHeaders(request.ImpersonationHeaders).PassedHeaders(), referrer,
+                    request.Cookies, cancellationToken);
+                mediaStream = File.OpenRead(curlOutputPath);
+            }
+            else
+            {
+                mediaStream = await DownloadWithHttpClientAsync(request, cancellationToken);
+            }
+
+            await using (mediaStream)
+            {
+                var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
+
+                // Make sure there is an active upload section to avoid images bundling up as separate sections if we
+                // have a long queue
+                await databaseService.SetUploadSectionActiveAsync(section.Id);
+
+                MediaFile media;
+                try
+                {
+                    media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, section.Name);
+                }
+                catch (Exception)
+                {
+                    // Try to read the first 200 characters as text from the stream
+                    mediaStream.Position = 0;
+
+                    using var reader = new StreamReader(mediaStream, Encoding.UTF8,
+                        detectEncodingFromByteOrderMarks: true,
+                        bufferSize: 1024, leaveOpen: true);
+
+                    var buffer = new char[200];
+                    var charsRead = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
+                    var startOfResponse = new string(buffer, 0, charsRead);
+
+                    logger.LogError("Cannot decode downloaded data as an image: {StartOfResponse}", startOfResponse);
+                    throw;
+                }
+
+                await ApplyDownloadMetadataAsync(media, request, databaseService, tagParser, missingTagService);
+                AddCachedUrl(request, media.Id);
+            }
+        }
+        finally
+        {
+            if (curlOutputPath != null)
+            {
+                try
+                {
+                    File.Delete(curlOutputPath);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to delete cURL download file {Path}", curlOutputPath);
+                }
+            }
+        }
+    }
+
+    private async Task<Stream> DownloadWithHttpClientAsync(RemoteDownloadRequest request,
+        CancellationToken cancellationToken)
+    {
         using var httpRequest = new HttpRequestMessage(HttpMethod.Get, request.ImageUrl);
         new BrowserImpersonationHeaders(request.ImpersonationHeaders).ConfigureHttpRequest(httpRequest, false);
 
@@ -263,50 +339,19 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             cancellationToken);
         response.EnsureSuccessStatusCode();
 
-        await using var mediaStream = new MemoryStream();
+        await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var mediaStream = new MemoryStream();
         try
         {
-            await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
             await responseStream.CopyToAsync(mediaStream, cancellationToken);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Failed to read response stream, reported length: {Length}",
-                response.Content.Headers.ContentLength);
-            throw;
-        }
-
-        mediaStream.Position = 0;
-
-        var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
-
-        // Make sure there is an active upload section to avoid images bundling up as separate sections if we have
-        // a long queue
-        await databaseService.SetUploadSectionActiveAsync(section.Id);
-
-        MediaFile media;
-        try
-        {
-            media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, section.Name);
-        }
-        catch (Exception)
-        {
-            // Try to read the first 200 characters as text from the stream
             mediaStream.Position = 0;
-
-            using var reader = new StreamReader(mediaStream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true,
-                bufferSize: 1024, leaveOpen: true);
-
-            var buffer = new char[200];
-            var charsRead = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
-            var startOfResponse = new string(buffer, 0, charsRead);
-
-            logger.LogError("Cannot decode downloaded data as an image: {StartOfResponse}", startOfResponse);
+            return mediaStream;
+        }
+        catch
+        {
+            await mediaStream.DisposeAsync();
             throw;
         }
-
-        await ApplyDownloadMetadataAsync(media, request, databaseService, tagParser, missingTagService);
-        AddCachedUrl(request, media.Id);
     }
 
     private static async Task ApplyDownloadMetadataAsync(MediaFile media, RemoteDownloadRequest request,

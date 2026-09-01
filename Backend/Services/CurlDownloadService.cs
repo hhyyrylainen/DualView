@@ -6,7 +6,7 @@ namespace Backend.Services;
 /// <summary>
 ///   Downloads remote files using the cURL command line program.
 /// </summary>
-public sealed class CurlDownloadService
+public sealed class CurlDownloadService : ICurlDownloadService
 {
     private const int MaximumLoggedOutputLength = 500;
 

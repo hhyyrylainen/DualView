@@ -145,6 +145,7 @@ builder.Services.AddScoped<IMediaImportHandler, MediaImportHandler>();
 builder.Services.AddScoped<IMediaProcessingService, MediaProcessingService>();
 builder.Services.AddSingleton<IOperationsStorage, OperationsStorage>();
 builder.Services.AddSingleton<ITemporaryFolderService, TemporaryFolderService>();
+builder.Services.AddSingleton<ICurlDownloadService, CurlDownloadService>();
 builder.Services.AddSingleton<IRemoteScanService, RemoteScanService>();
 builder.Services.AddSingleton<IRemoteDownloadService, RemoteDownloadService>();
 builder.Services.AddSingleton<IMissingTagService, MissingTagService>();
