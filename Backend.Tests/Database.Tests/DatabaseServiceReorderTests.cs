@@ -21,6 +21,41 @@ public class DatabaseServiceReorderTests
     }
 
     [Fact]
+    public async Task SetUploadSectionActive_ClearsPreviousSectionBeforeSelectingNewOne()
+    {
+        using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var firstSection = new UploadSection("First") { Selected = true, DisplayIndex = 0 };
+        var secondSection = new UploadSection("Second") { DisplayIndex = 1 };
+        await context.UploadSections.AddRangeAsync(firstSection, secondSection);
+        await context.SaveChangesAsync();
+
+        await service.SetUploadSectionActiveAsync(secondSection.Id);
+
+        Assert.False(await context.UploadSections.Where(section => section.Id == firstSection.Id)
+            .Select(section => section.Selected).SingleAsync());
+        Assert.True(await context.UploadSections.Where(section => section.Id == secondSection.Id)
+            .Select(section => section.Selected).SingleAsync());
+    }
+
+    [Fact]
+    public async Task SetUploadSectionActive_RejectsMissingSectionWithoutChangingCurrentSelection()
+    {
+        using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var section = new UploadSection("Current") { Selected = true };
+        await context.UploadSections.AddAsync(section);
+        await context.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<ArgumentException>(() => service.SetUploadSectionActiveAsync(999));
+
+        Assert.True(await context.UploadSections.Where(item => item.Id == section.Id)
+            .Select(item => item.Selected).SingleAsync());
+    }
+
+    [Fact]
     public async Task ReorderCollection_DoesNotRemoveItems()
     {
         // Arrange

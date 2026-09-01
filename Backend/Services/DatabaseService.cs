@@ -1663,13 +1663,31 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task SetUploadSectionActiveAsync(long? sectionId)
     {
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+
         var sections = await dbContext.UploadSections.ToListAsync();
         var previousActiveSection = sections.FirstOrDefault(section => section.Selected);
+        var activeSection = sectionId.HasValue
+            ? sections.FirstOrDefault(section => section.Id == sectionId.Value)
+            : null;
+        if (sectionId.HasValue && activeSection == null)
+            throw new ArgumentException("Upload section not found", nameof(sectionId));
+
+        // SQLite checks the unique partial index after each UPDATE. Clear the old active
+        // section in a separate statement before activating the new one, while keeping both
+        // statements in one transaction so clients never observe the intermediate state.
         foreach (var section in sections)
-            section.Selected = sectionId.HasValue && section.Id == sectionId.Value;
+            section.Selected = false;
         await SaveAsync();
 
-        var activeSection = sections.FirstOrDefault(section => section.Selected);
+        if (activeSection != null)
+        {
+            activeSection.Selected = true;
+            await SaveAsync();
+        }
+
+        await transaction.CommitAsync();
+
         if (previousActiveSection?.Id != activeSection?.Id)
         {
             await updateNotifier.NotifyUploadSectionActiveChanged(activeSection?.Id);
@@ -2602,6 +2620,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var distinctMediaIds = mediaIds.Distinct().ToList();
         if (distinctMediaIds.Count == 0 || appliedTags.Count == 0)
         {
+            // TODO: only call on import if there's actually tags
+
             logger.LogWarning("No media files or applied tags provided to add bulk tags");
             return;
         }
