@@ -2147,6 +2147,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
             replacementImplications.Add(new TagImply(replacementKey.Item1, replacementKey.Item2));
         }
+
         dbContext.TagImplies.RemoveRange(implications);
         await dbContext.TagImplies.AddRangeAsync(replacementImplications);
 
@@ -2498,7 +2499,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task UpdateTagSuperAliasAsync(string originalAlias, string alias, string expanded)
     {
         var existing = await dbContext.TagSuperAliases.FindAsync(originalAlias.ToLowerInvariant()) ??
-                        throw new ArgumentException("Super alias not found");
+                       throw new ArgumentException("Super alias not found");
         var normalizedAlias = NormalizeTagText(alias);
         var trimmedExpanded = expanded.Trim();
         if (trimmedExpanded.Length == 0)
@@ -2620,8 +2621,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var distinctMediaIds = mediaIds.Distinct().ToList();
         if (distinctMediaIds.Count == 0 || appliedTags.Count == 0)
         {
-            // TODO: only call on import if there's actually tags
-
             logger.LogWarning("No media files or applied tags provided to add bulk tags");
             return;
         }

@@ -354,7 +354,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         }
     }
 
-    private static async Task ApplyDownloadMetadataAsync(MediaFile media, RemoteDownloadRequest request,
+    private async Task ApplyDownloadMetadataAsync(MediaFile media, RemoteDownloadRequest request,
         IDatabaseService databaseService, ITagParser tagParser, IMissingTagService missingTagService)
     {
         var importInfo = await databaseService.GetMediaImportInfoAsync(media.Id) ?? new MediaImportInfo(media.Id);
@@ -384,7 +384,14 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             }
         }
 
-        await databaseService.AddParsedAppliedTagsToMediaAsync([media.Id], parsedTags);
+        if (parsedTags.Count > 0)
+        {
+            await databaseService.AddParsedAppliedTagsToMediaAsync([media.Id], parsedTags);
+        }
+        else
+        {
+            logger.LogInformation("No tags parsed for downloaded media file {MediaId}", media.Id);
+        }
     }
 
     private long? GetCachedMediaId(RemoteDownloadRequest request)
