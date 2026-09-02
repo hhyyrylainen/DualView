@@ -98,7 +98,17 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
 
     private void OnTagCreated(string tagName, long tagId)
     {
-        _ = ApplyCreatedTagAsync(tagName, tagId);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ApplyCreatedTagAsync(tagName, tagId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to apply newly created tag {TagId} to missing tag entries", tagId);
+            }
+        });
     }
 
     private async Task ApplyCreatedTagAsync(string tagName, long tagId)
