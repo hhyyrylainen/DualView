@@ -10,6 +10,7 @@ public interface IAppEvents
     public delegate void JobCreatedEventHandler(long aiJobId);
     public delegate void FlowChangedEventHandler(long flowId);
     public delegate void TagCreatedEventHandler(string tagName, long tagId);
+    public delegate void TagUpdatedEventHandler(long tagId);
 
     // Events
     public event NoParamsEventHandler SettingsChanged;
@@ -18,6 +19,7 @@ public interface IAppEvents
     public event JobCreatedEventHandler JobCompleted;
     public event FlowChangedEventHandler FlowChanged;
     public event TagCreatedEventHandler TagCreated;
+    public event TagUpdatedEventHandler TagUpdated;
 
     // Triggering events
     public void NotifySettingsChanged();
@@ -26,4 +28,5 @@ public interface IAppEvents
     public void NotifyJobCompleted(long aiJobId);
     public void NotifyFlowChanged(long flowId);
     public void NotifyTagCreated(string tagName, long tagId);
+    public void NotifyTagUpdated(long tagId);
 }

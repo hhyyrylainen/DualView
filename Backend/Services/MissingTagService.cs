@@ -20,6 +20,7 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
         this.appEvents = appEvents;
         this.logger = logger;
         appEvents.TagCreated += OnTagCreated;
+        appEvents.TagUpdated += OnTagUpdated;
     }
 
     public async Task ReportTagAsync(string tag, MissingTagTarget target, long targetId)
@@ -94,19 +95,30 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
     public void Dispose()
     {
         appEvents.TagCreated -= OnTagCreated;
+        appEvents.TagUpdated -= OnTagUpdated;
     }
 
     private void OnTagCreated(string tagName, long tagId)
+    {
+        RunTagApplicationInBackground(() => ApplyCreatedTagAsync(tagName, tagId), tagId);
+    }
+
+    private void OnTagUpdated(long tagId)
+    {
+        RunTagApplicationInBackground(() => ApplyUpdatedTagAsync(tagId), tagId);
+    }
+
+    private void RunTagApplicationInBackground(Func<Task> operation, long tagId)
     {
         _ = Task.Run(async () =>
         {
             try
             {
-                await ApplyCreatedTagAsync(tagName, tagId);
+                await operation();
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to apply newly created tag {TagId} to missing tag entries", tagId);
+                logger.LogError(ex, "Failed to apply tag {TagId} to missing tag entries", tagId);
             }
         });
     }
@@ -132,34 +144,88 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
             return;
         }
 
+        if (await ApplyParsedTagAsync(database, parsed.GetDTO(), entries))
+        {
+            RemoveAppliedEntries(entries);
+        }
+
+        await NotifyChangedAsync();
+        logger.LogInformation("Applied newly created tag {TagId} to {Count} missing tag entries", tagId, entries.Count);
+    }
+
+    private async Task ApplyUpdatedTagAsync(long tagId)
+    {
+        using var scope = scopeFactory.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var parser = scope.ServiceProvider.GetRequiredService<ITagParser>();
+        var tag = await database.GetTagAsync(tagId);
+        if (tag == null)
+            return;
+
+        var names = (await database.GetTagAliasesAsync(tagId)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        names.Add(tag.Name);
+
+        List<MissingTagDTO> entries;
+        lock (lockObject)
+        {
+            entries = missingTags.Where(item => names.Contains(item.Tag)).ToList();
+        }
+
+        foreach (var matchingEntries in entries.GroupBy(item => item.Tag, StringComparer.OrdinalIgnoreCase))
+        {
+            var parsed = await parser.ParseTag(matchingEntries.Key);
+            var groupedEntries = matchingEntries.ToList();
+            if (parsed == null || !await ApplyParsedTagAsync(database, parsed.GetDTO(), groupedEntries))
+                continue;
+
+            RemoveAppliedEntries(groupedEntries);
+        }
+
+        if (entries.Count > 0)
+            await NotifyChangedAsync();
+    }
+
+    private async Task<bool> ApplyParsedTagAsync(IDatabaseService database, AppliedTagDTO parsedTag,
+        List<MissingTagDTO> entries)
+    {
+        var mediaIds = new HashSet<long>();
         foreach (var entry in entries)
         {
             switch (entry.Target)
             {
                 case MissingTagTarget.MediaFile:
-                    await database.AddParsedAppliedTagToMediaAsync(entry.TargetId, parsed.GetDTO());
+                    mediaIds.Add(entry.TargetId);
                     break;
                 case MissingTagTarget.MediaImportInfo:
                     var importInfo = await database.GetMediaImportInfoAsync(entry.TargetId);
                     if (importInfo != null)
-                        await database.AddParsedAppliedTagToMediaAsync(importInfo.MediaFileId, parsed.GetDTO());
+                        mediaIds.Add(importInfo.MediaFileId);
                     break;
                 case MissingTagTarget.DownloadGallery:
                     var gallery = await database.GetDownloadGalleryAsync(entry.TargetId);
                     if (gallery != null)
+                    {
                         foreach (var import in gallery.AssociatedImports)
-                            await database.AddParsedAppliedTagToMediaAsync(import.MediaFileId, parsed.GetDTO());
+                            mediaIds.Add(import.MediaFileId);
+                    }
                     break;
             }
         }
 
+        if (mediaIds.Count == 0)
+            return true;
+
+        await database.AddParsedAppliedTagsToMediaAsync(mediaIds.ToList(), [parsedTag]);
+        return true;
+    }
+
+    private void RemoveAppliedEntries(IEnumerable<MissingTagDTO> entries)
+    {
+        var entrySet = entries.ToHashSet();
         lock (lockObject)
         {
-            missingTags.RemoveAll(item => item.Tag.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+            missingTags.RemoveAll(entrySet.Contains);
         }
-
-        await NotifyChangedAsync();
-        logger.LogInformation("Applied newly created tag {TagId} to {Count} missing tag entries", tagId, entries.Count);
     }
 
     private async Task NotifyChangedAsync()

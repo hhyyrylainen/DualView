@@ -2077,6 +2077,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         await SaveAsync();
         await updateNotifier.NotifyTagUpdated(id);
+        appEvents.NotifyTagUpdated(id);
         await updateNotifier.NotifyTagsUpdated();
         logger.LogInformation("Updated tag {TagId}", id);
     }
@@ -2197,6 +2198,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await transaction.CommitAsync();
 
         await updateNotifier.NotifyTagUpdated(targetTagId);
+        appEvents.NotifyTagUpdated(targetTagId);
         await updateNotifier.NotifyTagsUpdated();
         logger.LogInformation("Merged tag {SourceTagId} into tag {TargetTagId}", id, targetTagId);
     }
@@ -2259,6 +2261,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.TagAliases.AddAsync(tagAlias);
         await SaveAsync();
         await updateNotifier.NotifyTagUpdated(tagId);
+        appEvents.NotifyTagUpdated(tagId);
         logger.LogInformation("Added alias to tag {TagId}", tagId);
     }
 
@@ -2271,6 +2274,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             dbContext.TagAliases.Remove(tagAlias);
             await SaveAsync();
             await updateNotifier.NotifyTagUpdated(tagId);
+            appEvents.NotifyTagUpdated(tagId);
             logger.LogInformation("Removed alias from tag {TagId}", tagId);
         }
     }

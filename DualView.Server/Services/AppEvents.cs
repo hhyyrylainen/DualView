@@ -15,6 +15,7 @@ public class AppEvents : IAppEvents
     private event IAppEvents.JobCreatedEventHandler? JobCompletedInternal;
     private event IAppEvents.FlowChangedEventHandler? FlowChangedInternal;
     private event IAppEvents.TagCreatedEventHandler? TagCreatedInternal;
+    private event IAppEvents.TagUpdatedEventHandler? TagUpdatedInternal;
 
     public event IAppEvents.NoParamsEventHandler? SettingsChanged
     {
@@ -88,6 +89,18 @@ public class AppEvents : IAppEvents
         }
     }
 
+    public event IAppEvents.TagUpdatedEventHandler? TagUpdated
+    {
+        add
+        {
+            lock (@lock) TagUpdatedInternal += value;
+        }
+        remove
+        {
+            lock (@lock) TagUpdatedInternal -= value;
+        }
+    }
+
     public void NotifySettingsChanged()
     {
         lock (@lock)
@@ -139,6 +152,15 @@ public class AppEvents : IAppEvents
         {
             var handlers = TagCreatedInternal;
             handlers?.Invoke(tagName, tagId);
+        }
+    }
+
+    public void NotifyTagUpdated(long tagId)
+    {
+        lock (@lock)
+        {
+            var handlers = TagUpdatedInternal;
+            handlers?.Invoke(tagId);
         }
     }
 }
