@@ -35,13 +35,14 @@ var serverConfig = new ServerConfigurationService(logger, dataFolderService);
 string dbFilePath = serverConfig.DatabaseFilePath ?? dataFolderService.GetDatabaseFilePath();
 logger.Info($"Using database at: {dbFilePath}");
 
-// Create a connection string with WAL mode enabled
+// Create a connection string with WAL mode enabled. Do not use SQLite shared-cache mode:
+// shared cache uses table-level locks and can turn otherwise harmless concurrent reads/writes
+// into SQLITE_LOCKED errors. WAL already provides the desired reader/writer concurrency.
 var connectionString = new SqliteConnectionStringBuilder
 {
     DataSource = dbFilePath,
     Mode = SqliteOpenMode.ReadWriteCreate,
-    Cache = SqliteCacheMode.Shared,
-    DefaultTimeout = 5000,
+    DefaultTimeout = 30,
     // Ensures PRAGMA foreign_keys=ON for every connection created from this connection string
     ForeignKeys = true,
 }.ToString();
@@ -59,10 +60,9 @@ await using (var pragmaConnection = new SqliteConnection(connectionString))
     command.CommandText = "PRAGMA synchronous=NORMAL;";
     command.ExecuteNonQuery();
 
-    // Timeout set above which should hopefully be the same
-    /*// Strongly recommended to reduce transient SQLITE_BUSY:
-    command.CommandText = "PRAGMA busy_timeout=5000;";
-    await command.ExecuteNonQueryAsync();*/
+    // Keep the initialization connection consistent with the connection-string timeout.
+    command.CommandText = "PRAGMA busy_timeout=30000;";
+    await command.ExecuteNonQueryAsync();
 }
 
 //
