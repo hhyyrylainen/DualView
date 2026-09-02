@@ -2314,12 +2314,14 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<long> AddAppliedTagToMediaAsync(long mediaId, long tagId, List<long>? modifierIds,
         long? combinedWithAppliedTagId, string? combineWord)
     {
-        var media = await dbContext.MediaFiles.Include(m => m.AppliedTags).FirstOrDefaultAsync(m => m.Id == mediaId) ??
+        var media = await dbContext.MediaFiles.FirstOrDefaultAsync(m => m.Id == mediaId) ??
                     throw new ArgumentException("Media not found");
 
         var appliedTag = await GetOrCreateAppliedTagAsync(tagId, modifierIds, combinedWithAppliedTagId, combineWord);
+        var alreadyApplied = await dbContext.AppliedTags.AnyAsync(tag => tag.Id == appliedTag.Id &&
+            tag.MediaFiles.Any(relatedMedia => relatedMedia.Id == mediaId));
 
-        if (media.AppliedTags.All(tag => tag.Id != appliedTag.Id))
+        if (!alreadyApplied)
         {
             media.AppliedTags.Add(appliedTag);
             await SaveAsync();
