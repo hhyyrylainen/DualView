@@ -22,6 +22,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private readonly ISignalRService? signalRService;
     private readonly IBackendAPI? backendAPI;
     private List<RecentImportSectionDTO> loadedRecentSections = new();
+    private List<MissingTagDTO> loadedMissingTags = new();
 
     public ImportWindowViewModel()
     {
@@ -107,6 +108,16 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<MissingTagViewModel> MissingTags { get; } = new();
 
     public string MissingTagsHeader => $"Missing Tags ({MissingTags.Count})";
+
+    public bool SortMissingTagsByFrequency
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value))
+                UpdateMissingTags();
+        }
+    }
 
     public bool TargetNewSection
     {
@@ -223,10 +234,8 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 loadedRecentSections = recentSections;
-                MissingTags.Clear();
-                foreach (var missingTag in missingTags)
-                    MissingTags.Add(new MissingTagViewModel(missingTag, IgnoreMissingTagAsync, CreateMissingTag));
-                OnPropertyChanged(nameof(MissingTagsHeader));
+                loadedMissingTags = missingTags;
+                UpdateMissingTags();
                 var existingSections = Sections.ToDictionary(section => section.Id);
                 var refreshedSections = sections.Select(section =>
                     existingSections.TryGetValue(section.Id, out var existingSection)
@@ -325,11 +334,27 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
-            MissingTags.Clear();
-            foreach (var missingTag in missingTags)
-                MissingTags.Add(new MissingTagViewModel(missingTag, IgnoreMissingTagAsync, CreateMissingTag));
-            OnPropertyChanged(nameof(MissingTagsHeader));
+            loadedMissingTags = missingTags;
+            UpdateMissingTags();
         });
+    }
+
+    private void UpdateMissingTags()
+    {
+        MissingTags.Clear();
+        var groupedMissingTags = loadedMissingTags
+            .GroupBy(tag => tag.Tag, StringComparer.Ordinal)
+            .Select(group => (Tag: group.First(), Count: group.Count()));
+        if (SortMissingTagsByFrequency)
+            groupedMissingTags = groupedMissingTags.OrderByDescending(group => group.Count);
+
+        foreach (var missingTag in groupedMissingTags)
+        {
+            MissingTags.Add(new MissingTagViewModel(missingTag.Tag, missingTag.Count,
+                IgnoreMissingTagAsync, CreateMissingTag));
+        }
+
+        OnPropertyChanged(nameof(MissingTagsHeader));
     }
 
     private void RefreshRecentNames()
@@ -375,10 +400,12 @@ public sealed class MissingTagViewModel
 {
     private readonly Func<string, Task> ignore;
     private readonly Action<string> create;
+    private readonly string originalTag;
 
-    public MissingTagViewModel(MissingTagDTO tag, Func<string, Task> ignore, Action<string> create)
+    public MissingTagViewModel(MissingTagDTO tag, int count, Func<string, Task> ignore, Action<string> create)
     {
-        Tag = tag.Tag;
+        originalTag = tag.Tag;
+        Tag = count > 1 ? $"{tag.Tag} ({count})" : tag.Tag;
         Target = tag.Target.ToString();
         TargetId = tag.TargetId;
         this.ignore = ignore;
@@ -389,7 +416,7 @@ public sealed class MissingTagViewModel
     public string Target { get; }
     public long TargetId { get; }
 
-    public void Ignore() => _ = ignore(Tag);
+    public void Ignore() => _ = ignore(originalTag);
 
-    public void Create() => create(Tag);
+    public void Create() => create(originalTag);
 }
