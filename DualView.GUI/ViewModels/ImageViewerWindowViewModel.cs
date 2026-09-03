@@ -382,7 +382,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         });
     }
 
-    private async void RequestIDCopy()
+    public async void RequestIDCopy()
     {
         try
         {
@@ -403,6 +403,33 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         catch (Exception e)
         {
             windowService?.ShowErrorWindow("Failed to copy ID", e);
+        }
+    }
+
+    public async void ToggleDeleteMedia()
+    {
+        if (clientDatabaseService == null || !HasServerMedia || currentMediaFileId == 0)
+        {
+            windowService?.ShowNoticeWindow("Only server media can be deleted.");
+            return;
+        }
+
+        try
+        {
+            if (IsDeleted)
+            {
+                await clientDatabaseService.RestoreMediaAsync(currentMediaFileId);
+            }
+            else
+            {
+                await clientDatabaseService.DeleteMediaAsync(currentMediaFileId);
+            }
+
+            IsDeleted = !IsDeleted;
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow(IsDeleted ? "Failed to restore media" : "Failed to delete media", e);
         }
     }
 
@@ -633,32 +660,5 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             { Title = "Export...", Command = new RelayCommand(SaveMedia) });
 
         MainWindowViewModel.AddTrailingMenuItems(Hamburger, windowService);
-    }
-
-    private async void ToggleDeleteMedia()
-    {
-        if (clientDatabaseService == null || !HasServerMedia || currentMediaFileId == 0)
-        {
-            windowService?.ShowNoticeWindow("Only server media can be deleted.");
-            return;
-        }
-
-        try
-        {
-            if (IsDeleted)
-            {
-                await clientDatabaseService.RestoreMediaAsync(currentMediaFileId);
-            }
-            else
-            {
-                await clientDatabaseService.DeleteMediaAsync(currentMediaFileId);
-            }
-
-            IsDeleted = !IsDeleted;
-        }
-        catch (Exception e)
-        {
-            windowService?.ShowErrorWindow(IsDeleted ? "Failed to restore media" : "Failed to delete media", e);
-        }
     }
 }
