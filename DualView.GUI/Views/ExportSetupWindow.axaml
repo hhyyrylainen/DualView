@@ -33,6 +33,7 @@
                                  IsChecked="{Binding NameMode, Converter={StaticResource EnumToBoolConverter}, ConverterParameter=MediaId}" />
                 </StackPanel>
                 <CheckBox Content="Prefix names with collection order" IsChecked="{Binding PrefixCollectionOrder}" />
+                <CheckBox Content="Export tags to separate text files" IsChecked="{Binding ExportTags}" />
                 <TextBlock Text="Order" />
                 <StackPanel Spacing="4">
                     <RadioButton Content="Collection order" GroupName="Order"

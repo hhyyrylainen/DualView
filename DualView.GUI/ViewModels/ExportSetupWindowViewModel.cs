@@ -9,6 +9,7 @@ using DualView.GUI.Models;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Services;
+using DualView.Shared.Utils;
 
 namespace DualView.GUI.ViewModels;
 
@@ -89,6 +90,12 @@ public sealed class ExportSetupWindowViewModel : ViewModelBase, IDisposable
     } = ExportNameMode.OriginalName;
 
     public bool PrefixCollectionOrder
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
+    public bool ExportTags
     {
         get;
         set => SetProperty(ref field, value);
@@ -212,17 +219,44 @@ public sealed class ExportSetupWindowViewModel : ViewModelBase, IDisposable
             var targetDirectory = ExportPath;
             if (CreateCollectionSubfolder)
                 targetDirectory = Path.Combine(targetDirectory, MakeSafeName(collection.Name));
+
+            var exportFileNames = media
+                .Select(item => GetExportFileName(item, collectionOrder))
+                .ToList();
+            if (ExportTags)
+                ValidateExportFileNames(exportFileNames);
+
+            Dictionary<long, string>? mediaTags = null;
+            if (ExportTags)
+            {
+                mediaTags = new Dictionary<long, string>();
+                foreach (var item in media)
+                {
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    ProgressText = $"Loading tags for {item.OriginalFileName}";
+                    var appliedTags = await databaseService.GetMediaAppliedTagsAsync(item.Id);
+                    mediaTags[item.Id] = string.Join(", ", appliedTags.Select(AppliedTagText.ToText));
+                }
+            }
+
             Directory.CreateDirectory(targetDirectory);
 
             for (var index = 0; index < media.Count; ++index)
             {
                 cancellation.Token.ThrowIfCancellationRequested();
                 var item = media[index];
-                var fileName = GetExportFileName(item, collectionOrder);
+                var fileName = exportFileNames[index];
                 var targetPath = Path.Combine(targetDirectory, fileName);
                 ProgressText = $"Saving {fileName}";
                 Progress = index / (double)Math.Max(1, media.Count);
                 await ServerMediaSource.DownloadFullMediaToLocalFile(item.Id, targetPath);
+
+                if (ExportTags)
+                {
+                    var tagsPath = Path.Combine(targetDirectory, Path.ChangeExtension(fileName, ".txt"));
+                    await File.WriteAllTextAsync(tagsPath, mediaTags![item.Id], cancellation.Token);
+                }
+
                 Progress = (index + 1) / (double)Math.Max(1, media.Count);
             }
 
@@ -273,6 +307,23 @@ public sealed class ExportSetupWindowViewModel : ViewModelBase, IDisposable
         }
 
         return MakeSafeName(name) + extension;
+    }
+
+    private void ValidateExportFileNames(IReadOnlyList<string> exportFileNames)
+    {
+        if (NameMode != ExportNameMode.OriginalName)
+            return;
+
+        var fileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var fileName in exportFileNames)
+        {
+            if (!fileNames.Add(fileName))
+                throw new InvalidOperationException($"The export contains duplicate file name '{fileName}'.");
+
+            var tagsFileName = Path.ChangeExtension(fileName, ".txt");
+            if (!fileNames.Add(tagsFileName))
+                throw new InvalidOperationException($"The export contains duplicate file name '{tagsFileName}'.");
+        }
     }
 
     private static string MakeSafeName(string name)
