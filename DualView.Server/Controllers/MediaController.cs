@@ -56,10 +56,13 @@ public class MediaController : Controller
         if (string.IsNullOrEmpty(file.FileName) || string.IsNullOrEmpty(Path.GetExtension(file.FileName)))
             return BadRequest("File name is invalid");
 
+        var extension = Path.GetExtension(file.FileName);
+        var normalizedFileName = file.FileName[..^extension.Length] + extension.ToLowerInvariant();
+
         // Access the stream from the uploaded file
         await using var stream = file.OpenReadStream();
 
-        var media = await mediaImportHandler.ImportMedia(file.FileName, stream, sectionName, sourcePath);
+        var media = await mediaImportHandler.ImportMedia(normalizedFileName, stream, sectionName, sourcePath);
 
         return media.GetDTO();
     }
