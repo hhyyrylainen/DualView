@@ -300,8 +300,13 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
                 foreach (var plugin in plugins)
                 {
                     var result = await plugin.InspectWebsiteRequest(pageRequest, this, cancellation);
-                    if ((result & UrlInformation.GalleryPageContent) != 0)
-                        return await plugin.ScanPageAsync(pageRequest, this, cancellation);
+                    if ((result & (UrlInformation.Gallery | UrlInformation.GalleryPageContent)) != 0)
+                    {
+                        var scanResult = await plugin.ScanPageAsync(pageRequest, this, cancellation);
+                        if (scanResult.Subpages.Count == 0 && scanResult.Content.Count == 0)
+                            throw new InvalidOperationException("Page scan returned no subpages or content");
+                        return scanResult;
+                    }
                 }
 
                 throw new InvalidOperationException("No plugin found that accepted the scan request");
@@ -323,7 +328,10 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
                 if (attempt == MaximumScanAttempts)
                     throw;
 
-                await Task.Delay(TimeSpan.FromSeconds(3), cancellation);
+                // The final attempt is deliberately delayed much longer to give rate-limited sites time to recover.
+                await Task.Delay(
+                    attempt == MaximumScanAttempts - 1 ? TimeSpan.FromSeconds(30) : TimeSpan.FromSeconds(3),
+                    cancellation);
             }
         }
 
