@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Backend.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260904080814_AddRemoteScannedCollections")]
+    [Migration("20260904133510_AddRemoteScannedCollections")]
     partial class AddRemoteScannedCollections
     {
         /// <inheritdoc />
@@ -266,6 +266,10 @@ namespace Backend.Migrations
 
                     b.Property<string>("Hash")
                         .HasMaxLength(256)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ImpersonationHeaders")
+                        .HasMaxLength(16384)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("LocalFullFilePath")

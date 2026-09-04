@@ -265,6 +265,10 @@ namespace Backend.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ImpersonationHeaders")
+                        .HasMaxLength(16384)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("LocalFullFilePath")
                         .HasMaxLength(1024)
                         .HasColumnType("TEXT");

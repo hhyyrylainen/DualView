@@ -76,6 +76,9 @@ public class FoundMedia : UpdateableModel
     [MaxLength(16384)]
     public string? Cookies { get; set; }
 
+    [MaxLength(16384)]
+    public string? ImpersonationHeaders { get; set; }
+
     [MaxLength(256)]
     public string? Hash { get; set; }
 

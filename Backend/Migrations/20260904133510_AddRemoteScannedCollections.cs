@@ -45,6 +45,13 @@ namespace Backend.Migrations
                 defaultValue: "");
 
             migrationBuilder.AddColumn<string>(
+                name: "ImpersonationHeaders",
+                table: "FoundMedia",
+                type: "TEXT",
+                maxLength: 16384,
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
                 name: "OverrideName",
                 table: "FoundMedia",
                 type: "TEXT",
@@ -83,6 +90,10 @@ namespace Backend.Migrations
 
             migrationBuilder.DropColumn(
                 name: "CanonicalUrl",
+                table: "FoundMedia");
+
+            migrationBuilder.DropColumn(
+                name: "ImpersonationHeaders",
                 table: "FoundMedia");
 
             migrationBuilder.DropColumn(
