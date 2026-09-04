@@ -16,4 +16,9 @@ public interface IRemoteGalleryScannerService
     ///   Re-enqueues a gallery that stopped after an exhausted page retry budget.
     /// </summary>
     public Task RetryGalleryAsync(long galleryId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///   Stops accepting new work and lets the active page finish within the supplied timeout.
+    /// </summary>
+    public Task StopAsync(TimeSpan timeout);
 }

@@ -283,6 +283,7 @@ if (ResourceLimits.Memory >= reasonableMemoryLimit)
 
 var backgroundJobs = app.Services.GetRequiredService<IBackgroundJobs>();
 var remoteDownloadService = app.Services.GetRequiredService<IRemoteDownloadService>();
+var remoteGalleryScannerService = app.Services.GetRequiredService<IRemoteGalleryScannerService>();
 // Make sure some (optional services) are started so that info is available (almost) immediately
 var maintenanceJobs = app.Services.GetRequiredService<IMaintenanceService>();
 
@@ -305,6 +306,7 @@ else
 
 // Stop specific services that need some more care on shutdown
 var maintenanceStop = maintenanceJobs.Stop(TimeSpan.FromSeconds(60));
+remoteGalleryScannerService.StopAsync(TimeSpan.FromSeconds(15)).GetAwaiter().GetResult();
 backgroundJobs.Stop(true, TimeSpan.FromSeconds(30));
 remoteDownloadService.Stop(true, TimeSpan.FromSeconds(30));
 maintenanceStop.Wait();
