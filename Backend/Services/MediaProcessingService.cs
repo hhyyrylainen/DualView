@@ -192,6 +192,13 @@ public class MediaProcessingService : IMediaProcessingService
         }
     }
 
+    public async Task ResizeVideoThumbnailAsync(string sourcePath, string destinationPath,
+        CancellationToken cancellationToken)
+    {
+        await RunVideoThumbnailGenerationAsync(sourcePath, destinationPath, $"scale=-2:{VideoThumbnailSize}",
+            cancellationToken);
+    }
+
     public void ApplyMediaImageAdjustments(MediaFile mediaSettings, IMagickImage singleFrame)
     {
         if (mediaSettings.CropLeft > 0 || mediaSettings.CropTop > 0 || mediaSettings.CropRight > 0 ||
@@ -374,87 +381,52 @@ public class MediaProcessingService : IMediaProcessingService
         var width = original.Width;
         var height = original.Height;
 
-        var startInfo = new ProcessStartInfo("ffmpeg")
-        {
-            RedirectStandardOutput = true,
-        };
-
-        startInfo.ArgumentList.Add("-hide_banner");
-        startInfo.ArgumentList.Add("-y");
-
-        startInfo.ArgumentList.Add("-i");
-        startInfo.ArgumentList.Add(originalPath);
-
-        // TODO: implement video cropping if needed in the future
-
         var (newWidth, newHeight) = GetDivisibleByTwoDimensions((uint)width, (uint)height, VideoThumbnailSize);
+        await RunVideoThumbnailGenerationAsync(originalPath, thumbnailPath, $"scale={newWidth}:{newHeight}",
+            CancellationToken.None);
 
-        // Thumbnail doesn't need audio
-        startInfo.ArgumentList.Add("-an");
+        logger.LogInformation("Generated thumb video for {MediaId} size is: {Size} KiB", media.Id,
+            new FileInfo(thumbnailPath).Length / 1024);
+        return thumbnailPath;
+    }
 
-        // And we want only the first video stream
-        startInfo.ArgumentList.Add("-map");
-        startInfo.ArgumentList.Add("0:v:0");
+    private async Task RunVideoThumbnailGenerationAsync(string sourcePath, string destinationPath, string scaleFilter,
+        CancellationToken cancellationToken)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(destinationPath) ??
+                                  throw new InvalidOperationException("Invalid thumbnail path"));
 
-        // And then convert to the target codec
-        startInfo.ArgumentList.Add("-c:v");
-        startInfo.ArgumentList.Add(VideoThumbnailCodec);
-
-        // Then resize to the wanted size
-        startInfo.ArgumentList.Add("-vf");
-        startInfo.ArgumentList.Add($"scale={newWidth}:{newHeight}");
-
-        // And finally, we want to limit the bitrate as the video sizes are tiny so they aren't really legible anyway
-        startInfo.ArgumentList.Add("-b:v");
-        startInfo.ArgumentList.Add("0.8M");
-
-        startInfo.ArgumentList.Add("-t");
-        startInfo.ArgumentList.Add(MaxThumbVideoLength.ToString(CultureInfo.InvariantCulture));
-
-        startInfo.ArgumentList.Add("-r");
-        startInfo.ArgumentList.Add(ThumbnailVideoFrameRate.ToString(CultureInfo.InvariantCulture));
-
-        // Need to make the folder to save in
-        Directory.CreateDirectory(Path.GetDirectoryName(thumbnailPath) ??
-                                  throw new Exception("Failed to detect target folder"));
-
-        startInfo.ArgumentList.Add(thumbnailPath);
-
-        if (!await ThumbnailProcessingLock.WaitAsync(TimeSpan.FromMinutes(10)))
-        {
-            logger.LogError("Thumbnail video generation is being overloaded, will cancel a video!");
+        if (!await ThumbnailProcessingLock.WaitAsync(TimeSpan.FromMinutes(10), cancellationToken))
             throw new InvalidOperationException("Thumbnail video generation is being overloaded");
-        }
-
-        Process? process;
         try
         {
-            process = Process.Start(startInfo);
+            var startInfo = new ProcessStartInfo("ffmpeg")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            };
 
-            if (process == null)
-                throw new ApplicationException("Failed to start ffmpeg");
+            foreach (var argument in new[]
+                     {
+                         "-hide_banner", "-y", "-i", sourcePath, "-an", "-map", "0:v:0", "-c:v", VideoThumbnailCodec,
+                         "-vf", scaleFilter, "-b:v", "0.8M", "-t",
+                         MaxThumbVideoLength.ToString(CultureInfo.InvariantCulture), "-r",
+                         ThumbnailVideoFrameRate.ToString(CultureInfo.InvariantCulture), destinationPath
+                     })
+            {
+                startInfo.ArgumentList.Add(argument);
+            }
 
-            // Let's try for up to 5 minutes (we shouldn't have super big videos)
-            var cancellationToken = new CancellationTokenSource(TimeSpan.FromMinutes(5)).Token;
-
+            using var process = Process.Start(startInfo) ?? throw new ApplicationException("Failed to start ffmpeg");
             await process.WaitForExitAsync(cancellationToken);
+
+            if (process.ExitCode != 0)
+                throw new ApplicationException("Failed to run ffmpeg conversion");
         }
         finally
         {
             ThumbnailProcessingLock.Release();
         }
-
-        if (process.ExitCode != 0)
-        {
-            var cancellationToken = new CancellationTokenSource(TimeSpan.FromMinutes(1)).Token;
-            var outputText = await process.StandardOutput.ReadToEndAsync(cancellationToken);
-            Console.WriteLine(outputText);
-            throw new ApplicationException("Failed to run ffmpeg conversion");
-        }
-
-        logger.LogInformation("Generated thumb video for {MediaId} size is: {Size} KiB", media.Id,
-            new FileInfo(thumbnailPath).Length / 1024);
-        return thumbnailPath;
     }
 
     private async Task WaitForExistingMediaProcessing(MediaFile media,
