@@ -11,6 +11,7 @@ public interface IAppEvents
     public delegate void FlowChangedEventHandler(long flowId);
     public delegate void TagCreatedEventHandler(string tagName, long tagId);
     public delegate void TagUpdatedEventHandler(long tagId);
+    public delegate void ScannedCollectionEventHandler(long collectionId);
 
     // Events
     public event NoParamsEventHandler SettingsChanged;
@@ -20,6 +21,7 @@ public interface IAppEvents
     public event FlowChangedEventHandler FlowChanged;
     public event TagCreatedEventHandler TagCreated;
     public event TagUpdatedEventHandler TagUpdated;
+    public event ScannedCollectionEventHandler ScannedCollectionCreated;
 
     // Triggering events
     public void NotifySettingsChanged();
@@ -29,4 +31,5 @@ public interface IAppEvents
     public void NotifyFlowChanged(long flowId);
     public void NotifyTagCreated(string tagName, long tagId);
     public void NotifyTagUpdated(long tagId);
+    public void NotifyScannedCollectionCreated(long collectionId);
 }

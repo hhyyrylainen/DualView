@@ -61,6 +61,11 @@ public interface IRemoteDownloadProvider
 public class PageScanResult
 {
     /// <summary>
+    ///   Additional delay requested by the website plugin before another page is scanned.
+    /// </summary>
+    public TimeSpan AdditionalWaitTime { get; set; }
+
+    /// <summary>
     ///   Subpages found on the page. Either gallery or image pages.
     /// </summary>
     public List<RemoteDownloadRequest> Subpages { get; set; } = new();

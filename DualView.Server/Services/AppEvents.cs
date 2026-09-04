@@ -16,6 +16,7 @@ public class AppEvents : IAppEvents
     private event IAppEvents.FlowChangedEventHandler? FlowChangedInternal;
     private event IAppEvents.TagCreatedEventHandler? TagCreatedInternal;
     private event IAppEvents.TagUpdatedEventHandler? TagUpdatedInternal;
+    private event IAppEvents.ScannedCollectionEventHandler? ScannedCollectionCreatedInternal;
 
     public event IAppEvents.NoParamsEventHandler? SettingsChanged
     {
@@ -101,6 +102,18 @@ public class AppEvents : IAppEvents
         }
     }
 
+    public event IAppEvents.ScannedCollectionEventHandler? ScannedCollectionCreated
+    {
+        add
+        {
+            lock (@lock) ScannedCollectionCreatedInternal += value;
+        }
+        remove
+        {
+            lock (@lock) ScannedCollectionCreatedInternal -= value;
+        }
+    }
+
     public void NotifySettingsChanged()
     {
         lock (@lock)
@@ -161,6 +174,15 @@ public class AppEvents : IAppEvents
         {
             var handlers = TagUpdatedInternal;
             handlers?.Invoke(tagId);
+        }
+    }
+
+    public void NotifyScannedCollectionCreated(long collectionId)
+    {
+        lock (@lock)
+        {
+            var handlers = ScannedCollectionCreatedInternal;
+            handlers?.Invoke(collectionId);
         }
     }
 }

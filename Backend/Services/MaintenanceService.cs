@@ -13,6 +13,7 @@ public class MaintenanceService : IMaintenanceService
     private static readonly TimeSpan DeletedImageTime = TimeSpan.FromDays(60);
     private static readonly TimeSpan DeletedCollectionTime = TimeSpan.FromHours(48);
     private static readonly TimeSpan TemporaryMediaTime = TimeSpan.FromHours(72);
+    private static readonly TimeSpan RemoteMediaTime = TimeSpan.FromDays(30);
 
     private readonly ILogger<MaintenanceService> logger;
     private readonly IServiceScopeFactory scopeFactory;
@@ -39,6 +40,7 @@ public class MaintenanceService : IMaintenanceService
         allJobs.Add(new PurgeDeletedMedia());
         allJobs.Add(new PurgeDeletedCollections());
         allJobs.Add(new PurgeTemporaryMedia());
+        allJobs.Add(new PurgeOldRemoteMedia());
         allJobs.Add(new DeleteOrphanedAppliedTags());
 
         maintenanceThread = new Thread(Run);
@@ -711,6 +713,38 @@ public class MaintenanceService : IMaintenanceService
 
             jobRecord.StatusMessage = $"Purged {mediaPurged} temporary media files";
             return true;
+        }
+    }
+
+    private class PurgeOldRemoteMedia : MaintenanceJob
+    {
+        public override string Name => "PurgeOldRemoteMedia";
+
+        public override TimeSpan Interval => TimeSpan.FromDays(1);
+
+        protected override Task<bool> RunInternal(MaintenanceJobRecord jobRecord, IDatabaseService databaseService,
+            IServiceScope scope, CancellationToken cancellationToken)
+        {
+            var remoteMedia = Path.Combine(scope.ServiceProvider.GetRequiredService<IDataFolderService>().GetDataFolderPath(),
+                "remoteMedia");
+            if (!Directory.Exists(remoteMedia))
+                return Task.FromResult(true);
+
+            var cutoff = DateTime.UtcNow - RemoteMediaTime;
+            var deleted = 0;
+            foreach (var file in Directory.EnumerateFiles(remoteMedia, "*", SearchOption.AllDirectories))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                if (File.GetLastWriteTimeUtc(file) >= cutoff)
+                    continue;
+
+                File.Delete(file);
+                ++deleted;
+            }
+            jobRecord.StatusMessage = $"Deleted {deleted} old remote media files";
+            return Task.FromResult(true);
         }
     }
 

@@ -11,7 +11,6 @@ public class DownloadGalleryDTO
     public string GalleryUrl { get; set; }
     public string? TargetPath { get; set; }
     public string? GalleryName { get; set; }
-    public string? CurrentlyScannedUrl { get; set; }
     public bool IsDownloaded { get; set; }
     public string? TagsString { get; set; }
     public bool IsDeleted { get; set; }

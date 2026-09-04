@@ -148,6 +148,8 @@ builder.Services.AddSingleton<ITemporaryFolderService, TemporaryFolderService>()
 builder.Services.AddSingleton<ICurlDownloadService, CurlDownloadService>();
 builder.Services.AddSingleton<IRemoteScanService, RemoteScanService>();
 builder.Services.AddSingleton<IRemoteDownloadService, RemoteDownloadService>();
+builder.Services.AddSingleton<IRemoteGalleryMediaService, RemoteGalleryMediaService>();
+builder.Services.AddSingleton<IRemoteGalleryScannerService, RemoteGalleryScannerService>();
 builder.Services.AddSingleton<IMissingTagService, MissingTagService>();
 builder.Services.AddScoped<BrowserPluginWebSocketHandler>();
 builder.Services.AddSingleton<IPluginRegistry, PluginRegistry>();

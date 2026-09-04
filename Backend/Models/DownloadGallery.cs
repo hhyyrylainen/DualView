@@ -6,6 +6,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
 
+/// <summary>
+///   Provenance record describing the remote gallery a downloaded/imported item came from. This is just a historical
+///   record of where content came from.
+///   This is not the persisted scanner queue; use <see cref="ScannedCollection"/> for that.
+/// </summary>
 [Index(nameof(GalleryUrl), IsUnique = true)]
 public class DownloadGallery : UpdateableModel, ISoftDelete, IDTOProvider<DownloadGalleryDTO>
 {
@@ -27,10 +32,6 @@ public class DownloadGallery : UpdateableModel, ISoftDelete, IDTOProvider<Downlo
     [MaxLength(200)]
     public string? GalleryName { get; set; }
 
-    // TODO: remove this as our scanners will be transient and won't remember where they were
-    [MaxLength(1024)]
-    public string? CurrentlyScannedUrl { get; set; }
-
     public bool IsDownloaded { get; set; }
 
     [MaxLength(4096)]
@@ -47,7 +48,6 @@ public class DownloadGallery : UpdateableModel, ISoftDelete, IDTOProvider<Downlo
             Id = Id,
             TargetPath = TargetPath,
             GalleryName = GalleryName,
-            CurrentlyScannedUrl = CurrentlyScannedUrl,
             IsDownloaded = IsDownloaded,
             TagsString = TagsString,
             IsDeleted = IsDeleted,

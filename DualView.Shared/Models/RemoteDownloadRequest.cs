@@ -71,6 +71,13 @@ public sealed class RemoteDownloadRequest
     public string? OverrideName { get; set; }
 
     /// <summary>
+    ///   Optional preview image URL discovered while scanning a gallery page. Makes displaying this in the GUI
+    ///   much more efficient due to delaying the full size download.
+    /// </summary>
+    [JsonPropertyName("thumbnailUrl")]
+    public string? ThumbnailUrl { get; set; }
+
+    /// <summary>
     ///   Gets or sets cookies supplied for the target download URL.
     /// </summary>
     [JsonPropertyName("cookies")]
@@ -106,6 +113,7 @@ public sealed class RemoteDownloadRequest
             DownloadGalleryId = DownloadGalleryId,
             TargetImportSection = TargetImportSection,
             OverrideName = OverrideName,
+            ThumbnailUrl = ThumbnailUrl,
             Enriched = Enriched,
         };
     }
@@ -119,6 +127,7 @@ public sealed class RemoteDownloadRequest
             PageUrl = targetScan,
             DownloadGalleryId = DownloadGalleryId,
             TargetImportSection = TargetImportSection,
+            ThumbnailUrl = ThumbnailUrl,
         };
     }
 }
