@@ -37,4 +37,14 @@ public interface IMediaProcessingService
     /// <param name="mediaSettings">Settings</param>
     /// <param name="image">Target image</param>
     public void ApplyMediaImageAdjustments(MediaFile mediaSettings, MagickImageCollection image);
+
+    /// <summary>
+    ///   Creates a smaller thumbnail size video of a video.
+    /// </summary>
+    /// <param name="sourcePath">Source</param>
+    /// <param name="destinationPath">Destination</param>
+    /// <param name="cancellationToken">Cancellation</param>
+    /// <returns>Task to wait</returns>
+    public Task ResizeVideoThumbnailAsync(string sourcePath, string destinationPath,
+        CancellationToken cancellationToken);
 }
