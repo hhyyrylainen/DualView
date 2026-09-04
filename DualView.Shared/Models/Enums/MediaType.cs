@@ -67,11 +67,14 @@ public static class MediaTypeExtensions
 
     public static MediaType TypeFromExtension(string extension)
     {
-        if (extension == ".png")
+        if (extension == ".png" || extension == ".PNG")
             return MediaType.Png;
 
-        if (extension == ".jpeg" || extension == ".jpg" || extension == ".jfif" || extension == ".heic")
+        if (extension == ".jpeg" || extension == ".jpg" || extension == ".jfif" || extension == ".heic" ||
+            extension == ".JPG")
+        {
             return MediaType.Jpeg;
+        }
 
         if (extension == ".gif")
             return MediaType.Gif;
