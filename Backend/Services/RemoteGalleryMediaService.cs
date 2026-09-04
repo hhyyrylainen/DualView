@@ -18,18 +18,17 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly IDataFolderService dataFolderService;
     private readonly ICurlDownloadService curlDownloadService;
-    private readonly IMediaProcessingService mediaProcessingService;
     private readonly HttpClient httpClient;
 
     public RemoteGalleryMediaService(ILogger<RemoteGalleryMediaService> logger,
         IServiceScopeFactory serviceScopeFactory, IDataFolderService dataFolderService,
-        ICurlDownloadService curlDownloadService, IMediaProcessingService mediaProcessingService)
+        ICurlDownloadService curlDownloadService)
     {
         this.logger = logger;
         this.serviceScopeFactory = serviceScopeFactory;
         this.dataFolderService = dataFolderService;
         this.curlDownloadService = curlDownloadService;
-        this.mediaProcessingService = mediaProcessingService;
+
         var handler = new SocketsHttpHandler
         {
             AutomaticDecompression = DecompressionMethods.All,
@@ -37,7 +36,11 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
             UseCookies = false,
             SslOptions = { RemoteCertificateValidationCallback = static (_, _, _, _) => true },
         };
-        httpClient = new HttpClient(handler) { Timeout = TimeSpan.FromMinutes(15), };
+
+        httpClient = new HttpClient(handler)
+        {
+            Timeout = TimeSpan.FromMinutes(5),
+        };
     }
 
     public Task<string> GetThumbnailAsync(long itemId, CancellationToken cancellationToken)
@@ -54,6 +57,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
     {
         using var scope = serviceScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var mediaProcessingService = scope.ServiceProvider.GetRequiredService<IMediaProcessingService>();
         var item = await database.GetFoundMediaAsync(itemId) ??
                    throw new ArgumentException("Remote gallery item not found", nameof(itemId));
         var existing = thumbnail ? item.LocalThumbnailFilePath : item.LocalFullFilePath;
