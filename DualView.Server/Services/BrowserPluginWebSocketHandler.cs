@@ -25,19 +25,22 @@ public sealed class BrowserPluginWebSocketHandler
     private readonly IHostApplicationLifetime applicationLifetime;
     private readonly IRemoteDownloadService remoteDownloadService;
     private readonly IRemoteScanService remoteScanService;
+    private readonly IRemoteGalleryScannerService remoteGalleryScannerService;
 
     private BrowserImpersonationHeaders impersonationHeaders =
         new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
 
     public BrowserPluginWebSocketHandler(IServiceScopeFactory serviceScopeFactory,
         ILogger<BrowserPluginWebSocketHandler> logger, IHostApplicationLifetime applicationLifetime,
-        IRemoteDownloadService remoteDownloadService, IRemoteScanService remoteScanService)
+        IRemoteDownloadService remoteDownloadService, IRemoteScanService remoteScanService,
+        IRemoteGalleryScannerService remoteGalleryScannerService)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
         this.applicationLifetime = applicationLifetime;
         this.remoteDownloadService = remoteDownloadService;
         this.remoteScanService = remoteScanService;
+        this.remoteGalleryScannerService = remoteGalleryScannerService;
     }
 
     // TODO: should we have some key already in the query parameters?
@@ -251,13 +254,28 @@ public sealed class BrowserPluginWebSocketHandler
 
         // It is something to scan, so start a scan operation
 
-        // If it is a single content, we want to scan it and then put the media into an import section immediately
+        // Galleries are durable background work, including gallery pages that also happen to contain content.
+        if ((result & (UrlInformation.Gallery | UrlInformation.GalleryPage)) != 0)
+        {
+            var galleryId = await remoteGalleryScannerService.CreateGalleryAsync(pageRequest, cancellation);
+            logger.LogInformation("Created remote gallery scan {GalleryId} for {Url}", galleryId, pageRequest.HtmlUrl);
+            await SendMessageAsync(socket, new BrowserPluginMessage
+            {
+                Type = "scanAccepted",
+                RequestId = message.RequestId,
+            }, cancellation);
+
+            return;
+        }
+
+        // If it is a single content, scan it and put the media into an import section immediately.
         if ((result & UrlInformation.ContentPage) == UrlInformation.ContentPage)
         {
             logger.LogInformation("It is a content page link, will scan it and add the result media immediately");
 
             // This will scan immediately and throw on error. Though due to queueing, this might take a tiny bit
             // of time to finish.
+            // TODO: maybe this should just queue so that the browser plugin can send a ton of pages at once?
             var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
 
             if (scanResult.Content is { Count: > 0 })
@@ -287,18 +305,7 @@ public sealed class BrowserPluginWebSocketHandler
             return;
         }
 
-        logger.LogInformation("Will create a new scan operation for the link");
-
-        // If it is a full gallery, we want to create a scan operation and put it there
-
-        // TODO: implement scan operations!
-        // remoteScanService.
-
-        await SendMessageAsync(socket, new BrowserPluginMessage
-        {
-            Type = "scanAccepted",
-            RequestId = message.RequestId,
-        }, cancellation);
+        throw new InvalidOperationException("The URL type cannot be scanned");
     }
 
     private static string GetRequiredString(BrowserPluginMessage message, string propertyName, string requestName)
