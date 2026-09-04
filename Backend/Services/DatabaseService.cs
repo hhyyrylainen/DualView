@@ -2908,6 +2908,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.DownloadGalleries.FirstOrDefaultAsync(g => g.GalleryUrl == url);
     }
 
+    public async Task<FoundMedia?> GetFoundMediaAsync(long id)
+    {
+        return await dbContext.FoundMedia.FindAsync(id);
+    }
+
+    public async Task SaveFoundMediaAsync(FoundMedia media)
+    {
+        await SaveAsync();
+    }
+
     public async Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2)
     {
         if (mediaId1 == mediaId2)

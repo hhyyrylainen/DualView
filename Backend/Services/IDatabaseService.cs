@@ -151,6 +151,8 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<DownloadGallery>> GetDownloadGalleriesAsync();
     public Task<DownloadGallery?> GetDownloadGalleryAsync(long id);
     public Task<DownloadGallery?> GetDownloadGalleryByUrlAsync(string url);
+    public Task<FoundMedia?> GetFoundMediaAsync(long id);
+    public Task SaveFoundMediaAsync(FoundMedia media);
 
     // Ignored Duplicates
     public Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2);

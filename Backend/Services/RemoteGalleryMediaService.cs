@@ -1,9 +1,9 @@
 using System.Net;
 using System.Text.Json;
-using Backend.Database;
 using ImageMagick;
-using Microsoft.EntityFrameworkCore;
+using DualView.Shared.Models.Enums;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Backend.Services;
 
@@ -13,17 +13,23 @@ namespace Backend.Services;
 public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
 {
     private const int DownloadAttempts = 5;
+
+    private readonly ILogger<RemoteGalleryMediaService> logger;
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly IDataFolderService dataFolderService;
     private readonly ICurlDownloadService curlDownloadService;
+    private readonly IMediaProcessingService mediaProcessingService;
     private readonly HttpClient httpClient;
 
-    public RemoteGalleryMediaService(IServiceScopeFactory serviceScopeFactory, IDataFolderService dataFolderService,
-        ICurlDownloadService curlDownloadService)
+    public RemoteGalleryMediaService(ILogger<RemoteGalleryMediaService> logger,
+        IServiceScopeFactory serviceScopeFactory, IDataFolderService dataFolderService,
+        ICurlDownloadService curlDownloadService, IMediaProcessingService mediaProcessingService)
     {
+        this.logger = logger;
         this.serviceScopeFactory = serviceScopeFactory;
         this.dataFolderService = dataFolderService;
         this.curlDownloadService = curlDownloadService;
+        this.mediaProcessingService = mediaProcessingService;
         var handler = new SocketsHttpHandler
         {
             AutomaticDecompression = DecompressionMethods.All,
@@ -47,8 +53,8 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
     private async Task<string> DownloadAsync(long itemId, bool thumbnail, CancellationToken cancellationToken)
     {
         using var scope = serviceScopeFactory.CreateScope();
-        var database = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        var item = await database.FoundMedia.FindAsync([itemId], cancellationToken) ??
+        var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var item = await database.GetFoundMediaAsync(itemId) ??
                    throw new ArgumentException("Remote gallery item not found", nameof(itemId));
         var existing = thumbnail ? item.LocalThumbnailFilePath : item.LocalFullFilePath;
         if (!string.IsNullOrWhiteSpace(existing) && File.Exists(existing))
@@ -63,7 +69,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
         var extension = GetSafeExtension(sourceUrl, ".jpg");
         var destination = Path.Combine(directory, thumbnail ? "thumbnail.jpg" : "content" + extension);
 
-        var settings = await database.AppSettings.AsNoTracking().FirstAsync(cancellationToken);
+        var settings = await database.GetAppSettingsAsync();
 
         var cookies = DeserializeDictionary(item.Cookies);
         var headers = DeserializeDictionary(item.ImpersonationHeaders);
@@ -93,12 +99,17 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
                         new BrowserImpersonationHeaders(headers).ConfigureHttpRequest(request, false);
                         if (referrer != null)
                             request.Headers.Referrer = new Uri(referrer);
+
                         if (cookies.Count > 0)
+                        {
                             request.Headers.TryAddWithoutValidation("Cookie",
                                 string.Join("; ", cookies.Select(cookie => $"{cookie.Key}={cookie.Value}")));
+                        }
+
                         using var response = await httpClient.SendAsync(request,
                             HttpCompletionOption.ResponseHeadersRead, cancellationToken);
                         response.EnsureSuccessStatusCode();
+
                         await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
                         await using var output = File.Create(destination);
                         await input.CopyToAsync(output, cancellationToken);
@@ -111,12 +122,32 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
                 }
 
                 if (thumbnail)
-                    await ResizeThumbnailAsync(destination, cancellationToken);
+                {
+                    if (IsVideo(sourceUrl))
+                    {
+                        var videoThumbnail = Path.Combine(directory, "thumbnail.webm");
+                        await mediaProcessingService.ResizeVideoThumbnailAsync(destination, videoThumbnail,
+                            cancellationToken);
+                        File.Delete(destination);
+                        destination = videoThumbnail;
+                    }
+                    else
+                    {
+                        await ResizeThumbnailAsync(destination, cancellationToken);
+                    }
+                }
+
                 if (thumbnail)
+                {
                     item.LocalThumbnailFilePath = destination;
+                }
                 else
+                {
                     item.LocalFullFilePath = destination;
-                await database.SaveChangesAsync(cancellationToken);
+                }
+
+                logger.LogInformation("Successfully downloaded remote gallery item");
+                await database.SaveFoundMediaAsync(item);
                 return destination;
             }
             catch when (attempt < DownloadAttempts)
@@ -145,13 +176,30 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
         await images.WriteAsync(path, MagickFormat.Jpeg, cancellationToken);
     }
 
-    private static Dictionary<string, string> DeserializeDictionary(string? value) => string.IsNullOrWhiteSpace(value)
-        ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        : JsonSerializer.Deserialize<Dictionary<string, string>>(value) ?? new Dictionary<string, string>();
+    private static Dictionary<string, string> DeserializeDictionary(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            : JsonSerializer.Deserialize<Dictionary<string, string>>(value) ?? new Dictionary<string, string>();
+    }
 
-    private static string GetSafeExtension(string url, string fallback) =>
-        Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
-        Path.GetExtension(uri.AbsolutePath) is { Length: > 0 } extension && extension.Length <= 10
+    private static string GetSafeExtension(string url, string fallback)
+    {
+        return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+               Path.GetExtension(uri.AbsolutePath) is { Length: > 0 } extension && extension.Length <= 10
             ? extension
             : fallback;
+    }
+
+    private static bool IsVideo(string url)
+    {
+        try
+        {
+            return !MediaTypeExtensions.TypeFromExtension(GetSafeExtension(url, string.Empty)).IsImage();
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 }
