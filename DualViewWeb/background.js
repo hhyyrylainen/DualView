@@ -597,8 +597,20 @@ function getPublicStatus() {
 async function showTabToast(tabId, message, level) {
   try {
     await browser.tabs.sendMessage(tabId, { type: "show-toast", message, level });
+    return true;
   } catch (error) {
     console.debug("Unable to show a DualView toast in the tab", error);
+    try {
+      await browser.notifications.create(`dualview-error-${crypto.randomUUID()}`, {
+        type: "basic",
+        iconUrl: browser.runtime.getURL("icons/dualview.svg"),
+        title: "DualView background error",
+        message,
+      });
+    } catch (notificationError) {
+      console.debug("Unable to show a DualView error notification", notificationError);
+    }
+    return false;
   }
 }
 
