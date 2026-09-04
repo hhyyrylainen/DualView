@@ -27,6 +27,12 @@ public sealed class BrowserPluginWebSocketHandler
     private readonly IRemoteScanService remoteScanService;
     private readonly IRemoteGalleryScannerService remoteGalleryScannerService;
     private readonly SemaphoreSlim sendLock = new(1, 1);
+    private readonly Lock orderedProcessingLock = new();
+
+    /// <summary>
+    ///   A simple implementation of an ordered task queue
+    /// </summary>
+    private Task orderedProcessingTail = Task.CompletedTask;
 
     private BrowserImpersonationHeaders impersonationHeaders =
         new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
@@ -179,6 +185,7 @@ public sealed class BrowserPluginWebSocketHandler
                         await SendErrorAsync(socket, message.RequestId, ex.Message, cancellation);
                         break;
                     }
+
                     await SendMessageAsync(socket, new BrowserPluginMessage
                     {
                         Type = "downloadQueued",
@@ -265,16 +272,8 @@ public sealed class BrowserPluginWebSocketHandler
         if (result == UrlInformation.ContentLink)
         {
             await SendAcceptedAsync(socket, message.RequestId, cancellation);
-            logger.LogInformation("It is a direct image link, will scan it");
-            pageRequest.ImageUrl = pageRequest.HtmlUrl;
-            try
-            {
-                await QueueDownloadWithErrorReportingAsync(socket, pageRequest, message.RequestId, cancellation);
-            }
-            catch (Exception ex)
-            {
-                await SendErrorAsync(socket, message.RequestId, ex.Message, cancellation);
-            }
+            QueueOrderedProcessing(() => ProcessSupportedRequestAsync(socket, pageRequest, message.RequestId,
+                result, cancellation));
             return;
         }
 
@@ -284,15 +283,8 @@ public sealed class BrowserPluginWebSocketHandler
         if ((result & (UrlInformation.Gallery | UrlInformation.GalleryPage)) != 0)
         {
             await SendAcceptedAsync(socket, message.RequestId, cancellation);
-            try
-            {
-                var galleryId = await remoteGalleryScannerService.CreateGalleryAsync(pageRequest, cancellation);
-                logger.LogInformation("Created remote gallery scan {GalleryId} for {Url}", galleryId, pageRequest.HtmlUrl);
-            }
-            catch (Exception ex)
-            {
-                await SendErrorAsync(socket, message.RequestId, ex.Message, cancellation);
-            }
+            QueueOrderedProcessing(() => ProcessSupportedRequestAsync(socket, pageRequest, message.RequestId,
+                result, cancellation));
             return;
         }
 
@@ -300,28 +292,85 @@ public sealed class BrowserPluginWebSocketHandler
         if ((result & UrlInformation.ContentPage) == UrlInformation.ContentPage)
         {
             await SendAcceptedAsync(socket, message.RequestId, cancellation);
-            logger.LogInformation("It is a content page link, will scan it and add the result media immediately");
-            _ = ProcessContentPageInBackgroundAsync(socket, pageRequest, message.RequestId, cancellation);
+            QueueOrderedProcessing(() => ProcessSupportedRequestAsync(socket, pageRequest, message.RequestId,
+                result, cancellation));
             return;
         }
 
         throw new InvalidOperationException("The URL type cannot be scanned");
     }
 
-    private async Task ProcessContentPageInBackgroundAsync(WebSocket socket, RemoteDownloadRequest pageRequest,
-        string? requestId, CancellationToken cancellation)
+    private void QueueOrderedProcessing(Func<Task> operation)
+    {
+        lock (orderedProcessingLock)
+        {
+            orderedProcessingTail = RunOrderedProcessingAsync(orderedProcessingTail, operation);
+        }
+    }
+
+    private async Task RunOrderedProcessingAsync(Task previous, Func<Task> operation)
     {
         try
         {
-            var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
-            if (scanResult.Content is not { Count: > 0 })
+            await previous.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Previous operation was cancelled; continue processing the queue.
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Ordered browser plugin processing failed");
+        }
+
+        try
+        {
+            await operation();
+        }
+        catch (OperationCanceledException)
+        {
+            // The connection has gone away, so there is nowhere to report the failure.
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Ordered browser plugin processing failed");
+        }
+    }
+
+    private async Task ProcessSupportedRequestAsync(WebSocket socket, RemoteDownloadRequest pageRequest,
+        string? requestId, UrlInformation result, CancellationToken cancellation)
+    {
+        try
+        {
+            if (result == UrlInformation.ContentLink)
             {
-                throw new InvalidOperationException("No content found from scanning page");
+                logger.LogInformation("It is a direct image link, will scan it");
+                pageRequest.ImageUrl = pageRequest.HtmlUrl;
+                await QueueDownloadWithErrorReportingAsync(socket, pageRequest, requestId, cancellation);
+                return;
             }
 
-            foreach (var foundContent in scanResult.Content)
+            if ((result & (UrlInformation.Gallery | UrlInformation.GalleryPage)) != 0)
             {
-                await QueueDownloadWithErrorReportingAsync(socket, foundContent, requestId, cancellation);
+                var galleryId = await remoteGalleryScannerService.CreateGalleryAsync(pageRequest, cancellation);
+                logger.LogInformation("Created remote gallery scan {GalleryId} for {Url}", galleryId,
+                    pageRequest.HtmlUrl);
+                return;
+            }
+
+            if ((result & UrlInformation.ContentPage) == UrlInformation.ContentPage)
+            {
+                logger.LogInformation("It is a content page link, will scan it and add the result media immediately");
+                var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
+                if (scanResult.Content is not { Count: > 0 })
+                {
+                    throw new InvalidOperationException("No content found from scanning page");
+                }
+
+                foreach (var foundContent in scanResult.Content)
+                {
+                    await QueueDownloadWithErrorReportingAsync(socket, foundContent, requestId, cancellation);
+                }
             }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
