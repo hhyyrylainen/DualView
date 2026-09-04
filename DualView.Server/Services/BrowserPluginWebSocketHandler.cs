@@ -26,6 +26,7 @@ public sealed class BrowserPluginWebSocketHandler
     private readonly IRemoteDownloadService remoteDownloadService;
     private readonly IRemoteScanService remoteScanService;
     private readonly IRemoteGalleryScannerService remoteGalleryScannerService;
+    private readonly SemaphoreSlim sendLock = new(1, 1);
 
     private BrowserImpersonationHeaders impersonationHeaders =
         new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
@@ -167,7 +168,17 @@ public sealed class BrowserPluginWebSocketHandler
 
                     downloadRequest.ImpersonationHeaders = impersonationHeaders.Headers.ToDictionary(
                         header => header.Key, header => header.Value, StringComparer.OrdinalIgnoreCase);
-                    await remoteDownloadService.QueueDownloadAsync(downloadRequest, cancellation);
+                    try
+                    {
+                        await remoteDownloadService.QueueDownloadAsync(downloadRequest, cancellation,
+                            (exception, callbackCancellation) => SendErrorAsync(socket, message.RequestId,
+                                exception.Message, callbackCancellation));
+                    }
+                    catch (Exception ex)
+                    {
+                        await SendErrorAsync(socket, message.RequestId, ex.Message, cancellation);
+                        break;
+                    }
                     await SendMessageAsync(socket, new BrowserPluginMessage
                     {
                         Type = "downloadQueued",
@@ -223,7 +234,21 @@ public sealed class BrowserPluginWebSocketHandler
             CancellationTokenSource.CreateLinkedTokenSource(cancellationSource.Token, cancellation);
 
         // Inspect URL to know what it is actually
-        var result = await remoteScanService.InspectUrlAsync(pageRequest, linked.Token);
+        UrlInformation result;
+        try
+        {
+            result = await remoteScanService.InspectUrlAsync(pageRequest, linked.Token);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to inspect remote scan URL {Url}", pageRequest.HtmlUrl);
+            await SendErrorAsync(socket, message.RequestId, ex.Message, cancellation);
+            return;
+        }
 
         if (result == UrlInformation.Unknown)
         {
@@ -239,16 +264,17 @@ public sealed class BrowserPluginWebSocketHandler
 
         if (result == UrlInformation.ContentLink)
         {
-            // A direct image!
+            await SendAcceptedAsync(socket, message.RequestId, cancellation);
             logger.LogInformation("It is a direct image link, will scan it");
             pageRequest.ImageUrl = pageRequest.HtmlUrl;
-            await remoteDownloadService.QueueDownloadAsync(pageRequest, cancellation);
-
-            await SendMessageAsync(socket, new BrowserPluginMessage
+            try
             {
-                Type = "scanAccepted",
-                RequestId = message.RequestId,
-            }, cancellation);
+                await QueueDownloadWithErrorReportingAsync(socket, pageRequest, message.RequestId, cancellation);
+            }
+            catch (Exception ex)
+            {
+                await SendErrorAsync(socket, message.RequestId, ex.Message, cancellation);
+            }
             return;
         }
 
@@ -257,55 +283,95 @@ public sealed class BrowserPluginWebSocketHandler
         // Galleries are durable background work, including gallery pages that also happen to contain content.
         if ((result & (UrlInformation.Gallery | UrlInformation.GalleryPage)) != 0)
         {
-            var galleryId = await remoteGalleryScannerService.CreateGalleryAsync(pageRequest, cancellation);
-            logger.LogInformation("Created remote gallery scan {GalleryId} for {Url}", galleryId, pageRequest.HtmlUrl);
-            await SendMessageAsync(socket, new BrowserPluginMessage
+            await SendAcceptedAsync(socket, message.RequestId, cancellation);
+            try
             {
-                Type = "scanAccepted",
-                RequestId = message.RequestId,
-            }, cancellation);
-
+                var galleryId = await remoteGalleryScannerService.CreateGalleryAsync(pageRequest, cancellation);
+                logger.LogInformation("Created remote gallery scan {GalleryId} for {Url}", galleryId, pageRequest.HtmlUrl);
+            }
+            catch (Exception ex)
+            {
+                await SendErrorAsync(socket, message.RequestId, ex.Message, cancellation);
+            }
             return;
         }
 
         // If it is a single content, scan it and put the media into an import section immediately.
         if ((result & UrlInformation.ContentPage) == UrlInformation.ContentPage)
         {
+            await SendAcceptedAsync(socket, message.RequestId, cancellation);
             logger.LogInformation("It is a content page link, will scan it and add the result media immediately");
-
-            // This will scan immediately and throw on error. Though due to queueing, this might take a tiny bit
-            // of time to finish.
-            // TODO: maybe this should just queue so that the browser plugin can send a ton of pages at once?
-            var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
-
-            if (scanResult.Content is { Count: > 0 })
-            {
-                foreach (var foundContent in scanResult.Content)
-                {
-                    await remoteDownloadService.QueueDownloadAsync(foundContent, cancellation);
-                }
-
-                await SendMessageAsync(socket, new BrowserPluginMessage
-                {
-                    Type = "scanAccepted",
-                    RequestId = message.RequestId,
-                }, cancellation);
-            }
-            else
-            {
-                logger.LogError("No content found from scanning page");
-                await SendMessageAsync(socket, new BrowserPluginMessage
-                {
-                    Type = "error",
-                    RequestId = message.RequestId,
-                    Message = "No content found from scanning page",
-                }, cancellation);
-            }
-
+            _ = ProcessContentPageInBackgroundAsync(socket, pageRequest, message.RequestId, cancellation);
             return;
         }
 
         throw new InvalidOperationException("The URL type cannot be scanned");
+    }
+
+    private async Task ProcessContentPageInBackgroundAsync(WebSocket socket, RemoteDownloadRequest pageRequest,
+        string? requestId, CancellationToken cancellation)
+    {
+        try
+        {
+            var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
+            if (scanResult.Content is not { Count: > 0 })
+            {
+                throw new InvalidOperationException("No content found from scanning page");
+            }
+
+            foreach (var foundContent in scanResult.Content)
+            {
+                await QueueDownloadWithErrorReportingAsync(socket, foundContent, requestId, cancellation);
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            // The connection has gone away, so there is nowhere to report the failure.
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Remote scan failed for {Url}", pageRequest.HtmlUrl);
+            await SendErrorAsync(socket, requestId, ex.Message, cancellation);
+        }
+    }
+
+    private async Task QueueDownloadWithErrorReportingAsync(WebSocket socket, RemoteDownloadRequest request,
+        string? requestId, CancellationToken cancellation)
+    {
+        await remoteDownloadService.QueueDownloadAsync(request, cancellation,
+            (exception, callbackCancellation) => SendErrorAsync(socket, requestId, exception.Message,
+                callbackCancellation));
+    }
+
+    private Task SendAcceptedAsync(WebSocket socket, string? requestId, CancellationToken cancellation)
+    {
+        return SendMessageAsync(socket, new BrowserPluginMessage
+        {
+            Type = "scanAccepted",
+            RequestId = requestId,
+        }, cancellation);
+    }
+
+    private async Task SendErrorAsync(WebSocket socket, string? requestId, string error,
+        CancellationToken cancellation)
+    {
+        try
+        {
+            await SendMessageAsync(socket, new BrowserPluginMessage
+            {
+                Type = "error",
+                RequestId = requestId,
+                Message = error,
+            }, cancellation);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            // The connection has gone away, so there is nowhere to report the failure.
+        }
+        catch (WebSocketException ex)
+        {
+            logger.LogDebug(ex, "Unable to send a browser plugin error response");
+        }
     }
 
     private static string GetRequiredString(BrowserPluginMessage message, string propertyName, string requestName)
@@ -414,14 +480,22 @@ public sealed class BrowserPluginWebSocketHandler
         return socket.SendAsync(Encoding.UTF8.GetBytes(value), WebSocketMessageType.Text, true, cancellation);
     }
 
-    private static Task SendMessageAsync(WebSocket socket, BrowserPluginMessage message,
+    private async Task SendMessageAsync(WebSocket socket, BrowserPluginMessage message,
         CancellationToken cancellation)
     {
         var payload = JsonSerializer.SerializeToUtf8Bytes(message);
         var framedMessage = new byte[sizeof(int) + payload.Length];
         BinaryPrimitives.WriteInt32BigEndian(framedMessage, payload.Length);
         payload.CopyTo(framedMessage, sizeof(int));
-        return socket.SendAsync(framedMessage, WebSocketMessageType.Binary, true, cancellation);
+        await sendLock.WaitAsync(cancellation);
+        try
+        {
+            await socket.SendAsync(framedMessage, WebSocketMessageType.Binary, true, cancellation);
+        }
+        finally
+        {
+            sendLock.Release();
+        }
     }
 
     private static async Task CloseAsync(WebSocket socket, WebSocketCloseStatus status, string description)

@@ -23,7 +23,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
     private readonly ILogger<RemoteDownloadService> logger;
     private readonly ICurlDownloadService curlDownloadService;
     private readonly SemaphoreSlim processingLock = new(1, 1);
-    private readonly Channel<RemoteDownloadRequest> downloadQueue = Channel.CreateUnbounded<RemoteDownloadRequest>();
+    private readonly Channel<DownloadWorkItem> downloadQueue = Channel.CreateUnbounded<DownloadWorkItem>();
     private readonly HttpClient httpClient;
     private readonly Dictionary<string, long> recentDownloadUrls = new(StringComparer.Ordinal);
 
@@ -93,7 +93,8 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         logger.LogDebug("Remote download service stopped");
     }
 
-    public async ValueTask QueueDownloadAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
+    public async ValueTask QueueDownloadAsync(RemoteDownloadRequest request, CancellationToken cancellationToken,
+        Func<Exception, CancellationToken, Task>? failureCallback = null)
     {
         if (string.IsNullOrWhiteSpace(request.ImageUrl))
             throw new ArgumentException("A remote download requires an image URL", nameof(request));
@@ -106,7 +107,8 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             EventType = "download-queued",
             ImageUrl = request.ImageUrl,
         }, cancellationToken);
-        await downloadQueue.Writer.WriteAsync(request, cancellationToken);
+        await downloadQueue.Writer.WriteAsync(new DownloadWorkItem(request, failureCallback, cancellationToken),
+            cancellationToken);
     }
 
     private async Task RunDownloadThreadAsync(CancellationToken stoppingToken)
@@ -116,11 +118,13 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             try
             {
                 // This loops normally forever if there are no problems
-                await foreach (var request in downloadQueue.Reader.ReadAllAsync(stoppingToken))
+                await foreach (var workItem in downloadQueue.Reader.ReadAllAsync(stoppingToken))
                 {
                     try
                     {
-                        await ProcessDownloadAsync(request, stoppingToken);
+                        var failure = await ProcessDownloadAsync(workItem.Request, stoppingToken);
+                        if (failure != null && workItem.FailureCallback != null)
+                            await workItem.FailureCallback(failure, workItem.CallbackCancellation);
                     }
                     catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
                     {
@@ -129,12 +133,12 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Remote download worker failed for {ImageUrl}", request.ImageUrl);
+                        logger.LogError(ex, "Remote download worker failed for {ImageUrl}", workItem.Request.ImageUrl);
 
                         await remoteScanService.RecordEventAsync(new RemoteScanEvent
                         {
                             EventType = "download-worker-fail",
-                            ImageUrl = request.ImageUrl,
+                            ImageUrl = workItem.Request.ImageUrl,
                             Detail = ex.ToString(),
                         }, stoppingToken);
                     }
@@ -155,7 +159,8 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         }
     }
 
-    private async Task ProcessDownloadAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
+    private async Task<Exception?> ProcessDownloadAsync(RemoteDownloadRequest request,
+        CancellationToken cancellationToken)
     {
         await processingLock.WaitAsync(cancellationToken);
         try
@@ -179,7 +184,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                         ImageUrl = enrichedRequest.ImageUrl,
                         Attempt = attempt,
                     }, cancellationToken);
-                    return;
+                    return null;
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
                 {
@@ -199,13 +204,15 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                     {
                         logger.LogError(ex, "Remote download failed after {AttemptCount} attempts for {ImageUrl}",
                             MaximumAttempts, request.ImageUrl);
-                        return;
+                        return ex;
                     }
 
                     var delaySeconds = Math.Min(300, 3 * Math.Pow(2, attempt - 1));
                     await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken);
                 }
             }
+
+            return null;
         }
         finally
         {
@@ -438,5 +445,21 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             fileName = "remote-download";
 
         return string.IsNullOrWhiteSpace(Path.GetExtension(fileName)) ? $"{fileName}.jpg" : fileName;
+    }
+
+    private sealed class DownloadWorkItem
+    {
+        public RemoteDownloadRequest Request { get; }
+        public Func<Exception, CancellationToken, Task>? FailureCallback { get; }
+        public CancellationToken CallbackCancellation { get; }
+
+        public DownloadWorkItem(RemoteDownloadRequest request,
+            Func<Exception, CancellationToken, Task>? failureCallback,
+            CancellationToken callbackCancellation)
+        {
+            Request = request;
+            FailureCallback = failureCallback;
+            CallbackCancellation = callbackCancellation;
+        }
     }
 }

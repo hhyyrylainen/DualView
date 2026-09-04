@@ -22,5 +22,7 @@ public interface IRemoteDownloadService
     /// <summary>
     ///   Queues a remote download for serialized processing.
     /// </summary>
-    public ValueTask QueueDownloadAsync(RemoteDownloadRequest request, CancellationToken cancellationToken);
+    /// <param name="failureCallback">Called after all download attempts fail.</param>
+    public ValueTask QueueDownloadAsync(RemoteDownloadRequest request, CancellationToken cancellationToken,
+        Func<Exception, CancellationToken, Task>? failureCallback = null);
 }

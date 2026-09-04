@@ -10,6 +10,7 @@ const RECONNECT_ALARM = "dualview-web-reconnect";
 const RECONNECT_DELAY_MS = 500;
 const CONNECTION_CHECK_TIMEOUT_MS = 2500;
 const MAX_SERVER_REPLY_TIME_MS = 10000;
+const MAX_REQUEST_TRACKING_TIME_MS = 30 * 60 * 1000;
 
 let socket;
 let status = "disconnected";
@@ -289,13 +290,41 @@ function handleSocketMessage(event, messageSocket) {
   }
 
   if (message?.type === "downloadQueued" || message?.type === "scanAccepted") {
-    if (message.requestId && pendingRequests.has(message.requestId)) {
-      const resolveRequest = pendingRequests.get(message.requestId);
-      pendingRequests.delete(message.requestId);
-      resolveRequest(true);
-    }
-    pendingTabIds.clear();
+    acknowledgeRequest(message.requestId);
   }
+
+  if (message?.type === "error") {
+    failRequest(message.requestId, message.message || "DualView failed to process the request.");
+  }
+}
+
+function acknowledgeRequest(requestId) {
+  const request = requestId ? pendingRequests.get(requestId) : undefined;
+  if (!request) {
+    return;
+  }
+
+  request.acknowledged = true;
+  if (request.acknowledgementTimeout) {
+    window.clearTimeout(request.acknowledgementTimeout);
+    request.acknowledgementTimeout = undefined;
+  }
+  request.resolve(true);
+  request.resolve = () => {};
+  pendingTabIds.delete(request.tabId);
+}
+
+function failRequest(requestId, message) {
+  const request = requestId ? pendingRequests.get(requestId) : undefined;
+  if (!request) {
+    return;
+  }
+
+  pendingRequests.delete(requestId);
+  clearRequestTimeouts(request);
+  request.resolve(false);
+  showTabToast(request.tabId, message, "error");
+  pendingTabIds.delete(request.tabId);
 }
 
 function handleSocketClosed(event, closedSocket) {
@@ -322,8 +351,9 @@ function handleSocketClosed(event, closedSocket) {
     console.warn("DualView websocket closed:", event.code, reason);
   }
 
-  for (const rejectRequest of pendingRequests.values()) {
-    rejectRequest(false);
+  for (const request of pendingRequests.values()) {
+    clearRequestTimeouts(request);
+    request.resolve(false);
   }
   pendingRequests.clear();
 
@@ -358,12 +388,14 @@ async function sendContextMessage(tabId, message, pageUrl, requestId, waitForAck
     message.cookies = await getRelevantCookies(pageUrl);
   }
 
-  const acknowledgement = waitForAcknowledgement ? waitForRequestAcknowledgement(requestId) : undefined;
+  const effectiveRequestId = requestId ?? crypto.randomUUID();
+  message.requestId = effectiveRequestId;
+  const acknowledgement = waitForRequestAcknowledgement(tabId, effectiveRequestId, waitForAcknowledgement);
   pendingTabIds.add(tabId);
   if (!sendProtocolMessage({ ...message, sentAt: new Date().toISOString() })) {
     pendingTabIds.delete(tabId);
     if (acknowledgement) {
-      resolvePendingRequest(requestId, false);
+      failRequest(effectiveRequestId, "DualView connection changed. Please try again.");
     }
     await showTabToast(tabId, "DualView connection changed. Please try again.", "error");
     await connectIfConfigured();
@@ -381,29 +413,42 @@ async function sendContextMessage(tabId, message, pageUrl, requestId, waitForAck
   return acknowledged;
 }
 
-function resolvePendingRequest(requestId, acknowledged) {
-  const resolveRequest = pendingRequests.get(requestId);
-  if (!resolveRequest) {
-    return;
-  }
-
-  pendingRequests.delete(requestId);
-  resolveRequest(acknowledged);
+function waitForRequestAcknowledgement(tabId, requestId, waitForAcknowledgement) {
+  return new Promise(resolve => {
+    const request = {
+      tabId,
+      acknowledged: false,
+      resolve,
+      acknowledgementTimeout: waitForAcknowledgement
+        ? window.setTimeout(() => {
+          const currentRequest = pendingRequests.get(requestId);
+          if (!currentRequest || currentRequest.acknowledged) {
+            return;
+          }
+          pendingRequests.delete(requestId);
+          clearRequestTimeouts(currentRequest);
+          currentRequest.resolve(false);
+        }, MAX_SERVER_REPLY_TIME_MS)
+        : undefined,
+      trackingTimeout: window.setTimeout(() => {
+        pendingRequests.delete(requestId);
+      }, MAX_REQUEST_TRACKING_TIME_MS),
+    };
+    pendingRequests.set(requestId, request);
+    if (!waitForAcknowledgement) {
+      resolve(true);
+      request.resolve = () => {};
+    }
+  });
 }
 
-function waitForRequestAcknowledgement(requestId) {
-  return new Promise(resolve => {
-    const timeout = window.setTimeout(() => {
-      if (pendingRequests.delete(requestId)) {
-        resolve(false);
-      }
-    }, MAX_SERVER_REPLY_TIME_MS);
-
-    pendingRequests.set(requestId, acknowledged => {
-      window.clearTimeout(timeout);
-      resolve(acknowledged);
-    });
-  });
+function clearRequestTimeouts(request) {
+  if (request.acknowledgementTimeout) {
+    window.clearTimeout(request.acknowledgementTimeout);
+  }
+  if (request.trackingTimeout) {
+    window.clearTimeout(request.trackingTimeout);
+  }
 }
 
 async function getRelevantCookies(pageUrl) {
