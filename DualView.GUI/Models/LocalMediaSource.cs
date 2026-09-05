@@ -11,13 +11,16 @@ namespace DualView.GUI.Models;
 public class LocalMediaSource : BaseMediaSource, IVisualMediaSource
 {
     private readonly string path;
+    private readonly bool thumbnailOnly;
 
-    public LocalMediaSource(string path, IServiceProvider videoPlayerServiceProvider) : base(videoPlayerServiceProvider)
+    public LocalMediaSource(string path, IServiceProvider videoPlayerServiceProvider, bool thumbnailOnly = false) : base(
+        videoPlayerServiceProvider)
     {
         if (!File.Exists(path))
             throw new FileNotFoundException("File not found", path);
 
         this.path = path;
+        this.thumbnailOnly = thumbnailOnly;
     }
 
     public string LocalPath => path;
@@ -95,7 +98,21 @@ public class LocalMediaSource : BaseMediaSource, IVisualMediaSource
             {
                 if (MediaType.IsImage())
                 {
-                    if (MediaType.IsAnimated())
+                    if (thumbnailOnly || !MediaType.IsAnimated())
+                    {
+                        var image = new MagickImage();
+                        await image.ReadAsync(path);
+                        image.AutoOrient();
+
+                        // Upload entries only need a small still preview. Reading one frame avoids retaining every
+                        // frame of an animated image while the upload window is open.
+                        MediaProcessingService.ResizeWithDivisibleByTwoDimensions(image,
+                            thumbnailOnly && MediaType.IsAnimated()
+                                ? MediaProcessingService.AnimatedThumbnailSize
+                                : MediaProcessingService.ThumbnailSize);
+                        LoadImage(image, null);
+                    }
+                    else
                     {
                         var collection = new MagickImageCollection();
                         await collection.ReadAsync(path);
@@ -105,22 +122,7 @@ public class LocalMediaSource : BaseMediaSource, IVisualMediaSource
                             frame.AutoOrient();
                         }
 
-                        // When animated, we would need to coalesce to get a smaller size for the thumbnail, so we kind of
-                        // can't resize
-
                         LoadImage(null, collection);
-                    }
-                    else
-                    {
-                        var image = new MagickImage();
-                        await image.ReadAsync(path);
-
-                        image.AutoOrient();
-
-                        // Make a smaller size for the thumbnail
-                        MediaProcessingService.ResizeWithDivisibleByTwoDimensions(image);
-
-                        LoadImage(image, null);
                     }
                 }
                 else
@@ -148,7 +150,7 @@ public class LocalMediaSource : BaseMediaSource, IVisualMediaSource
 
     public IVisualMediaSource Clone()
     {
-        return new LocalMediaSource(path, VideoPlayerServiceProvider);
+        return new LocalMediaSource(path, VideoPlayerServiceProvider, thumbnailOnly);
     }
 
     protected override void AdjustOutputResolution(ref int width, ref int height)

@@ -353,7 +353,10 @@ public class UploadWindowViewModel : ViewModelBase, IDisposable
             if (serviceProvider != null)
             {
                 ThumbnailViewer = ActivatorUtilities.CreateInstance<MediaViewerViewModel>(serviceProvider);
-                ThumbnailViewer.MediaToShow = new LocalMediaSource(path, serviceProvider);
+                // Upload entries should only keep a small still preview in memory. This also avoids retaining every
+                // frame of an animated file while the upload window is open.
+                ThumbnailViewer.ShowingThumbnail = true;
+                ThumbnailViewer.MediaToShow = new LocalMediaSource(path, serviceProvider, true);
                 ThumbnailViewer.IsVisible = true;
                 ThumbnailViewer.AllowSelection = true;
                 ThumbnailViewer.Name = FileName;
