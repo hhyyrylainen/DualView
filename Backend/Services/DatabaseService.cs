@@ -1474,6 +1474,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await dbContext.UploadSections.AddAsync(newSection);
         await SaveAsync();
         await updateNotifier.NotifyUploadSectionsUpdated();
+        _ = NotifyUploadSectionContentsUpdatedAfterDelayAsync(newSection.Id);
         logger.LogInformation("Created upload section '{SectionName}' ({SectionId})", newSection.Name,
             newSection.Id);
 
@@ -2319,7 +2320,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         var appliedTag = await GetOrCreateAppliedTagAsync(tagId, modifierIds, combinedWithAppliedTagId, combineWord);
         var alreadyApplied = await dbContext.AppliedTags.AnyAsync(tag => tag.Id == appliedTag.Id &&
-            tag.MediaFiles.Any(relatedMedia => relatedMedia.Id == mediaId));
+                                                                         tag.MediaFiles.Any(relatedMedia =>
+                                                                             relatedMedia.Id == mediaId));
 
         if (!alreadyApplied)
         {
@@ -3346,6 +3348,21 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (tag.Id == 0)
             await SaveAsync();
         return tag.Id;
+    }
+
+    private async Task NotifyUploadSectionContentsUpdatedAfterDelayAsync(long sectionId)
+    {
+        // This is used to re-notify about a thing that clients might commonly miss otherwise
+
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            await updateNotifier.NotifyUploadSectionContentsUpdated(sectionId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Failed to send delayed contents update for upload section {SectionId}", sectionId);
+        }
     }
 
     async Task<List<MissingTagDTO>> IClientDatabaseService.GetMissingTagsAsync()
