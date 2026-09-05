@@ -8,8 +8,27 @@ namespace DualView.GUI.Models;
 public sealed class ImportSectionBrowse(
     long sectionId,
     IClientDatabaseService databaseService,
-    IServiceProvider serviceProvider) : ICollectionBrowse
+    IServiceProvider serviceProvider,
+    Func<long, bool> isSelected,
+    Action<long, bool> setSelected) : ICollectionBrowse, IMediaSelectionBrowse
 {
+    public event Action<long, bool>? OnSelectionChanged;
+
+    public bool IsSelected(long mediaId)
+    {
+        return isSelected(mediaId);
+    }
+
+    public void SetSelected(long mediaId, bool selected)
+    {
+        setSelected(mediaId, selected);
+    }
+
+    public void NotifySelectionChanged(long mediaId, bool selected)
+    {
+        OnSelectionChanged?.Invoke(mediaId, selected);
+    }
+
     public async Task<(int Count, int? Index)> GetBrowseInfoAsync(long? mediaId)
     {
         var media = (await databaseService.GetUploadSectionAsync(sectionId))?.Media;

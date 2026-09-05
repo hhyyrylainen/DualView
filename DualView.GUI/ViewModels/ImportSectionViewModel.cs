@@ -72,7 +72,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         this.signalRService = signalRService;
         this.backendAPI = backendAPI;
         collectionBrowse = new ImportSectionBrowse(section.Id, databaseService,
-            serviceProvider ?? Program.ServiceProvider!);
+            serviceProvider ?? Program.ServiceProvider!, IsMediaSelected, SetMediaSelected);
 
         if (windowService != null)
         {
@@ -289,6 +289,11 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     public int ImageCount => Media.Count;
     public int SelectedCount => Media.Count(item => item.Selected);
+
+    public bool IsMediaSelected(long mediaId)
+    {
+        return Media.FirstOrDefault(item => GetMediaId(item) == mediaId)?.Selected ?? false;
+    }
 
     public async Task LoadTargetNameSuggestionsAsync(string search)
     {
@@ -888,6 +893,24 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     {
         OnPropertyChanged(nameof(SelectedCount));
         UpdateSelectedImageViewer();
+
+        if (sender is MediaViewerViewModel viewer && viewer.MediaToShow is ServerMediaSource media &&
+            collectionBrowse is IMediaSelectionBrowse selectionBrowse)
+        {
+            selectionBrowse.NotifySelectionChanged(media.ServerId, viewer.Selected);
+        }
+    }
+
+    private void SetMediaSelected(long mediaId, bool selected)
+    {
+        var viewer = Media.FirstOrDefault(item => GetMediaId(item) == mediaId);
+        if (viewer != null)
+            viewer.Selected = selected;
+    }
+
+    private static long GetMediaId(MediaViewerViewModel viewer)
+    {
+        return ((ServerMediaSource)viewer.MediaToShow!).ServerId;
     }
 
     private void UpdateSelectedImageViewer()

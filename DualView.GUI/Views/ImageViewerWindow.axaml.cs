@@ -44,6 +44,11 @@ public partial class ImageViewerWindow : Window
             viewModel.NavigateToAdjacentMedia(1);
             e.Handled = true;
         }
+        else if (e.Key == Key.Space && viewModel.Media.AllowSelection)
+        {
+            viewModel.Media.Selected = !viewModel.Media.Selected;
+            e.Handled = true;
+        }
     }
 
     private void CloseItem_OnClick(object? sender, RoutedEventArgs e)

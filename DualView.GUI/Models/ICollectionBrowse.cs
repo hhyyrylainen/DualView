@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 namespace DualView.GUI.Models;
@@ -11,7 +12,11 @@ public interface ICollectionBrowse
 
 public interface IMediaSelectionBrowse
 {
+    public event Action<long, bool>? OnSelectionChanged;
+
     public bool IsSelected(long mediaId);
 
     public void SetSelected(long mediaId, bool selected);
+
+    public void NotifySelectionChanged(long mediaId, bool selected);
 }

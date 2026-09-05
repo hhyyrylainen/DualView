@@ -22,7 +22,7 @@
 
         <!-- Top bar -->
         <Grid Grid.Row="0"
-              ColumnDefinitions="Auto, Auto, *, Auto, Auto, Auto"
+              ColumnDefinitions="Auto, Auto, *, Auto, Auto, Auto, Auto"
               Background="#F0F0F0">
 
             <ContentControl Grid.Column="0" Margin="6,0"
@@ -79,7 +79,13 @@
                 Sound
             </CheckBox>
 
-            <TextBlock Grid.Column="5" VerticalAlignment="Center" IsVisible="{Binding IsTemporary}"
+            <CheckBox Grid.Column="5" IsChecked="{Binding Media.Selected}"
+                      IsVisible="{Binding Media.AllowSelection}"
+                      Margin="5,0">
+                Selected
+            </CheckBox>
+
+            <TextBlock Grid.Column="6" VerticalAlignment="Center" IsVisible="{Binding IsTemporary}"
                        ToolTip.Tip="Use the Import window to import this media to a collection to make it permanent; otherwise it will be deleted after a while">
                 TEMPORARY Import
             </TextBlock>
