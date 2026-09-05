@@ -8,3 +8,10 @@ public interface ICollectionBrowse
 
     public Task<IVisualMediaSource?> GetMediaAsync(int index);
 }
+
+public interface IMediaSelectionBrowse
+{
+    public bool IsSelected(long mediaId);
+
+    public void SetSelected(long mediaId, bool selected);
+}
