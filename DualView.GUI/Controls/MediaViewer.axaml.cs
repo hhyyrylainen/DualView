@@ -139,7 +139,7 @@ public partial class MediaViewer : UserControl
                 }
             }
 
-            if (vm.AllowSelection)
+            if (vm.AllowSelection && vm.AllowSelectionOnClick)
             {
                 // Toggle the selected state
                 vm.Selected = !vm.Selected;

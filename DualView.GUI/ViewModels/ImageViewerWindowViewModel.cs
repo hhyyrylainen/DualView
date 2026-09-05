@@ -48,9 +48,11 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         {
             ShowingThumbnail = false,
             ShowName = false,
+            AllowSelectionOnClick = false,
         };
 
         Media.OnDisplayedFrameChanged += CheckMediaDetails;
+        Media.OnSelectionChanged += OnMediaSelectionChanged;
     }
 
     [ActivatorUtilitiesConstructor]
@@ -68,9 +70,11 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             ShowingThumbnail = false,
             ShowName = false,
             AllowPanning = true,
+            AllowSelectionOnClick = false,
         };
 
         Media.OnDisplayedFrameChanged += CheckMediaDetails;
+        Media.OnSelectionChanged += OnMediaSelectionChanged;
 
         signalRService.OnMediaUpdated += OnMediaUpdated;
 
@@ -152,14 +156,32 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     {
         Media.MediaToShow = source;
 
+        if (collectionBrowse is IMediaSelectionBrowse previousSelectionBrowse)
+            previousSelectionBrowse.OnSelectionChanged -= OnBrowseSelectionChanged;
+
         if (!ReferenceEquals(collectionBrowse, browsingSupport))
             previousBrowseIndex = null;
 
         collectionBrowse = browsingSupport;
+        if (collectionBrowse is IMediaSelectionBrowse currentSelectionBrowse)
+            currentSelectionBrowse.OnSelectionChanged += OnBrowseSelectionChanged;
+
         Media.MediaOpenResources = extraData ??
                                    (windowService == null
                                        ? null
                                        : new ShowMediaInSeparateWindow(windowService, browsingSupport));
+        if (browsingSupport is IMediaSelectionBrowse selectionBrowse &&
+            source is ServerMediaSource selectionServerMediaSource)
+        {
+            Media.AllowSelection = true;
+            Media.Selected = selectionBrowse.IsSelected(selectionServerMediaSource.ServerId);
+        }
+        else
+        {
+            Media.AllowSelection = false;
+            Media.Selected = false;
+        }
+
         var displayVersion = ++mediaDisplayVersion;
         BrowsePosition = string.Empty;
         OnPropertyChanged(nameof(ImageInfo));
@@ -345,6 +367,9 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         Media.Dispose();
         browseLock.Dispose();
         Media.OnDisplayedFrameChanged -= CheckMediaDetails;
+        Media.OnSelectionChanged -= OnMediaSelectionChanged;
+        if (collectionBrowse is IMediaSelectionBrowse selectionBrowse)
+            selectionBrowse.OnSelectionChanged -= OnBrowseSelectionChanged;
 
         if (signalRService != null)
         {
@@ -636,6 +661,26 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         {
             // Refresh state from the server
             _ = LoadMediaFileStatus(currentConfiguredMediaId);
+        }
+    }
+
+    private void OnMediaSelectionChanged(object? sender, EventArgs e)
+    {
+        if (collectionBrowse is not IMediaSelectionBrowse selectionBrowse ||
+            Media.MediaToShow is not ServerMediaSource serverMediaSource)
+        {
+            return;
+        }
+
+        selectionBrowse.SetSelected(serverMediaSource.ServerId, Media.Selected);
+    }
+
+    private void OnBrowseSelectionChanged(long mediaId, bool selected)
+    {
+        if (Media.MediaToShow is ServerMediaSource serverMediaSource &&
+            serverMediaSource.ServerId == mediaId)
+        {
+            Media.Selected = selected;
         }
     }
 

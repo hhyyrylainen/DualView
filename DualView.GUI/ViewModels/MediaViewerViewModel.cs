@@ -265,6 +265,12 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref field, value);
     }
 
+    public bool AllowSelectionOnClick
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = true;
+
     public bool ShowName
     {
         get;
