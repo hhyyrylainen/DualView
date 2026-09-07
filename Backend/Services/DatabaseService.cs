@@ -529,14 +529,18 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         if (orderedIds.Count == 0)
             return;
 
-        var anchorIndex = request.BeforeMediaId is { } beforeMediaId && itemsByMediaId.ContainsKey(beforeMediaId)
-            ? collection.Items.OrderBy(item => item.SequenceNumber).ToList().FindIndex(item => item.MediaFileId == beforeMediaId)
-            : collection.Items.Count;
-        if (anchorIndex < 0)
-            anchorIndex = collection.Items.Count;
+        if (request.SortColumn == CollectionSortColumn.CollectionOrder &&
+            request.SortDirection == SortDirection.Descending)
+        {
+            orderedIds.Reverse();
+        }
 
         var orderedItems = collection.Items.OrderBy(item => item.SequenceNumber).ToList();
         var movedItems = orderedIds.Select(mediaId => itemsByMediaId[mediaId]).ToHashSet();
+        var anchorIndex = orderedItems.FindIndex(movedItems.Contains);
+        if (anchorIndex < 0)
+            anchorIndex = orderedItems.Count;
+
         orderedItems.RemoveAll(movedItems.Contains);
         anchorIndex = Math.Clamp(anchorIndex, 0, orderedItems.Count);
         orderedItems.InsertRange(anchorIndex, orderedIds.Select(mediaId => itemsByMediaId[mediaId]));
