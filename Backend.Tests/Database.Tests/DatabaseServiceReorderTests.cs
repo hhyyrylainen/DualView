@@ -2,6 +2,7 @@ using Backend.Database;
 using Backend.Models;
 using Backend.Services;
 using DualView.Shared.Requests;
+using DualView.Shared.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -125,7 +126,6 @@ public class DatabaseServiceReorderTests
         await service.ReorderCollectionPageAsync(collection.Id, new CollectionReorderRequest
         {
             MediaIds = [40, 20, 30],
-            BeforeMediaId = 20,
         });
 
         var order = await context.Set<CollectionItem>().IgnoreQueryFilters()
@@ -134,6 +134,134 @@ public class DatabaseServiceReorderTests
             .Select(item => item.MediaFileId)
             .ToListAsync();
         Assert.Equal([10, 40, 20, 30, 50], order);
+    }
+
+    [Fact]
+    public async Task ReorderCollectionPage_NormalizesDescendingCollectionOrder()
+    {
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var collection = new Collection("Test");
+        var media = Enumerable.Range(1, 5)
+            .Select(index => new MediaFile($"p{index}", $"h{index}") { Id = index * 10 })
+            .ToList();
+        await context.Collections.AddAsync(collection);
+        await context.MediaFiles.AddRangeAsync(media);
+        foreach (var (item, index) in media.Select((item, index) => (item, index)))
+        {
+            collection.Items.Add(new CollectionItem
+            {
+                Collection = collection,
+                MediaFile = item,
+                SequenceNumber = index,
+            });
+        }
+        await context.SaveChangesAsync();
+
+        await service.ReorderCollectionPageAsync(collection.Id, new CollectionReorderRequest
+        {
+            MediaIds = [40, 50, 30],
+            SortColumn = CollectionSortColumn.CollectionOrder,
+            SortDirection = SortDirection.Descending,
+        });
+
+        var order = await context.Set<CollectionItem>().IgnoreQueryFilters()
+            .Where(item => item.CollectionId == collection.Id)
+            .OrderBy(item => item.SequenceNumber)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        Assert.Equal([10, 20, 30, 50, 40], order);
+    }
+
+    [Fact]
+    public async Task ReorderCollectionPage_PersistsReorderMadeInNameOrder()
+    {
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var collection = new Collection("Test");
+        var media = new List<MediaFile>
+        {
+            new("Charlie", "h30") { Id = 30 },
+            new("Alpha", "h10") { Id = 10 },
+            new("Bravo", "h20") { Id = 20 },
+        };
+        await context.Collections.AddAsync(collection);
+        await context.MediaFiles.AddRangeAsync(media);
+        foreach (var (item, index) in media.Select((item, index) => (item, index)))
+        {
+            collection.Items.Add(new CollectionItem
+            {
+                Collection = collection,
+                MediaFile = item,
+                SequenceNumber = index,
+            });
+        }
+        await context.SaveChangesAsync();
+
+        // Name order is [10, 20, 30]. Move 20 before 10 and save that display order.
+        await service.ReorderCollectionPageAsync(collection.Id, new CollectionReorderRequest
+        {
+            MediaIds = [20, 10, 30],
+            SortColumn = CollectionSortColumn.Name,
+            SortDirection = SortDirection.Ascending,
+        });
+
+        var order = await context.Set<CollectionItem>().IgnoreQueryFilters()
+            .Where(item => item.CollectionId == collection.Id)
+            .OrderBy(item => item.SequenceNumber)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        Assert.Equal([20, 10, 30], order);
+    }
+
+    [Fact]
+    public async Task ReorderCollectionPage_OnlyChangesItemsOnTheSelectedPage()
+    {
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var collection = new Collection("Test");
+        var media = Enumerable.Range(1, 100)
+            .Select(index => new MediaFile($"p{index}", $"h{index}") { Id = index })
+            .ToList();
+        await context.Collections.AddAsync(collection);
+        await context.MediaFiles.AddRangeAsync(media);
+        foreach (var (item, index) in media.Select((item, index) => (item, index)))
+        {
+            collection.Items.Add(new CollectionItem
+            {
+                Collection = collection,
+                MediaFile = item,
+                SequenceNumber = index,
+            });
+        }
+        await context.SaveChangesAsync();
+
+        // Page 2 with page size 25 contains items 26 through 50. Reorder only three of them.
+        var pageOrder = Enumerable.Range(26, 25).Select(index => (long)index).ToList();
+        pageOrder.Remove(30);
+        pageOrder.Remove(35);
+        pageOrder.Remove(40);
+        pageOrder.InsertRange(4, [40, 30, 35]);
+
+        await service.ReorderCollectionPageAsync(collection.Id, new CollectionReorderRequest
+        {
+            MediaIds = pageOrder,
+            SortColumn = CollectionSortColumn.CollectionOrder,
+            SortDirection = SortDirection.Ascending,
+        });
+
+        var order = await context.Set<CollectionItem>().IgnoreQueryFilters()
+            .Where(item => item.CollectionId == collection.Id)
+            .OrderBy(item => item.SequenceNumber)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        var expectedOrder = Enumerable.Range(1, 25).Select(index => (long)index)
+            .Concat(pageOrder)
+            .Concat(Enumerable.Range(51, 50).Select(index => (long)index));
+        Assert.Equal(expectedOrder, order);
     }
 
     [Fact]
