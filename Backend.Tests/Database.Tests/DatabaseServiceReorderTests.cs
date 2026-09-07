@@ -1,6 +1,7 @@
 using Backend.Database;
 using Backend.Models;
 using Backend.Services;
+using DualView.Shared.Requests;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
@@ -95,6 +96,44 @@ public class DatabaseServiceReorderTests
         Assert.Equal(0, items[0].SequenceNumber);
         Assert.Equal(1, items[1].SequenceNumber);
         Assert.Equal(2, items[2].SequenceNumber);
+    }
+
+    [Fact]
+    public async Task ReorderCollectionPage_ReplacesVisiblePageAtItsOriginalPosition()
+    {
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+        var collection = new Collection("Test");
+        var media = Enumerable.Range(1, 5)
+            .Select(index => new MediaFile($"p{index}", $"h{index}") { Id = index * 10 })
+            .ToList();
+        await context.Collections.AddAsync(collection);
+        await context.MediaFiles.AddRangeAsync(media);
+        foreach (var (item, index) in media.Select((item, index) => (item, index)))
+        {
+            collection.Items.Add(new CollectionItem
+            {
+                Collection = collection,
+                MediaFile = item,
+                SequenceNumber = index,
+            });
+        }
+        media[2].IsDeleted = true;
+        await context.SaveChangesAsync();
+
+        await service.ReorderCollectionPageAsync(collection.Id, new CollectionReorderRequest
+        {
+            MediaIds = [40, 20, 30],
+            BeforeMediaId = 20,
+        });
+
+        var order = await context.Set<CollectionItem>().IgnoreQueryFilters()
+            .Where(item => item.CollectionId == collection.Id)
+            .OrderBy(item => item.SequenceNumber)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        Assert.Equal([10, 40, 20, 30, 50], order);
     }
 
     [Fact]

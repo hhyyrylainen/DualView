@@ -3,6 +3,7 @@ using System.Text;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Requests;
 using DualView.Shared.Services;
 using DualView.Shared.Utils;
 using Backend.Database;
@@ -467,6 +468,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task ReorderCollection(long collectionId, List<long> newImageOrderIds)
     {
         var collection = await dbContext.Collections
+            .IgnoreQueryFilters()
             .Include(c => c.Items)
             .FirstOrDefaultAsync(c => c.Id == collectionId);
 
@@ -508,6 +510,50 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await updateNotifier.NotifyCollectionUpdated(collectionId);
         logger.LogInformation("Reordered {ItemCount} items in collection '{CollectionName}' ({CollectionId})",
             newImageOrderIds.Count, collection.Name, collection.Id);
+    }
+
+    public async Task ReorderCollectionPageAsync(long collectionId, CollectionReorderRequest request)
+    {
+        if (request.MediaIds.Count == 0)
+            return;
+
+        var collection = await dbContext.Collections
+            .IgnoreQueryFilters()
+            .Include(c => c.Items)
+            .FirstOrDefaultAsync(c => c.Id == collectionId);
+        if (collection == null)
+            throw new ArgumentException("Collection not found");
+
+        var itemsByMediaId = collection.Items.ToDictionary(item => item.MediaFileId);
+        var orderedIds = request.MediaIds.Where(itemsByMediaId.ContainsKey).Distinct().ToList();
+        if (orderedIds.Count == 0)
+            return;
+
+        var anchorIndex = request.BeforeMediaId is { } beforeMediaId && itemsByMediaId.ContainsKey(beforeMediaId)
+            ? collection.Items.OrderBy(item => item.SequenceNumber).ToList().FindIndex(item => item.MediaFileId == beforeMediaId)
+            : collection.Items.Count;
+        if (anchorIndex < 0)
+            anchorIndex = collection.Items.Count;
+
+        var orderedItems = collection.Items.OrderBy(item => item.SequenceNumber).ToList();
+        var movedItems = orderedIds.Select(mediaId => itemsByMediaId[mediaId]).ToHashSet();
+        orderedItems.RemoveAll(movedItems.Contains);
+        anchorIndex = Math.Clamp(anchorIndex, 0, orderedItems.Count);
+        orderedItems.InsertRange(anchorIndex, orderedIds.Select(mediaId => itemsByMediaId[mediaId]));
+
+        var temporarySequence = -1;
+        foreach (var item in collection.Items)
+            item.SequenceNumber = temporarySequence--;
+
+        await SaveAsync();
+        for (var index = 0; index < orderedItems.Count; ++index)
+            orderedItems[index].SequenceNumber = index;
+
+        collection.UpdatedAt = DateTime.UtcNow;
+        await SaveAsync();
+        await updateNotifier.NotifyCollectionUpdated(collectionId);
+        logger.LogInformation("Reordered page of collection '{CollectionName}' ({CollectionId})", collection.Name,
+            collection.Id);
     }
 
     public async Task RemoveMediaFromCollection(long mediaId, long collectionId)
