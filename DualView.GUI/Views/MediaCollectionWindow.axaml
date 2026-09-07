@@ -14,7 +14,8 @@
         <vm:MediaCollectionWindowViewModel />
     </Design.DataContext>
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto"
+          DragDrop.AllowDrop="{Binding CanReorderItems}">
         <Menu Grid.Row="0">
             <MenuItem Header="File">
                 <MenuItem Header="Export..." Command="{Binding Export}" />
@@ -102,7 +103,7 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Background="#F0F0F0" Height="42">
+        <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Background="#F0F0F0" Height="42">
             <ContentControl Grid.Column="0" Margin="6,0" DataContext="{Binding Hamburger}">
                 <controls:HamburgerMenuControl />
             </ContentControl>
@@ -118,7 +119,9 @@
             <TextBlock Grid.Column="2" Text="Page " VerticalAlignment="Center" />
             <TextBlock Grid.Column="3" Text="{Binding CurrentPage, StringFormat='{}{0} / '}" VerticalAlignment="Center" />
             <TextBlock Grid.Column="3" Text="{Binding TotalPages}" VerticalAlignment="Center" Margin="45 0 8 0" />
-            <Button Grid.Column="4" Content="Close" Command="{Binding Close}" Margin="4" />
+            <Button Grid.Column="4" Content="Save Order" Command="{Binding SaveOrder}"
+                    IsVisible="{Binding HasUnsavedOrderChanges}" Margin="4" />
+            <Button Grid.Column="5" Content="Close" Command="{Binding Close}" Margin="4" />
         </Grid>
     </Grid>
 </Window>

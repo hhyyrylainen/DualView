@@ -177,6 +177,13 @@ public class CollectionController : Controller
         return Ok();
     }
 
+    [HttpPost("{id:long}/reorderPage")]
+    public async Task<IActionResult> ReorderPage([Required] long id, [FromBody] CollectionReorderRequest request)
+    {
+        await databaseService.ReorderCollectionPageAsync(id, request);
+        return Ok();
+    }
+
     [HttpPost("{id:long}/addMedia")]
     public async Task<IActionResult> AddMediaToCollection([Required] long id,
         [FromBody] CollectionMediaImportRequest request)

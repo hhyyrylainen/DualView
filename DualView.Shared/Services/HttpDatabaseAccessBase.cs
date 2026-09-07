@@ -337,6 +337,12 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task ReorderCollectionPageAsync(long collectionId, CollectionReorderRequest request)
+    {
+        var response = await HttpClient.PostAsJsonAsync($"api/v1/collection/{collectionId}/reorderPage", request);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<List<MediaFileDTO>> GetDeletedMediaAsync(int limit, int offset = 0)
     {
         return await HttpClient.GetFromJsonAsync<List<MediaFileDTO>>(

@@ -1,6 +1,7 @@
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Requests;
 
 namespace DualView.Shared.Services;
 
@@ -34,6 +35,7 @@ public interface IDatabaseCommonService
 
     public Task RemoveMediaFromCollection(long mediaId, long collectionId);
     public Task ReorderCollection(long collectionId, List<long> newImageOrderIds);
+    public Task ReorderCollectionPageAsync(long collectionId, CollectionReorderRequest request);
 
     public Task<List<long>> GetMediaCollectionsAsync(long mediaId);
 
