@@ -111,6 +111,11 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
             cancellationToken);
     }
 
+    public Task<int> GetQueueLengthAsync()
+    {
+        return Task.FromResult(downloadQueue.Reader.Count);
+    }
+
     private async Task RunDownloadThreadAsync(CancellationToken stoppingToken)
     {
         while (!stoppingToken.IsCancellationRequested)
@@ -202,6 +207,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
 
                     if (attempt == MaximumAttempts)
                     {
+                        logger.LogInformation("Referrer for failed URL is: {Referrer}", request.Referrer);
                         logger.LogError(ex, "Remote download failed after {AttemptCount} attempts for {ImageUrl}",
                             MaximumAttempts, request.ImageUrl);
                         return ex;

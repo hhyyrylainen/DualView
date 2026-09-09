@@ -360,6 +360,8 @@ public sealed class BrowserPluginWebSocketHandler
 
             if ((result & UrlInformation.ContentPage) == UrlInformation.ContentPage)
             {
+                await ThrottleScanIfDownloadQueueIsLong(cancellation);
+
                 logger.LogInformation("It is a content page link, will scan it and add the result media immediately");
                 var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
                 if (scanResult.Content is not { Count: > 0 })
@@ -381,6 +383,24 @@ public sealed class BrowserPluginWebSocketHandler
         {
             logger.LogError(ex, "Remote scan failed for {Url}", pageRequest.HtmlUrl);
             await SendErrorAsync(socket, requestId, ex.Message, cancellation);
+        }
+    }
+
+    private async Task ThrottleScanIfDownloadQueueIsLong(CancellationToken cancellation)
+    {
+        var downloadQueueLength = await remoteDownloadService.GetQueueLengthAsync();
+        if (downloadQueueLength > 10)
+        {
+            if (downloadQueueLength < 20)
+            {
+                logger.LogDebug("Waiting a little bit before scanning page as download queue is long");
+            }
+            else
+            {
+                logger.LogInformation("Waiting a little bit before scanning page as download queue is long");
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(Math.Min(downloadQueueLength, 100) / 10), cancellation);
         }
     }
 
