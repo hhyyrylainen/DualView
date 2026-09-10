@@ -13,7 +13,7 @@ namespace DualView.GUI.Controls;
 
 public partial class ImportSectionControl : UserControl
 {
-    private const double DragStartThreshold = 6;
+    private const double DragStartThreshold = 8;
 
     private static readonly DataFormat<ImportMediaDragData> MediaDragFormat =
         DataFormat.CreateInProcessFormat<ImportMediaDragData>("DualView.ImportMedia");

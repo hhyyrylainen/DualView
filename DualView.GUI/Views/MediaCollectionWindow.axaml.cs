@@ -12,7 +12,7 @@ namespace DualView.GUI.Views;
 
 public partial class MediaCollectionWindow : Window
 {
-    private const double DragStartThreshold = 6;
+    private const double DragStartThreshold = 8;
 
     private static readonly DataFormat<CollectionMediaDragData> MediaDragFormat =
         DataFormat.CreateInProcessFormat<CollectionMediaDragData>("DualView.CollectionMedia");
