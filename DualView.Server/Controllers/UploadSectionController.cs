@@ -112,6 +112,7 @@ public class UploadSectionController : Controller
         section.Name = request.Name.Trim();
         section.KeepTarget = request.KeepTarget;
         section.RemoveAfterImport = request.RemoveAfterImport;
+        section.PreventFullImport = request.PreventFullImport;
         section.TargetFolderId = request.TargetFolderId;
         await databaseService.SaveUploadSectionAsync(section);
         return Ok();

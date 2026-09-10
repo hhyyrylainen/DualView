@@ -7,6 +7,7 @@ public class UploadSectionDTO
     public bool KeepTarget { get; set; }
     public bool Selected { get; set; }
     public bool RemoveAfterImport { get; set; }
+    public bool PreventFullImport { get; set; }
     public long TargetFolderId { get; set; }
     public List<MediaFileDTO> Media { get; set; } = new();
     public List<AppliedTagDTO> AppliedTags { get; set; } = new();

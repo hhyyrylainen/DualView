@@ -60,6 +60,11 @@ public class UploadSection : UpdateableModel, IDTOProvider<UploadSectionDTO>
     /// </summary>
     public bool RemoveAfterImport { get; set; } = true;
 
+    /// <summary>
+    ///   Prevents importing every item when no individual items are selected.
+    /// </summary>
+    public bool PreventFullImport { get; set; }
+
     public ICollection<UploadSectionItem> Items { get; set; } = new List<UploadSectionItem>();
 
     public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
@@ -73,6 +78,7 @@ public class UploadSection : UpdateableModel, IDTOProvider<UploadSectionDTO>
             KeepTarget = KeepTarget,
             Selected = Selected,
             RemoveAfterImport = RemoveAfterImport,
+            PreventFullImport = PreventFullImport,
             TargetFolderId = TargetFolderId,
             Media = Items.OrderBy(item => item.Index).Select(item => item.MediaFile.GetDTO()).ToList(),
             AppliedTags = AppliedTags.Select(tag => tag.GetDTO()).ToList(),

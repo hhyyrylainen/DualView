@@ -55,6 +55,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         TagEditor = new TagEditorViewModel();
         ImageTagEditor = new TagEditorViewModel();
         RemoveAfterImport = true;
+        PreventFullImport = false;
         id = -1;
         IsActive = true;
         TargetFolderId = 1;
@@ -92,6 +93,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         Name = section.Name;
         KeepEvenWhenEmpty = section.KeepTarget;
         RemoveAfterImport = section.RemoveAfterImport;
+        PreventFullImport = section.PreventFullImport;
         IsActive = section.Selected;
         TargetFolderId = section.TargetFolderId;
 
@@ -210,6 +212,16 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     }
 
     public bool RemoveAfterImport
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value) && isInitialized)
+                SaveImmediately();
+        }
+    }
+
+    public bool PreventFullImport
     {
         get;
         set
@@ -367,6 +379,13 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     {
         if (databaseService == null)
             return;
+
+        if (PreventFullImport && Media.All(item => !item.Selected))
+        {
+            windowService?.ShowErrorWindow("Import prevented",
+                new InvalidOperationException("Select at least one image before importing."));
+            return;
+        }
 
         try
         {
@@ -734,6 +753,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             Name = section.Name;
             KeepEvenWhenEmpty = section.KeepTarget;
             RemoveAfterImport = section.RemoveAfterImport;
+            PreventFullImport = section.PreventFullImport;
             TargetFolderId = section.TargetFolderId;
             IsActive = section.Selected;
         }
@@ -883,7 +903,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
             await databaseService.SaveUploadSectionAsync(new UploadSectionDTO
             {
                 Id = id, Name = Name.Trim(), KeepTarget = KeepEvenWhenEmpty, RemoveAfterImport = RemoveAfterImport,
-                TargetFolderId = TargetFolderId,
+                PreventFullImport = PreventFullImport, TargetFolderId = TargetFolderId,
             });
         }
         finally
