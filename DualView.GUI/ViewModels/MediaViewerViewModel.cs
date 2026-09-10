@@ -110,6 +110,36 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public bool IsDragging
+    {
+        get;
+        set => SetProperty(ref field, value);
+    }
+
+    public bool IsDragTargetBefore
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
+
+    public bool IsDragTargetAfter
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
+
+    public void SetDragTarget(bool insertAfter)
+    {
+        IsDragTargetBefore = !insertAfter;
+        IsDragTargetAfter = insertAfter;
+    }
+
+    public void ClearDragTarget()
+    {
+        IsDragTargetBefore = false;
+        IsDragTargetAfter = false;
+    }
+
     /// <summary>
     ///   Whether the media viewer is currently visible (used to lazy load)
     /// </summary>

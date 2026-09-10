@@ -32,6 +32,24 @@
                                      Margin="4 4 4 3" MinWidth="32" MinHeight="32" Name="MainDisplay"
                                      IsVisibleInViewport="{Binding IsVisible, Mode=OneWayToSource}" />
 
+        <Border Grid.Row="0" Margin="4" Background="#B0000000" IsVisible="{Binding IsDragging}">
+            <TextBlock Text="Dragging" Foreground="White" HorizontalAlignment="Center"
+                       VerticalAlignment="Center" />
+        </Border>
+
+        <Grid Grid.Row="0" ColumnDefinitions="*,*" IsHitTestVisible="False">
+            <Border Grid.Column="0" BorderBrush="#FF42A5F5" BorderThickness="4,0,0,0"
+                    Background="#5542A5F5" IsVisible="{Binding IsDragTargetBefore}">
+                <TextBlock Text="← Drop before" Foreground="White" HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+            <Border Grid.Column="1" BorderBrush="#FF42A5F5" BorderThickness="0,0,4,0"
+                    Background="#5542A5F5" IsVisible="{Binding IsDragTargetAfter}">
+                <TextBlock Text="Drop after →" Foreground="White" HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+            </Border>
+        </Grid>
+
         <TextBlock Grid.Row="1" Text="{Binding Name}" MaxLines="3" TextWrapping="Wrap" HorizontalAlignment="Center"
                    Margin="0" TextAlignment="Center" IsVisible="{Binding ShowName}" />
     </Grid>

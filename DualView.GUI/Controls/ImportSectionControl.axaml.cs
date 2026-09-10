@@ -13,7 +13,7 @@ namespace DualView.GUI.Controls;
 
 public partial class ImportSectionControl : UserControl
 {
-    private const double DragStartThreshold = 8;
+    private const double DragStartThreshold = 6;
 
     private static readonly DataFormat<ImportMediaDragData> MediaDragFormat =
         DataFormat.CreateInProcessFormat<ImportMediaDragData>("DualView.ImportMedia");
@@ -24,6 +24,7 @@ public partial class ImportSectionControl : UserControl
     private MediaViewer? dragSource;
     private PointerPressedEventArgs? dragPressedEvent;
     private bool dragInProgress;
+    private MediaViewerViewModel? dragTargetViewModel;
 
     public ImportSectionControl()
     {
@@ -36,6 +37,7 @@ public partial class ImportSectionControl : UserControl
         AddHandler(PointerMovedEvent, OnDragPointerMoved, RoutingStrategies.Bubble, true);
         AddHandler(PointerReleasedEvent, OnDragPointerReleased, RoutingStrategies.Bubble, true);
         AddHandler(DragDrop.DragOverEvent, OnDragOver, RoutingStrategies.Bubble, true);
+        AddHandler(DragDrop.DragLeaveEvent, OnDragLeave, RoutingStrategies.Bubble, true);
         AddHandler(DragDrop.DropEvent, OnDrop, RoutingStrategies.Bubble, true);
     }
 
@@ -193,18 +195,34 @@ public partial class ImportSectionControl : UserControl
         if (!mediaIds.Contains(source.ServerId))
             mediaIds.Add(source.ServerId);
 
+        var draggedViewers = viewModel.Media
+            .Where(media => mediaIds.Contains(((ServerMediaSource)media.MediaToShow!).ServerId))
+            .ToList();
+        foreach (var draggedViewer in draggedViewers)
+            draggedViewer.IsDragging = true;
+
         dragInProgress = true;
-        var transfer = new DataTransfer();
-        transfer.Add(DataTransferItem.Create(MediaDragFormat,
-            new ImportMediaDragData(viewModel, mediaIds)));
-        await DragDrop.DoDragDropAsync(dragPressedEvent, transfer, DragDropEffects.Move | DragDropEffects.Copy);
-        dragSource = null;
-        dragPressedEvent = null;
-        dragInProgress = false;
+        try
+        {
+            var transfer = new DataTransfer();
+            transfer.Add(DataTransferItem.Create(MediaDragFormat,
+                new ImportMediaDragData(viewModel, mediaIds)));
+            await DragDrop.DoDragDropAsync(dragPressedEvent, transfer, DragDropEffects.Move | DragDropEffects.Copy);
+        }
+        finally
+        {
+            foreach (var draggedViewer in draggedViewers)
+                draggedViewer.IsDragging = false;
+
+            dragSource = null;
+            dragPressedEvent = null;
+            dragInProgress = false;
+        }
     }
 
     private void OnDragPointerReleased(object? sender, PointerReleasedEventArgs e)
     {
+        ClearDragTarget();
         dragSource = null;
         dragPressedEvent = null;
         dragInProgress = false;
@@ -213,12 +231,44 @@ public partial class ImportSectionControl : UserControl
     private void OnDragOver(object? sender, DragEventArgs e)
     {
         if (!e.DataTransfer.Contains(MediaDragFormat) || DataContext is not ImportSectionViewModel)
+        {
+            ClearDragTarget();
             return;
+        }
+
+        var target = FindMediaViewer(e.Source as Control);
+        if (target?.DataContext is not MediaViewerViewModel targetViewModel)
+        {
+            ClearDragTarget();
+            e.DragEffects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        if (e.DataTransfer.TryGetValue(MediaDragFormat) is { } dragData &&
+            dragData.SourceSection == DataContext &&
+            dragData.MediaIds.Contains(GetMediaId(targetViewModel)))
+        {
+            ClearDragTarget();
+            e.DragEffects = DragDropEffects.None;
+            e.Handled = true;
+            return;
+        }
+
+        var insertAfter = e.GetPosition(target).X > target.Bounds.Width / 2;
+        ClearDragTarget();
+        dragTargetViewModel = targetViewModel;
+        dragTargetViewModel.SetDragTarget(insertAfter);
 
         e.DragEffects = e.KeyModifiers.HasFlag(KeyModifiers.Control)
             ? DragDropEffects.Copy
             : DragDropEffects.Move;
         e.Handled = true;
+    }
+
+    private void OnDragLeave(object? sender, DragEventArgs e)
+    {
+        ClearDragTarget();
     }
 
     private async void OnDrop(object? sender, DragEventArgs e)
@@ -228,6 +278,8 @@ public partial class ImportSectionControl : UserControl
         {
             return;
         }
+
+        ClearDragTarget();
 
         var target = FindMediaViewer(e.Source as Control);
         if (target?.DataContext is MediaViewerViewModel dropTargetViewModel &&
@@ -246,13 +298,24 @@ public partial class ImportSectionControl : UserControl
         if (target != null)
         {
             var point = e.GetPosition(target);
-            if (point.Y > target.Bounds.Height / 2 || point.X > target.Bounds.Width / 2)
+            if (point.X > target.Bounds.Width / 2)
                 ++index;
         }
 
         await viewModel.MoveMediaAsync(dragData, index,
             e.KeyModifiers.HasFlag(KeyModifiers.Control));
         e.Handled = true;
+    }
+
+    private void ClearDragTarget()
+    {
+        dragTargetViewModel?.ClearDragTarget();
+        dragTargetViewModel = null;
+    }
+
+    private static long GetMediaId(MediaViewerViewModel viewer)
+    {
+        return ((ServerMediaSource)viewer.MediaToShow!).ServerId;
     }
 
     private static MediaViewer? FindMediaViewer(Control? control)
