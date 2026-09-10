@@ -16,6 +16,8 @@ namespace Backend.Services;
 
 public class DatabaseService : IDatabaseService, IClientDatabaseService
 {
+    private static readonly SemaphoreSlim uncategorizedCollectionLock = new(1, 1);
+
     private readonly ILogger<DatabaseService> logger;
     private readonly AppDbContext dbContext;
     private readonly IEntityUpdateNotifier updateNotifier;
@@ -597,6 +599,23 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     }
 
     public async Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionAsync(long collectionId,
+        List<long> mediaIds)
+    {
+        if (collectionId == Collection.UncategorizedCollectionId)
+            return await RemoveMediaFromCollectionInternalAsync(collectionId, mediaIds);
+
+        await uncategorizedCollectionLock.WaitAsync();
+        try
+        {
+            return await RemoveMediaFromCollectionInternalAsync(collectionId, mediaIds);
+        }
+        finally
+        {
+            uncategorizedCollectionLock.Release();
+        }
+    }
+
+    private async Task<CollectionMediaRemovalResult> RemoveMediaFromCollectionInternalAsync(long collectionId,
         List<long> mediaIds)
     {
         var collection = await dbContext.Collections.FindAsync(collectionId) ??
@@ -1632,6 +1651,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             Selected = section.Selected,
             TargetFolderId = section.TargetFolderId,
             RemoveAfterImport = section.RemoveAfterImport,
+            PreventFullImport = section.PreventFullImport,
             AppliedTags = section.AppliedTags.ToList(),
             Items = section.Items.Select(item => new UploadSectionItem
             {
@@ -2934,6 +2954,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         section.Name = request.Name;
         section.KeepTarget = request.KeepTarget;
         section.RemoveAfterImport = request.RemoveAfterImport;
+        section.PreventFullImport = request.PreventFullImport;
         section.TargetFolderId = request.TargetFolderId;
         await SaveUploadSectionAsync(section);
     }

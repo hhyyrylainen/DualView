@@ -1,6 +1,9 @@
+using Backend.Database;
 using Backend.Models;
 using Backend.Services;
 using DualView.Shared.Models.Enums;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Tests.Database.Tests;
 
@@ -274,5 +277,65 @@ public class LegacyDatabasePortTests
         var importedSection = await service.GetUploadSectionAsync(section.Id);
         Assert.NotNull(importedSection);
         Assert.NotNull(importedSection.LastImported);
+    }
+
+    [Fact]
+    public async Task RemovingCollectionsToUncategorizedThenImportingSomeItemsKeepsCollectionItemsConsistent()
+    {
+        await using var connection = new SqliteConnection(
+            $"Data Source=file:{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
+        await connection.OpenAsync();
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        await using var setupContext = new AppDbContext(options);
+        await setupContext.Database.EnsureCreatedAsync();
+        await AppDbContext.SeedData(setupContext, CancellationToken.None);
+
+        await using var firstContext = new AppDbContext(options);
+        await using var secondContext = new AppDbContext(options);
+        var firstService = SqliteTestHelpers.CreateService(firstContext);
+        var secondService = SqliteTestHelpers.CreateService(secondContext);
+
+        var firstCollectionId = await firstService.CreateCollection("First source", MediaFolder.RootFolderId);
+        var secondCollectionId = await firstService.CreateCollection("Second source", MediaFolder.RootFolderId);
+        var targetCollectionId = await firstService.CreateCollection("Target", MediaFolder.RootFolderId);
+        var media = Enumerable.Range(1, 6)
+            .Select(index => new MediaFile($"image-{index}.jpg", $"uncategorized-regression-{index}"))
+            .ToList();
+
+        foreach (var mediaFile in media.Take(3))
+            await firstService.CreateMediaAsync(mediaFile, firstCollectionId);
+        foreach (var mediaFile in media.Skip(3))
+            await firstService.CreateMediaAsync(mediaFile, secondCollectionId);
+
+        var firstRemoval = firstService.RemoveMediaFromCollectionAsync(firstCollectionId,
+            media.Take(3).Select(item => item.Id).ToList());
+        var secondRemoval = secondService.RemoveMediaFromCollectionAsync(secondCollectionId,
+            media.Skip(3).Select(item => item.Id).ToList());
+        await Task.WhenAll(firstRemoval, secondRemoval);
+
+        var uncategorizedBeforeImport = await firstContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == Collection.UncategorizedCollectionId)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        Assert.Equal(media.Select(item => item.Id).ToHashSet(), uncategorizedBeforeImport.ToHashSet());
+
+        var importedIds = media.Take(2).Select(item => item.Id).ToList();
+        var targetSequence = await firstService.GetNextCollectionSequenceNumberAsync(targetCollectionId);
+        await firstService.AddMediaToCollection(importedIds, targetCollectionId, targetSequence);
+
+        var uncategorizedAfterImport = await firstContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == Collection.UncategorizedCollectionId)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+        var targetItems = await firstContext.Set<CollectionItem>()
+            .Where(item => item.CollectionId == targetCollectionId)
+            .Select(item => item.MediaFileId)
+            .ToListAsync();
+
+        Assert.Equal(media.Skip(2).Select(item => item.Id).ToHashSet(), uncategorizedAfterImport.ToHashSet());
+        Assert.Equal(importedIds.ToHashSet(), targetItems.ToHashSet());
     }
 }
