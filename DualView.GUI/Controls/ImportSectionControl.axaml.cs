@@ -131,7 +131,27 @@ public partial class ImportSectionControl : UserControl
         while (startIndex >= 0 && !viewModel.Media[startIndex].Selected)
             --startIndex;
 
-        ++startIndex;
+        if (startIndex < 0)
+        {
+            var endIndex = itemIndex + 1;
+            while (endIndex < viewModel.Media.Count && !viewModel.Media[endIndex].Selected)
+                ++endIndex;
+
+            if (endIndex < viewModel.Media.Count)
+            {
+                for (var index = itemIndex; index <= endIndex; ++index)
+                    viewModel.Media[index].Selected = true;
+
+                return;
+            }
+
+            startIndex = 0;
+        }
+        else
+        {
+            ++startIndex;
+        }
+
         for (var index = startIndex; index <= itemIndex; ++index)
             viewModel.Media[index].Selected = true;
     }
