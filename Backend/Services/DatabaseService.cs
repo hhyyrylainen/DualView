@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Data;
 using System.Text;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
@@ -607,7 +608,10 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await uncategorizedCollectionLock.WaitAsync();
         try
         {
-            return await RemoveMediaFromCollectionInternalAsync(collectionId, mediaIds);
+            await using var transaction = await dbContext.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+            var result = await RemoveMediaFromCollectionInternalAsync(collectionId, mediaIds);
+            await transaction.CommitAsync();
+            return result;
         }
         finally
         {
@@ -652,13 +656,15 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
         if (uncategorizedIds.Count > 0)
         {
-            var nextSequenceNumber = await GetNextCollectionSequenceNumberAsync(Collection.UncategorizedCollectionId);
-            dbContext.Set<CollectionItem>().AddRange(uncategorizedIds.Select((mediaId, index) => new CollectionItem
+            var sequenceNumbers = await GetAvailableCollectionSequenceNumbersAsync(
+                Collection.UncategorizedCollectionId, uncategorizedIds.Count);
+            var newUncategorizedItems = uncategorizedIds.Select((mediaId, index) => new CollectionItem
             {
                 CollectionId = Collection.UncategorizedCollectionId,
                 MediaFileId = mediaId,
-                SequenceNumber = nextSequenceNumber + index,
-            }));
+                SequenceNumber = sequenceNumbers[index],
+            }).ToList();
+            dbContext.Set<CollectionItem>().AddRange(newUncategorizedItems);
             result.AddedToUncategorizedMediaIds = uncategorizedIds;
         }
 
@@ -1417,12 +1423,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         var mediaToCategorize = activeMediaIds.Except(existingUncategorizedMediaIds).ToList();
         if (mediaToCategorize.Count > 0)
         {
-            var nextSequenceNumber = await GetNextCollectionSequenceNumberAsync(Collection.UncategorizedCollectionId);
+            var sequenceNumbers = await GetAvailableCollectionSequenceNumbersAsync(
+                Collection.UncategorizedCollectionId, mediaToCategorize.Count);
             dbContext.Set<CollectionItem>().AddRange(mediaToCategorize.Select((mediaId, index) => new CollectionItem
             {
                 CollectionId = Collection.UncategorizedCollectionId,
                 MediaFileId = mediaId,
-                SequenceNumber = nextSequenceNumber + index,
+                SequenceNumber = sequenceNumbers[index],
             }));
         }
 
@@ -1489,7 +1496,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<int> GetNextCollectionSequenceNumberAsync(long collectionId)
     {
+        // Important to ignore query filters as we use soft-delete in this app!
         return await dbContext.Set<CollectionItem>()
+            .IgnoreQueryFilters()
             .Where(ci => ci.CollectionId == collectionId)
             .OrderByDescending(ci => ci.SequenceNumber)
             .Select(ci => ci.SequenceNumber)
@@ -3328,6 +3337,35 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                 $"The collection requires images to remain in groups of {collection.ImageGroupSize}. " +
                 $"Removing these images would leave {remainingItemCount} images.");
         }
+    }
+
+    private async Task<List<int>> GetAvailableCollectionSequenceNumbersAsync(long collectionId, int count)
+    {
+        var usedSequenceNumbers = await dbContext.Set<CollectionItem>()
+            .IgnoreQueryFilters()
+            .Where(item => item.CollectionId == collectionId)
+            .Select(item => item.SequenceNumber)
+            .ToHashSetAsync();
+
+        foreach (var entry in dbContext.ChangeTracker.Entries<CollectionItem>())
+        {
+            if (entry.Entity.CollectionId == collectionId && entry.State != EntityState.Deleted)
+                usedSequenceNumbers.Add(entry.Entity.SequenceNumber);
+        }
+
+        var nextSequenceNumber = usedSequenceNumbers.Count == 0 ? 0 : usedSequenceNumbers.Max();
+        var availableSequenceNumbers = new List<int>(count);
+        while (availableSequenceNumbers.Count < count)
+        {
+            if (nextSequenceNumber == int.MaxValue)
+                throw new InvalidOperationException("No collection sequence numbers remain.");
+
+            ++nextSequenceNumber;
+            if (usedSequenceNumbers.Add(nextSequenceNumber))
+                availableSequenceNumbers.Add(nextSequenceNumber);
+        }
+
+        return availableSequenceNumbers;
     }
 
     private async Task AddRecentImportSectionAsync(string name)

@@ -310,6 +310,21 @@ public class LegacyDatabasePortTests
         foreach (var mediaFile in media.Skip(3))
             await firstService.CreateMediaAsync(mediaFile, secondCollectionId);
 
+        var pendingMedia = new MediaFile("pending-image.jpg", "uncategorized-regression-pending");
+        await firstContext.MediaFiles.AddAsync(pendingMedia);
+        await firstContext.SaveChangesAsync();
+        var pendingSequence = await firstService.GetNextCollectionSequenceNumberAsync(
+            Collection.UncategorizedCollectionId);
+        firstContext.Set<CollectionItem>().Add(new CollectionItem
+        {
+            CollectionId = Collection.UncategorizedCollectionId,
+            MediaFileId = pendingMedia.Id,
+            SequenceNumber = pendingSequence,
+        });
+        await firstContext.SaveChangesAsync();
+        pendingMedia.IsDeleted = true;
+        await firstContext.SaveChangesAsync();
+
         var firstRemoval = firstService.RemoveMediaFromCollectionAsync(firstCollectionId,
             media.Take(3).Select(item => item.Id).ToList());
         var secondRemoval = secondService.RemoveMediaFromCollectionAsync(secondCollectionId,
@@ -317,16 +332,19 @@ public class LegacyDatabasePortTests
         await Task.WhenAll(firstRemoval, secondRemoval);
 
         var uncategorizedBeforeImport = await firstContext.Set<CollectionItem>()
+            .IgnoreQueryFilters()
             .Where(item => item.CollectionId == Collection.UncategorizedCollectionId)
             .Select(item => item.MediaFileId)
             .ToListAsync();
-        Assert.Equal(media.Select(item => item.Id).ToHashSet(), uncategorizedBeforeImport.ToHashSet());
+        Assert.Equal(media.Select(item => item.Id).Append(pendingMedia.Id).ToHashSet(),
+            uncategorizedBeforeImport.ToHashSet());
 
         var importedIds = media.Take(2).Select(item => item.Id).ToList();
         var targetSequence = await firstService.GetNextCollectionSequenceNumberAsync(targetCollectionId);
         await firstService.AddMediaToCollection(importedIds, targetCollectionId, targetSequence);
 
         var uncategorizedAfterImport = await firstContext.Set<CollectionItem>()
+            .IgnoreQueryFilters()
             .Where(item => item.CollectionId == Collection.UncategorizedCollectionId)
             .Select(item => item.MediaFileId)
             .ToListAsync();
@@ -335,7 +353,8 @@ public class LegacyDatabasePortTests
             .Select(item => item.MediaFileId)
             .ToListAsync();
 
-        Assert.Equal(media.Skip(2).Select(item => item.Id).ToHashSet(), uncategorizedAfterImport.ToHashSet());
+        Assert.Equal(media.Skip(2).Select(item => item.Id).Append(pendingMedia.Id).ToHashSet(),
+            uncategorizedAfterImport.ToHashSet());
         Assert.Equal(importedIds.ToHashSet(), targetItems.ToHashSet());
     }
 }
