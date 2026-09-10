@@ -571,11 +571,14 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
+    public async Task<UploadSectionImportResultDTO> ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
     {
         var response = await HttpClient.PostAsJsonAsync($"api/v1/uploadSection/{sectionId}/import", mediaIds);
         if (response.IsSuccessStatusCode)
-            return;
+        {
+            return await response.Content.ReadFromJsonAsync<UploadSectionImportResultDTO>() ??
+                   throw new Exception("Failed to read import result");
+        }
 
         var description = await ReadErrorDescriptionAsync(response);
         throw new HttpRequestException(description, null, response.StatusCode);

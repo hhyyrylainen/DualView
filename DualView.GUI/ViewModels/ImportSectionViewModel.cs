@@ -36,6 +36,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
     private CancellationTokenSource? nameSaveCancellation;
     private CancellationTokenSource? folderPathInitializationCancellation;
+    private CancellationTokenSource? importStatusCancellation;
     private bool isInitialized;
     private int folderPathInitializationCount;
     private bool isRefreshingActive;
@@ -290,6 +291,12 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     public int ImageCount => Media.Count;
     public int SelectedCount => Media.Count(item => item.Selected);
 
+    public string? ImportStatusText
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
+
     public bool IsMediaSelected(long mediaId)
     {
         return Media.FirstOrDefault(item => GetMediaId(item) == mediaId)?.Selected ?? false;
@@ -367,13 +374,15 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
 
             var selected = Media.Where(item => item.Selected)
                 .Select(item => ((ServerMediaSource)item.MediaToShow!).ServerId).ToList();
-            await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
+            var result = await databaseService.ImportUploadSectionAsync(id, selected.Count == 0 ? null : selected);
+            ShowImportStatus($"Imported {result.ImportedCount} image(s) to collection '{result.CollectionName}'.");
 
             if (AutoDeselectAfterImport)
                 DeselectAll();
         }
         catch (Exception ex)
         {
+            ShowImportStatus($"Import failed: {ex.Message}");
             windowService?.ShowErrorWindow("Failed to import section", ex);
         }
     }
@@ -620,6 +629,7 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         FolderPicker.Dispose();
         DisposeSelectedImageViewer();
         CancelNameSave();
+        CancelImportStatus();
 
         try
         {
@@ -887,6 +897,34 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
         nameSaveCancellation?.Cancel();
         nameSaveCancellation?.Dispose();
         nameSaveCancellation = null;
+    }
+
+    private void ShowImportStatus(string status)
+    {
+        CancelImportStatus();
+        importStatusCancellation = new CancellationTokenSource();
+        var cancellationToken = importStatusCancellation.Token;
+        ImportStatusText = status;
+        _ = ClearImportStatusAsync(cancellationToken);
+    }
+
+    private async Task ClearImportStatusAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken);
+            ImportStatusText = null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private void CancelImportStatus()
+    {
+        importStatusCancellation?.Cancel();
+        importStatusCancellation?.Dispose();
+        importStatusCancellation = null;
     }
 
     private void OnMediaSelectionChanged(object? sender, EventArgs e)

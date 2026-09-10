@@ -1749,7 +1749,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         }
     }
 
-    public async Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
+    public async Task<UploadSectionImportResultDTO> ImportUploadSectionAsync(long sectionId, List<long>? mediaIds)
     {
         var section = await dbContext.UploadSections
             .Include(item => item.Items)
@@ -1768,7 +1768,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Distinct()
             .ToList();
         if (selectedIds.Count == 0)
-            return;
+            return new UploadSectionImportResultDTO { CollectionName = section.Name };
 
         logger.LogInformation("Trying to import {ItemCount} items from upload section '{SectionName}' ({SectionId})",
             selectedIds.Count, section.Name, section.Id);
@@ -1802,6 +1802,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await AddRecentImportSectionAsync(section.Name);
 
         var nextSequence = await GetNextCollectionSequenceNumberAsync(collection.Id);
+        var existingMediaCount = await dbContext.Set<CollectionItem>()
+            .CountAsync(item => item.CollectionId == collection.Id && selectedIds.Contains(item.MediaFileId));
+        var importedCount = selectedIds.Count - existingMediaCount;
         await AddMediaToCollection(selectedIds, collection.Id, nextSequence);
 
         await dbContext.Entry(collection).Collection(item => item.AppliedTags).LoadAsync();
@@ -1840,7 +1843,11 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             await updateNotifier.NotifyUploadSectionsUpdated();
             logger.LogInformation("Removed empty upload section '{SectionName}' ({SectionId}) after import",
                 section.Name, section.Id);
-            return;
+            return new UploadSectionImportResultDTO
+            {
+                ImportedCount = importedCount,
+                CollectionName = collection.Name,
+            };
         }
 
         if (targetFolderApplied)
@@ -1867,6 +1874,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             await SaveAsync();
             await updateNotifier.NotifyUploadSectionUpdated(sectionId);
         }
+
+        return new UploadSectionImportResultDTO
+        {
+            ImportedCount = importedCount,
+            CollectionName = collection.Name,
+        };
     }
 
     public async Task AddMediaToUploadSectionAsync(long mediaId, long sectionId, int index)
@@ -2940,7 +2953,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     Task IClientDatabaseService.SetUploadSectionActiveAsync(long? sectionId) => SetUploadSectionActiveAsync(sectionId);
 
-    Task IClientDatabaseService.ImportUploadSectionAsync(long sectionId, List<long>? mediaIds) =>
+    Task<UploadSectionImportResultDTO> IClientDatabaseService.ImportUploadSectionAsync(long sectionId, List<long>? mediaIds) =>
         ImportUploadSectionAsync(sectionId, mediaIds);
 
     public async Task<List<DownloadGallery>> GetDownloadGalleriesAsync()

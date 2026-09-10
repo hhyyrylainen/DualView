@@ -82,7 +82,7 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task SetUploadSectionActiveAsync(long? sectionId);
-    public Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds);
+    public Task<UploadSectionImportResultDTO> ImportUploadSectionAsync(long sectionId, List<long>? mediaIds);
     public Task<List<DownloadGalleryDTO>> GetAllDownloadGalleriesAsync();
     public Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id);
 

@@ -98,7 +98,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task RemoveMediaFromUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task ReorderUploadSectionAsync(long sectionId, List<long> mediaIds);
     public Task SetUploadSectionActiveAsync(long? sectionId);
-    public Task ImportUploadSectionAsync(long sectionId, List<long>? mediaIds);
+    public Task<UploadSectionImportResultDTO> ImportUploadSectionAsync(long sectionId, List<long>? mediaIds);
 
     // Backend maintenance jobs
     public Task<MaintenanceJobRecord?> GetMaintenanceRecord(string name);

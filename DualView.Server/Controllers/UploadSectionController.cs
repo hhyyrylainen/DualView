@@ -163,12 +163,11 @@ public class UploadSectionController : Controller
     }
 
     [HttpPost("{sectionId:long}/import")]
-    public async Task<ActionResult> Import(long sectionId, [FromBody] List<long>? mediaIds)
+    public async Task<ActionResult<UploadSectionImportResultDTO>> Import(long sectionId, [FromBody] List<long>? mediaIds)
     {
         try
         {
-            await databaseService.ImportUploadSectionAsync(sectionId, mediaIds);
-            return Ok();
+            return Ok(await databaseService.ImportUploadSectionAsync(sectionId, mediaIds));
         }
         catch (ArgumentException ex)
         {

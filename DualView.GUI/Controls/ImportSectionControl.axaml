@@ -105,11 +105,12 @@
                 </Grid>
             </Grid>
 
-            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto" RowDefinitions="Auto" Margin="2">
+            <Grid Grid.Row="2" ColumnDefinitions="Auto,Auto,Auto,*" RowDefinitions="Auto" Margin="2">
                 <TextBlock Grid.Column="0" Margin="0,0,8,0">Images:</TextBlock>
                 <TextBlock Grid.Column="1"
                            Text="{Binding ImageCount}" />
                 <TextBlock Grid.Column="2" Text="{Binding SelectedCount, StringFormat='{}({0} selected)'}" />
+                <TextBlock Grid.Column="3" Margin="8,0,0,0" Text="{Binding ImportStatusText}" TextWrapping="Wrap" />
             </Grid>
         </Grid>
     </Border>
