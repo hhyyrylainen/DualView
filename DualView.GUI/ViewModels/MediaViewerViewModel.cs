@@ -214,6 +214,8 @@ public class MediaViewerViewModel : ViewModelBase, IDisposable
 
             if (value == null)
             {
+                IsDragging = false;
+                ClearDragTarget();
                 UnloadDisplay();
                 MediaOpenResources?.RefreshAvailableOptions(null);
             }
