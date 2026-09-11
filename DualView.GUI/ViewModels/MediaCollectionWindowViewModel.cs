@@ -11,6 +11,7 @@ using DualView.GUI.Models;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
+using DualView.Shared.Requests;
 using DualView.Shared.Services;
 using DualView.Shared.Utils;
 using Microsoft.Extensions.DependencyInjection;
@@ -42,6 +43,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     private List<long>? visualSimilarityOrder;
     private CollectionMediaRemovalResult? latestRemoval;
     private ICollectionBrowse? collectionBrowse;
+    private List<long>? originalPageMediaIds;
 
     public MediaCollectionWindowViewModel()
     {
@@ -101,6 +103,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref field, value))
             {
+                OnPropertyChanged(nameof(CanReorderItems));
                 OnPropertyChanged(nameof(CanNavigateBackwards));
                 OnPropertyChanged(nameof(CanNavigateForwards));
             }
@@ -138,6 +141,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref searchText, value))
             {
+                OnPropertyChanged(nameof(CanReorderItems));
                 ResetScrollPositionCache(true);
                 _ = RefreshItems();
             }
@@ -164,6 +168,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref field, value))
             {
+                OnPropertyChanged(nameof(CanReorderItems));
                 ResetScrollPositionCache(false);
                 _ = RefreshItems();
             }
@@ -177,6 +182,7 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         {
             if (SetProperty(ref field, value))
             {
+                OnPropertyChanged(nameof(CanReorderItems));
                 ResetScrollPositionCache(false);
                 _ = RefreshItems();
             }
@@ -248,6 +254,14 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
 
     public bool CanNavigateBackwards => !IsVisualSimilarityMode && CurrentPage > 1;
     public bool CanNavigateForwards => !IsVisualSimilarityMode && CurrentPage < TotalPages;
+    public bool CanReorderItems => !IsVisualSimilarityMode;
+
+    public bool HasUnsavedOrderChanges
+    {
+        get;
+        private set => SetProperty(ref field, value);
+    }
+
     public int SelectedCount => CollectionItems.Count(item => item.Selected);
     public bool CanUndoRemoval => latestRemoval != null;
 
@@ -287,6 +301,32 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public void SendSelectedToImport() => _ = SendSelectedToImportAsync();
     public void DeleteCollection() => _ = DeleteCollectionAsync();
     public void DeleteCollectionAndImages() => _ = DeleteCollectionAndImagesAsync();
+    public void SaveOrder() => _ = SaveOrderAsync();
+
+    public void MoveMediaForReorder(IReadOnlyList<long> mediaIds, long targetMediaId, bool insertAfter)
+    {
+        if (!CanReorderItems)
+            return;
+
+        var movedItems = CollectionItems
+            .Where(item => item.MediaToShow is ServerMediaSource source && mediaIds.Contains(source.ServerId))
+            .ToList();
+        var target = CollectionItems.FirstOrDefault(item => item.MediaToShow is ServerMediaSource source &&
+                                                              source.ServerId == targetMediaId);
+        if (movedItems.Count == 0 || target == null || movedItems.Contains(target))
+            return;
+
+        var targetIndex = CollectionItems.IndexOf(target) + (insertAfter ? 1 : 0);
+        targetIndex -= CollectionItems.Take(targetIndex).Count(movedItems.Contains);
+        foreach (var item in movedItems)
+            CollectionItems.Remove(item);
+
+        targetIndex = Math.Clamp(targetIndex, 0, CollectionItems.Count);
+        for (var index = 0; index < movedItems.Count; ++index)
+            CollectionItems.Insert(targetIndex + index, movedItems[index]);
+
+        HasUnsavedOrderChanges = true;
+    }
 
     public void OpenReorderWindow()
     {
@@ -428,6 +468,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
                 foreach (var item in CollectionItems)
                     item.Dispose();
                 CollectionItems.Clear();
+                originalPageMediaIds = content.Select(item => item.Id).ToList();
+                HasUnsavedOrderChanges = false;
                 foreach (var item in content)
                 {
                     var viewer = new MediaViewerViewModel(logger!, windowService!)
@@ -480,6 +522,36 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
         foreach (var item in CollectionItems)
             item.Dispose();
         Hamburger.Dispose();
+    }
+
+    private async Task SaveOrderAsync()
+    {
+        if (!HasUnsavedOrderChanges || databaseService == null || collectionId == null ||
+            originalPageMediaIds is not { Count: > 0 })
+        {
+            return;
+        }
+
+        var mediaIds = CollectionItems
+            .Select(item => item.MediaToShow)
+            .OfType<ServerMediaSource>()
+            .Select(source => source.ServerId)
+            .ToList();
+        try
+        {
+            await databaseService.ReorderCollectionPageAsync(collectionId.Value, new CollectionReorderRequest
+            {
+                MediaIds = mediaIds,
+                SortColumn = SortColumn,
+                SortDirection = SortDirection,
+            });
+            HasUnsavedOrderChanges = false;
+            originalPageMediaIds = mediaIds;
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to save collection order", ex);
+        }
     }
 
     private async Task LoadCollectionTagsAsync(long id)
