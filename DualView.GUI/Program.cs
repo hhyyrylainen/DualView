@@ -211,6 +211,7 @@ sealed class Program
         services.AddSingleton<IBackendStatusService, BackendStatusService>();
 
         services.AddSingleton<IWindowService, WindowService>();
+        services.AddSingleton<IWindowRecoveryService, WindowRecoveryService>();
         services.AddSingleton<ICachedIPResolver, CachedIPResolver>();
         services.AddSingleton<FfmpegDecoderService>();
         services.AddSingleton<IAudioPlaybackService, AudioPlaybackService>();

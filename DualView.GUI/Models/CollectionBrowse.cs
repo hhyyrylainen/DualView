@@ -10,6 +10,8 @@ public sealed class CollectionBrowse(
     IClientDatabaseService databaseService,
     IServiceProvider serviceProvider) : ICollectionBrowse
 {
+    public long CollectionId => collectionId;
+
     public async Task<(int Count, int? Index)> GetBrowseInfoAsync(long? mediaId)
     {
         var info = await databaseService.GetCollectionBrowseInfoAsync(collectionId, mediaId);

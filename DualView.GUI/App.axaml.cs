@@ -47,6 +47,7 @@ public class App : Application
                 serviceScope = Program.ServiceProvider.CreateScope();
                 logger = serviceScope.ServiceProvider.GetRequiredService<ILoggingService>();
                 logger.Info("Application framework initialized");
+                var windowRecoveryService = serviceScope.ServiceProvider.GetRequiredService<IWindowRecoveryService>();
 
                 // If we are not connected to the server, show the connection failure window instead of the usual main
                 // window
@@ -83,6 +84,10 @@ public class App : Application
 
                 // Register for shutdown
                 desktop.Exit += OnApplicationExit;
+
+                // Restore state from before crash
+                _ = windowRecoveryService.RecoverWindowsAsync(
+                    serviceScope.ServiceProvider.GetRequiredService<IWindowService>());
 
                 // UI Thread Watchdog to detect freezes
                 StartUiWatchdog();
@@ -178,6 +183,7 @@ public class App : Application
     private void OnApplicationExit(object? sender, EventArgs e)
     {
         running = false;
+        serviceScope?.ServiceProvider.GetService<IWindowRecoveryService>()?.Clear();
         logger?.Info("Application UI shutting down");
         logger = null;
 

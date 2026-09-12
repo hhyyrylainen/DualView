@@ -96,6 +96,8 @@ public sealed class MediaCollectionWindowViewModel : ViewModelBase, IDisposable
     public string CollectionStatistics => Collection == null ? "" : $"{CollectionItemCount} images";
     public int CollectionItemCount { get; private set; }
 
+    public long? CollectionId => collectionId;
+
     public bool IsVisualSimilarityMode
     {
         get;

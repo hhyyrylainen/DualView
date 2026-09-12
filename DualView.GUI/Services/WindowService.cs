@@ -17,13 +17,16 @@ public sealed class WindowService : IWindowService
 {
     private readonly ILogger<WindowService> logger;
     private readonly IServiceProvider services;
+    private readonly IWindowRecoveryService windowRecoveryService;
 
     private readonly ConcurrentDictionary<Type, Window> singletons = new();
 
-    public WindowService(ILogger<WindowService> logger, IServiceProvider services)
+    public WindowService(ILogger<WindowService> logger, IServiceProvider services,
+        IWindowRecoveryService windowRecoveryService)
     {
         this.logger = logger;
         this.services = services;
+        this.windowRecoveryService = windowRecoveryService;
     }
 
     public TViewModel? ShowSingletonWindow<TViewModel>()
@@ -43,7 +46,8 @@ public sealed class WindowService : IWindowService
         // Resolve VM and make it
         var vm = serviceScope.ServiceProvider.GetRequiredService<TViewModel>();
 
-        PerformWindowCreation(vm, serviceScope);
+        var window = PerformWindowCreation(vm, serviceScope);
+        windowRecoveryService.RegisterSingletonWindow(window, vmType);
         return vm;
     }
 
@@ -54,7 +58,9 @@ public sealed class WindowService : IWindowService
         var vm = serviceScope.ServiceProvider.GetRequiredService<TViewModel>();
         onCreated?.Invoke(vm);
 
-        PerformWindowCreation(vm, serviceScope);
+        var window = PerformWindowCreation(vm, serviceScope);
+        if (vm is MediaCollectionWindowViewModel collectionViewModel && collectionViewModel.CollectionId.HasValue)
+            windowRecoveryService.RegisterCollectionWindow(window, collectionViewModel.CollectionId.Value);
     }
 
     /// <summary>
@@ -78,7 +84,8 @@ public sealed class WindowService : IWindowService
             return;
         }
 
-        PerformWindowCreation(viewModel, serviceScope);
+        var window = PerformWindowCreation(viewModel, serviceScope);
+        windowRecoveryService.RegisterSingletonWindow(window, vmType);
     }
 
     public void ShowErrorWindow(string errorTitle, Exception exception)
@@ -235,7 +242,12 @@ public sealed class WindowService : IWindowService
 
         editViewModel.ShowMedia(mediaSource, null, collectionBrowse);
 
-        PerformInstanceWindowCreation(editViewModel, serviceScope);
+        var window = PerformInstanceWindowCreation(editViewModel, serviceScope);
+        if (mediaSource is ServerMediaSource serverSource)
+        {
+            long? collectionId = collectionBrowse is CollectionBrowse browse ? browse.CollectionId : null;
+            windowRecoveryService.RegisterMediaViewer(window, serverSource.ServerId, collectionId);
+        }
     }
 
     public void ShowOperationStatus(long operationId)
@@ -343,7 +355,7 @@ public sealed class WindowService : IWindowService
         return window;
     }
 
-    private void PerformWindowCreation<TViewModel>(TViewModel viewModel, IServiceScope? serviceScope)
+    private Window PerformWindowCreation<TViewModel>(TViewModel viewModel, IServiceScope? serviceScope)
         where TViewModel : class
     {
         var vmType = typeof(TViewModel);
@@ -353,6 +365,7 @@ public sealed class WindowService : IWindowService
         // Track lifetime
         view.Closed += (_, _) =>
         {
+            windowRecoveryService.UnregisterWindow(view);
             singletons.TryRemove(vmType, out var _);
             (viewModel as IDisposable)?.Dispose();
             serviceScope?.Dispose();
@@ -369,9 +382,10 @@ public sealed class WindowService : IWindowService
         view.Show();
 
         view.Activate();
+        return view;
     }
 
-    private void PerformInstanceWindowCreation<TViewModel>(TViewModel viewModel, IServiceScope? serviceScope,
+    private Window PerformInstanceWindowCreation<TViewModel>(TViewModel viewModel, IServiceScope? serviceScope,
         Action? onClose = null)
         where TViewModel : class
     {
@@ -380,6 +394,7 @@ public sealed class WindowService : IWindowService
         // Dispose of things once done
         view.Closed += (_, _) =>
         {
+            windowRecoveryService.UnregisterWindow(view);
             (viewModel as IDisposable)?.Dispose();
             serviceScope?.Dispose();
             onClose?.Invoke();
@@ -390,5 +405,6 @@ public sealed class WindowService : IWindowService
         view.Show();
 
         view.Activate();
+        return view;
     }
 }
