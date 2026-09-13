@@ -243,6 +243,15 @@ public sealed class WindowService : IWindowService
         editViewModel.ShowMedia(mediaSource, null, collectionBrowse);
 
         var window = PerformInstanceWindowCreation(editViewModel, serviceScope);
+
+        void OnDisplayedMediaChanged(long mediaId)
+        {
+            windowRecoveryService.UpdateMediaViewer(window, mediaId);
+        }
+
+        editViewModel.OnDisplayedMediaChanged += OnDisplayedMediaChanged;
+        window.Closed += (_, _) => editViewModel.OnDisplayedMediaChanged -= OnDisplayedMediaChanged;
+
         if (mediaSource is ServerMediaSource serverSource)
         {
             long? collectionId = collectionBrowse is CollectionBrowse browse ? browse.CollectionId : null;
