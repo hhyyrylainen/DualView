@@ -40,6 +40,8 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
     public event MediaSaveRequested? OnMediaSaveRequested;
 
+    public event Action<long>? OnDisplayedMediaChanged;
+
     // Design time constructor
     public ImageViewerWindowViewModel()
     {
@@ -155,6 +157,9 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         ICollectionBrowse? browsingSupport)
     {
         Media.MediaToShow = source;
+
+        if (source is ServerMediaSource serverSource)
+            OnDisplayedMediaChanged?.Invoke(serverSource.ServerId);
 
         if (collectionBrowse is IMediaSelectionBrowse previousSelectionBrowse)
             previousSelectionBrowse.OnSelectionChanged -= OnBrowseSelectionChanged;

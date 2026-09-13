@@ -73,6 +73,21 @@ public sealed class WindowRecoveryService : IWindowRecoveryService, IDisposable
             });
     }
 
+    public void UpdateMediaViewer(Window window, long mediaId)
+    {
+        lock (synchronization)
+        {
+            if (!entries.TryGetValue(window, out var entry) || entry.Kind != WindowRecoveryKind.MediaViewer ||
+                entry.MediaId == mediaId)
+            {
+                return;
+            }
+
+            entry.MediaId = mediaId;
+            dirty = true;
+        }
+    }
+
     public void RegisterSingletonWindow(Window window, Type viewModelType)
     {
         Register(window,
