@@ -19,7 +19,11 @@ public class App : Application
 {
     private IServiceScope? serviceScope;
     private ILoggingService? logger;
+    private IBackendStatusService? backendStatusService;
+    private IWindowRecoveryService? windowRecoveryService;
+    private IWindowService? windowService;
     private bool running;
+    private bool windowRecoveryStarted;
 
     public override void Initialize()
     {
@@ -47,11 +51,11 @@ public class App : Application
                 serviceScope = Program.ServiceProvider.CreateScope();
                 logger = serviceScope.ServiceProvider.GetRequiredService<ILoggingService>();
                 logger.Info("Application framework initialized");
-                var windowRecoveryService = serviceScope.ServiceProvider.GetRequiredService<IWindowRecoveryService>();
+                windowRecoveryService = serviceScope.ServiceProvider.GetRequiredService<IWindowRecoveryService>();
 
                 // If we are not connected to the server, show the connection failure window instead of the usual main
                 // window
-                var backendStatusService = serviceScope.ServiceProvider.GetRequiredService<IBackendStatusService>();
+                backendStatusService = serviceScope.ServiceProvider.GetRequiredService<IBackendStatusService>();
 
                 if (!backendStatusService.IsConnected)
                 {
@@ -86,8 +90,8 @@ public class App : Application
                 desktop.Exit += OnApplicationExit;
 
                 // Restore state from before crash
-                _ = windowRecoveryService.RecoverWindowsAsync(
-                    serviceScope.ServiceProvider.GetRequiredService<IWindowService>());
+                windowService = serviceScope.ServiceProvider.GetRequiredService<IWindowService>();
+                StartWindowRecoveryWhenBackendIsAvailable();
 
                 // UI Thread Watchdog to detect freezes
                 StartUiWatchdog();
@@ -183,6 +187,9 @@ public class App : Application
     private void OnApplicationExit(object? sender, EventArgs e)
     {
         running = false;
+        if (backendStatusService != null)
+            backendStatusService.OnStatusChanged -= OnBackendStatusChanged;
+
         serviceScope?.ServiceProvider.GetService<IWindowRecoveryService>()?.Clear();
         logger?.Info("Application UI shutting down");
         logger = null;
@@ -192,6 +199,37 @@ public class App : Application
         serviceScope = null;
 
         Program.OnApplicationExit(sender, e);
+    }
+
+    private void StartWindowRecoveryWhenBackendIsAvailable()
+    {
+        if (backendStatusService?.IsConnected == true)
+        {
+            StartWindowRecovery();
+            return;
+        }
+
+        backendStatusService?.OnStatusChanged += OnBackendStatusChanged;
+    }
+
+    private void OnBackendStatusChanged(bool connected)
+    {
+        if (!connected)
+            return;
+
+        if (backendStatusService != null)
+            backendStatusService.OnStatusChanged -= OnBackendStatusChanged;
+
+        Dispatcher.UIThread.Post(StartWindowRecovery);
+    }
+
+    private void StartWindowRecovery()
+    {
+        if (windowRecoveryStarted || windowRecoveryService == null || windowService == null)
+            return;
+
+        windowRecoveryStarted = true;
+        _ = windowRecoveryService.RecoverWindowsAsync(windowService);
     }
 
     private void DisableAvaloniaDataAnnotationValidation()
