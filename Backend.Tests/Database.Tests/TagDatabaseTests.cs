@@ -103,6 +103,26 @@ public class TagDatabaseTests
     }
 
     [Fact]
+    public async Task SearchTagsWildcard_ReturnsTagsMatchingAliases()
+    {
+        // Arrange
+        using var context = CreateDbContext();
+        var service = new DatabaseService(logger, context, updateNotifier,
+            appEvents, dataFolderService, mediaProcessingService);
+
+        var tagId = await service.CreateTagAsync("Apple", TagCategory.DescribeCharacterObject);
+        await service.CreateTagAliasAsync(tagId, "Malus domestica");
+
+        // Act
+        var results = await service.SearchTagsWildcardAsync("domestica");
+
+        // Assert
+        var result = Assert.Single(results);
+        Assert.Equal(tagId, result.Id);
+        Assert.Equal("apple", result.Name);
+    }
+
+    [Fact]
     public async Task GetTagByName_IsCaseInsensitive()
     {
         // Arrange

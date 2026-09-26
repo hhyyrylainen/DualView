@@ -2899,7 +2899,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     {
         var pattern = search.ToLowerInvariant();
         return await dbContext.Tags
-            .Where(t => t.Name.Contains(pattern))
+            .Where(t => t.Name.Contains(pattern) || t.Aliases.Any(alias => alias.Name.Contains(pattern)))
             .OrderBy(t => t.Name.StartsWith(pattern) ? 0 : 1)
             .ThenBy(t => t.Name.IndexOf(pattern))
             .ThenBy(t => t.Name)
