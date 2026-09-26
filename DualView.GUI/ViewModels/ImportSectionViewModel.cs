@@ -366,7 +366,23 @@ public sealed class ImportSectionViewModel : ViewModelBase, IDisposable
     {
         if (databaseService == null)
             return;
+
         await databaseService.SetUploadSectionActiveAsync(IsActive ? id : null);
+
+        // Make really sure we got the latest state properly
+        var section = await databaseService.GetUploadSectionAsync(id);
+        if (section == null)
+            return;
+
+        isRefreshingActive = true;
+        try
+        {
+            IsActive = section.Selected;
+        }
+        finally
+        {
+            isRefreshingActive = false;
+        }
     }
 
     public async Task SaveAsync()
