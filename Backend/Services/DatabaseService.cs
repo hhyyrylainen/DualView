@@ -1088,6 +1088,9 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     public async Task<List<string>> SearchUploadTargetNamesAsync(string search, int limit = 100)
     {
         var searchLower = search.Trim().ToLowerInvariant();
+
+        // If using different cases in search, then prefer exact case results
+        var hasUppercaseSearch = search.Any(char.IsUpper);
         limit = Math.Clamp(limit, 1, 200);
 
         var sectionNames = dbContext.UploadSections
@@ -1101,7 +1104,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await sectionNames.Concat(collectionNames)
             .Distinct()
             .OrderBy(name => name.ToLower().StartsWith(searchLower) ? 0 : 1)
-            .ThenBy(name => name.Contains(search) ? 0 : 1)
+            .ThenBy(name => hasUppercaseSearch && name.Contains(search) ? 0 : 1)
             .ThenBy(name => name.ToLower().IndexOf(searchLower))
             .ThenBy(name => name.Length)
             .ThenBy(name => name)

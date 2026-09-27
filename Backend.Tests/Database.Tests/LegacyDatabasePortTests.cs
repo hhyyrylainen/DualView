@@ -65,6 +65,23 @@ public class LegacyDatabasePortTests
     }
 
     [Fact]
+    public async Task UploadTargetNameSearch_DoesNotPrioritizeCaseForLowercaseSearch()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+
+        await service.CreateCollection("Cat", MediaFolder.RootFolderId);
+        await service.CreateCollection("Cathedral", MediaFolder.RootFolderId);
+        await service.CreateCollection("catwalk", MediaFolder.RootFolderId);
+        await service.CreateCollection("The Cat", MediaFolder.RootFolderId);
+        await service.CreateCollection("concatenate", MediaFolder.RootFolderId);
+
+        var names = await service.SearchUploadTargetNamesAsync("cat");
+
+        Assert.Equal(["Cat", "catwalk", "Cathedral", "Uncategorized", "concatenate", "The Cat"], names);
+    }
+
+    [Fact]
     public async Task Folders_RejectDuplicateNamesWithinOneParent()
     {
         await using var context = SqliteTestHelpers.CreateContext(seed: true);
