@@ -343,6 +343,26 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public async Task ClearRemoteScanEventsAsync()
+    {
+        if (backendAPI == null)
+            return;
+
+        try
+        {
+            await backendAPI.ClearRemoteScanEvents();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                RemoteScanEvents.Clear();
+                OnPropertyChanged(nameof(StatusHeader));
+            });
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to clear remote scan events", ex);
+        }
+    }
+
     public void Dispose()
     {
         signalRService?.OnUploadSectionsUpdated -= OnUploadSectionsUpdated;

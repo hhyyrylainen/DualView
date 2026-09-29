@@ -66,34 +66,42 @@
             <TextBlock Grid.Row="1" IsVisible="{Binding ScanTabSelected}"
                        Text="Scanning is not implemented yet."
                        Margin="12" />
-            <ListBox Grid.Row="1" IsVisible="{Binding StatusTabSelected}" ItemsSource="{Binding RemoteScanEvents}"
-                     Margin="12">
-                <ListBox.ItemTemplate>
-                    <DataTemplate DataType="{x:Type vm:RemoteScanEventViewModel}">
-                        <Border Background="{Binding Background}" Padding="6" Margin="0,2">
-                            <Grid ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
-                                <TextBlock Text="{Binding CreatedAt}" Margin="0,0,8,0" />
-                                <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding EventType}" FontWeight="Bold" />
-                                <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Detail}" TextWrapping="Wrap" Margin="8,0" />
-                                <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal" Spacing="4">
-                                    <Button Content="Copy main URL" Command="{Binding CopyMainUrl}" />
-                                    <Button Content="Copy referrer" Command="{Binding CopyReferrerUrl}" />
-                                    <Button Content="Acknowledge" Command="{Binding Acknowledge}"
-                                            IsVisible="{Binding IsWarningOrError}" />
-                                </StackPanel>
-                                <TextBlock Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding MainUrl}" TextWrapping="Wrap" />
-                                <TextBlock Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="4" Text="{Binding ReferrerUrl}" TextWrapping="Wrap" />
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ListBox.ItemTemplate>
-            </ListBox>
+            <Grid Grid.Row="1" IsVisible="{Binding StatusTabSelected}" RowDefinitions="*,Auto" Margin="12">
+                <ListBox Grid.Row="0" ItemsSource="{Binding RemoteScanEvents}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:RemoteScanEventViewModel}">
+                            <Border Background="{Binding Background}" Padding="6" Margin="0,2">
+                                <Grid ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                    <TextBlock Grid.Row="0" Text="{Binding CreatedAt}" Margin="0,0,8,0" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding EventType}"
+                                               FontWeight="Bold" />
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Detail}" TextWrapping="Wrap"
+                                               Margin="8,0" />
+                                    <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal" Spacing="4">
+                                        <Button Content="Copy main URL" Command="{Binding CopyMainUrl}" />
+                                        <Button Content="Copy referrer" Command="{Binding CopyReferrerUrl}" />
+                                        <Button Content="Acknowledge" Command="{Binding Acknowledge}"
+                                                IsVisible="{Binding IsWarningOrError}" />
+                                    </StackPanel>
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="4"
+                                               Text="{Binding MainUrl}" TextWrapping="Wrap" />
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="4"
+                                               Text="{Binding ReferrerUrl}" TextWrapping="Wrap" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <Button Grid.Row="1" Content="Clear all" Command="{Binding ClearRemoteScanEventsAsync}"
+                        HorizontalAlignment="Right" Margin="0,8,0,0" />
+            </Grid>
             <Grid Grid.Row="1" IsVisible="{Binding MissingTagsTabSelected}" RowDefinitions="Auto,*" Margin="12">
                 <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
                     <CheckBox IsChecked="{Binding SortMissingTagsByFrequency}" VerticalAlignment="Center">
                         Sort by frequency
                     </CheckBox>
-                    <Button Content="Clear current detections" Command="{Binding ClearCurrentMissingTagDetectionsAsync}" />
+                    <Button Content="Clear current detections"
+                            Command="{Binding ClearCurrentMissingTagDetectionsAsync}" />
                     <Button Content="Reset ignored tags" Command="{Binding ResetIgnoredTagsAsync}" />
                 </StackPanel>
                 <ListBox Grid.Row="1" ItemsSource="{Binding MissingTags}">

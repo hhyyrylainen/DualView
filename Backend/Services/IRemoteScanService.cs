@@ -47,4 +47,9 @@ public interface IRemoteScanService
     ///   Gets a snapshot of the recorded events.
     /// </summary>
     public Task<IReadOnlyList<RemoteScanEvent>> GetEventsAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    ///   Clears all recorded events.
+    /// </summary>
+    public Task ClearEventsAsync(CancellationToken cancellationToken);
 }

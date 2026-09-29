@@ -248,6 +248,19 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         }
     }
 
+    public async Task ClearEventsAsync(CancellationToken cancellationToken)
+    {
+        await eventLock.WaitAsync(cancellationToken);
+        try
+        {
+            events.Clear();
+        }
+        finally
+        {
+            eventLock.Release();
+        }
+    }
+
     private async Task RecordEventInternalAsync(RemoteScanEvent scanEvent, CancellationToken cancellationToken)
     {
         await eventLock.WaitAsync(cancellationToken);

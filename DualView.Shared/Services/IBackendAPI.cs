@@ -20,6 +20,7 @@ public interface IBackendAPI
     public Task<bool> CancelOperation(long operationId);
     public Task ClearCurrentMissingTagDetections();
     public Task<IReadOnlyList<RemoteScanEventDTO>> GetRemoteScanEvents();
+    public Task ClearRemoteScanEvents();
     public Task<long> StartCollectionVisualSimilaritySort(long collectionId);
     public Task<long> StartCollectionVisualSimilaritySort(long collectionId, IReadOnlyList<long> selectedImageIds);
     public Task<long> StartImportSectionVisualSimilaritySort(long sectionId);

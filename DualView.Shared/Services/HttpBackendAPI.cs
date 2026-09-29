@@ -89,6 +89,12 @@ public class HttpBackendAPI : IBackendAPI
                new List<RemoteScanEventDTO>();
     }
 
+    public async Task ClearRemoteScanEvents()
+    {
+        var response = await HttpClient.PostAsync("api/v1/remoteScan/events/clear", null);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<long> StartCollectionVisualSimilaritySort(long collectionId)
     {
         var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/sortByVisualSimilarity", null);

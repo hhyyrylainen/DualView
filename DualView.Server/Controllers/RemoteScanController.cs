@@ -29,4 +29,11 @@ public class RemoteScanController : Controller
             Attempt = scanEvent.Attempt,
         }).ToList();
     }
+
+    [HttpPost("events/clear")]
+    public async Task<IActionResult> ClearEvents(CancellationToken cancellationToken)
+    {
+        await remoteScanService.ClearEventsAsync(cancellationToken);
+        return Ok();
+    }
 }
