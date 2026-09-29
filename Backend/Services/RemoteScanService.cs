@@ -263,6 +263,10 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         {
             eventLock.Release();
         }
+
+        using var scope = serviceScopeFactory.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<IEntityUpdateNotifier>()
+            .NotifyRemoteScanEvent(scanEvent);
     }
 
     private async Task ProcessScanQueueAsync()
