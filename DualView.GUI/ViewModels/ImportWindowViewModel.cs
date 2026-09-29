@@ -123,7 +123,8 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     {
         get
         {
-            var warningCount = RemoteScanEvents.Count(scanEvent => scanEvent.IsWarningOrError);
+            var warningCount = RemoteScanEvents.Count(scanEvent =>
+                scanEvent.IsWarningOrError && !scanEvent.IsAcknowledged);
             return warningCount == 0 ? "Status" : $"Status ({warningCount})";
         }
     }
@@ -417,7 +418,8 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
     private RemoteScanEventViewModel CreateRemoteScanEventViewModel(RemoteScanEventDTO scanEvent)
     {
-        return new RemoteScanEventViewModel(scanEvent, RequestCopyToClipboard);
+        return new RemoteScanEventViewModel(scanEvent, RequestCopyToClipboard,
+            () => OnPropertyChanged(nameof(StatusHeader)));
     }
 
     private async Task ReloadMissingTagsAsync()
@@ -480,13 +482,16 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     }
 }
 
-public sealed class RemoteScanEventViewModel
+public sealed class RemoteScanEventViewModel : ViewModelBase
 {
     private readonly Func<string, Task>? requestCopyToClipboard;
+    private readonly Action? acknowledged;
 
-    public RemoteScanEventViewModel(RemoteScanEventDTO scanEvent, Func<string, Task>? requestCopyToClipboard)
+    public RemoteScanEventViewModel(RemoteScanEventDTO scanEvent, Func<string, Task>? requestCopyToClipboard,
+        Action? acknowledged)
     {
         this.requestCopyToClipboard = requestCopyToClipboard;
+        this.acknowledged = acknowledged;
         CreatedAt = scanEvent.CreatedAt.LocalDateTime;
         EventType = scanEvent.EventType;
         MainUrl = scanEvent.MainUrl;
@@ -502,12 +507,35 @@ public sealed class RemoteScanEventViewModel
     public string? Detail { get; }
     public int? Attempt { get; }
 
+    public bool IsAcknowledged
+    {
+        get;
+        private set
+        {
+            if (SetProperty(ref field, value))
+                OnPropertyChanged(nameof(Background));
+        }
+    }
+
     public bool IsWarningOrError => EventType.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
                                     EventType.Contains("retry", StringComparison.OrdinalIgnoreCase) ||
                                     EventType.Contains("warning", StringComparison.OrdinalIgnoreCase) ||
                                     EventType.Contains("error", StringComparison.OrdinalIgnoreCase);
 
-    public IBrush Background => IsWarningOrError ? Brushes.LightCoral : Brushes.Transparent;
+    public IBrush Background => !IsWarningOrError
+        ? Brushes.Transparent
+        : IsAcknowledged
+            ? Brushes.MistyRose
+            : Brushes.LightCoral;
+
+    public void Acknowledge()
+    {
+        if (!IsWarningOrError)
+            return;
+
+        IsAcknowledged = true;
+        acknowledged?.Invoke();
+    }
 
     public void CopyMainUrl()
     {

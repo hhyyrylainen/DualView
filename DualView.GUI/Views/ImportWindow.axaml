@@ -78,6 +78,8 @@
                                 <StackPanel Grid.Row="0" Grid.Column="3" Orientation="Horizontal" Spacing="4">
                                     <Button Content="Copy main URL" Command="{Binding CopyMainUrl}" />
                                     <Button Content="Copy referrer" Command="{Binding CopyReferrerUrl}" />
+                                    <Button Content="Acknowledge" Command="{Binding Acknowledge}"
+                                            IsVisible="{Binding IsWarningOrError}" />
                                 </StackPanel>
                                 <TextBlock Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="4" Text="{Binding MainUrl}" TextWrapping="Wrap" />
                                 <TextBlock Grid.Column="0" Grid.Row="2" Grid.ColumnSpan="4" Text="{Binding ReferrerUrl}" TextWrapping="Wrap" />
