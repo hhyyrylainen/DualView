@@ -1,4 +1,6 @@
 using DualView.Shared.Models;
+using Backend.Models;
+using DualView.Shared.Models.DTO;
 using DualView.Shared.Services;
 using Backend.Services;
 using Microsoft.AspNetCore.SignalR;
@@ -122,4 +124,18 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
         logger.LogDebug("Broadcasting missing tags update to all clients");
         await hubContext.Clients.All.MissingTagsUpdated();
     }
+
+    public async Task NotifyRemoteScanEvent(RemoteScanEvent scanEvent)
+    {
+        await hubContext.Clients.All.RemoteScanEventRecorded(new RemoteScanEventDTO
+        {
+            CreatedAt = scanEvent.CreatedAt,
+            EventType = scanEvent.EventType,
+            MainUrl = scanEvent.ImageUrl,
+            ReferrerUrl = scanEvent.ReferrerUrl,
+            Detail = scanEvent.Detail,
+            Attempt = scanEvent.Attempt,
+        });
+    }
+
 }

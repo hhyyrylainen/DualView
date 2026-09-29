@@ -66,6 +66,8 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         signalRService.OnUploadSectionActiveChanged += OnUploadSectionActiveChanged;
         signalRService.OnMissingTagsUpdated += OnMissingTagsUpdated;
         signalRService.OnRemoteScanEventRecorded += OnRemoteScanEventRecorded;
+
+        _ = LoadRemoteScanEventsAsync();
     }
 
     public ObservableCollection<ImportSectionViewModel> Sections { get; } = new();

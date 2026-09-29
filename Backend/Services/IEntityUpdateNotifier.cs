@@ -1,4 +1,5 @@
 using DualView.Shared.Models;
+using Backend.Models;
 
 namespace Backend.Services;
 
@@ -26,4 +27,6 @@ public interface IEntityUpdateNotifier
     public Task NotifyUploadSectionUpdated(long sectionId);
     public Task NotifyUploadSectionContentsUpdated(long sectionId);
     public Task NotifyMissingTagsUpdated();
+
+    public Task NotifyRemoteScanEvent(RemoteScanEvent scanEvent);
 }

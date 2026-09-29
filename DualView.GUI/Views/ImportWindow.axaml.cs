@@ -12,6 +12,9 @@ public partial class ImportWindow : Window
     public ImportWindow()
     {
         InitializeComponent();
+        DataContextChanged += OnDataContextChanged;
+    }
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (DataContext is ImportWindowViewModel viewModel)
