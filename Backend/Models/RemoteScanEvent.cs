@@ -21,6 +21,11 @@ public sealed class RemoteScanEvent
     public string? ImageUrl { get; init; }
 
     /// <summary>
+    ///   Gets the referrer URL associated with the event.
+    /// </summary>
+    public string? ReferrerUrl { get; init; }
+
+    /// <summary>
     ///   Gets the failure or status detail.
     /// </summary>
     public string? Detail { get; init; }

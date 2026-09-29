@@ -83,6 +83,12 @@ public class HttpBackendAPI : IBackendAPI
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task<IReadOnlyList<RemoteScanEventDTO>> GetRemoteScanEvents()
+    {
+        return await HttpClient.GetFromJsonAsync<List<RemoteScanEventDTO>>("api/v1/remoteScan/events") ??
+               new List<RemoteScanEventDTO>();
+    }
+
     public async Task<long> StartCollectionVisualSimilaritySort(long collectionId)
     {
         var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/sortByVisualSimilarity", null);

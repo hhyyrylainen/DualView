@@ -15,6 +15,7 @@ namespace Backend.Services;
 /// </summary>
 public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvider
 {
+    private const int MaximumStoredEvents = 1000;
     private const int MaximumScanAttempts = 5;
 
     private readonly IServiceScopeFactory serviceScopeFactory;
@@ -253,6 +254,8 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         try
         {
             events.Add(scanEvent);
+            if (events.Count > MaximumStoredEvents)
+                events.RemoveRange(0, events.Count - MaximumStoredEvents);
             logger.LogInformation("Remote scan event {EventType} for {ImageUrl}: {Detail}",
                 scanEvent.EventType, scanEvent.ImageUrl, scanEvent.Detail);
         }
@@ -321,6 +324,7 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
                 {
                     EventType = attempt == MaximumScanAttempts ? "scan-failed" : "scan-retry",
                     ImageUrl = pageRequest.HtmlUrl,
+                    ReferrerUrl = pageRequest.Referrer,
                     Detail = ex.Message,
                     Attempt = attempt,
                 }, cancellation);

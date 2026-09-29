@@ -1,4 +1,5 @@
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
 
 namespace DualView.Shared.Services;
 
@@ -26,4 +27,6 @@ public interface IDataHub
     public Task UploadSectionUpdated(long sectionId);
     public Task UploadSectionContentsUpdated(long sectionId);
     public Task MissingTagsUpdated();
+
+    public Task RemoteScanEventRecorded(RemoteScanEventDTO scanEvent);
 }

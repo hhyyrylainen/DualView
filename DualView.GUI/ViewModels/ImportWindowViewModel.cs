@@ -2,8 +2,10 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
+using Avalonia.Media;
 using DualView.GUI.Services;
 using DualView.Shared.Models.DTO;
 using DualView.Shared.Services;
@@ -21,6 +23,11 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private readonly IServiceProvider? serviceProvider;
     private readonly ISignalRService? signalRService;
     private readonly IBackendAPI? backendAPI;
+
+    private readonly Lock remoteScanEventLock = new();
+    private readonly List<RemoteScanEventDTO> remoteScanEventsReceivedDuringLoad = new();
+    private bool loadingRemoteScanEvents;
+
     private List<RecentImportSectionDTO> loadedRecentSections = new();
     private List<MissingTagDTO> loadedMissingTags = new();
 
@@ -58,7 +65,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         signalRService.OnUploadSectionsUpdated += OnUploadSectionsUpdated;
         signalRService.OnUploadSectionActiveChanged += OnUploadSectionActiveChanged;
         signalRService.OnMissingTagsUpdated += OnMissingTagsUpdated;
-        _ = ReloadAsync();
+        signalRService.OnRemoteScanEventRecorded += OnRemoteScanEventRecorded;
     }
 
     public ObservableCollection<ImportSectionViewModel> Sections { get; } = new();
@@ -106,6 +113,19 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     }
 
     public ObservableCollection<MissingTagViewModel> MissingTags { get; } = new();
+
+    public ObservableCollection<RemoteScanEventViewModel> RemoteScanEvents { get; } = new();
+
+    public string StatusHeader
+    {
+        get
+        {
+            var warningCount = RemoteScanEvents.Count(scanEvent => scanEvent.IsWarningOrError);
+            return warningCount == 0 ? "Status" : $"Status ({warningCount})";
+        }
+    }
+
+    public Func<string, Task>? RequestCopyToClipboard { get; set; }
 
     public string MissingTagsHeader => $"Missing Tags ({MissingTags.Count})";
 
@@ -279,11 +299,52 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    public async Task LoadRemoteScanEventsAsync()
+    {
+        if (backendAPI == null)
+            return;
+
+        lock (remoteScanEventLock)
+        {
+            loadingRemoteScanEvents = true;
+            remoteScanEventsReceivedDuringLoad.Clear();
+        }
+
+        try
+        {
+            var events = await backendAPI.GetRemoteScanEvents();
+            List<RemoteScanEventDTO> eventsReceivedDuringLoad;
+            lock (remoteScanEventLock)
+            {
+                loadingRemoteScanEvents = false;
+                eventsReceivedDuringLoad = remoteScanEventsReceivedDuringLoad.ToList();
+                remoteScanEventsReceivedDuringLoad.Clear();
+            }
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                RemoteScanEvents.Clear();
+                foreach (var scanEvent in events.TakeLast(1000))
+                    RemoteScanEvents.Add(CreateRemoteScanEventViewModel(scanEvent));
+                foreach (var scanEvent in eventsReceivedDuringLoad)
+                    AddRemoteScanEvent(scanEvent);
+                OnPropertyChanged(nameof(StatusHeader));
+            });
+        }
+        catch (Exception ex)
+        {
+            lock (remoteScanEventLock)
+                loadingRemoteScanEvents = false;
+            logger?.LogError(ex, "Failed to load remote scan events");
+        }
+    }
+
     public void Dispose()
     {
         signalRService?.OnUploadSectionsUpdated -= OnUploadSectionsUpdated;
         signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
         signalRService?.OnMissingTagsUpdated -= OnMissingTagsUpdated;
+        signalRService?.OnRemoteScanEventRecorded -= OnRemoteScanEventRecorded;
         foreach (var section in Sections)
             section.Dispose();
         Hamburger.Dispose();
@@ -324,6 +385,36 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private void OnMissingTagsUpdated()
     {
         _ = ReloadMissingTagsAsync();
+    }
+
+    private void OnRemoteScanEventRecorded(RemoteScanEventDTO scanEvent)
+    {
+        lock (remoteScanEventLock)
+        {
+            if (loadingRemoteScanEvents)
+            {
+                remoteScanEventsReceivedDuringLoad.Add(scanEvent);
+                return;
+            }
+        }
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            AddRemoteScanEvent(scanEvent);
+            OnPropertyChanged(nameof(StatusHeader));
+        });
+    }
+
+    private void AddRemoteScanEvent(RemoteScanEventDTO scanEvent)
+    {
+        RemoteScanEvents.Add(CreateRemoteScanEventViewModel(scanEvent));
+        while (RemoteScanEvents.Count > 1000)
+            RemoteScanEvents.RemoveAt(0);
+    }
+
+    private RemoteScanEventViewModel CreateRemoteScanEventViewModel(RemoteScanEventDTO scanEvent)
+    {
+        return new RemoteScanEventViewModel(scanEvent, RequestCopyToClipboard);
     }
 
     private async Task ReloadMissingTagsAsync()
@@ -383,6 +474,48 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
             { Title = "Import All Sections", Command = new RelayCommand(StartImportAll) });*/
 
         MainWindowViewModel.AddTrailingMenuItems(Hamburger, windowService);
+    }
+}
+
+public sealed class RemoteScanEventViewModel
+{
+    private readonly Func<string, Task>? requestCopyToClipboard;
+
+    public RemoteScanEventViewModel(RemoteScanEventDTO scanEvent, Func<string, Task>? requestCopyToClipboard)
+    {
+        this.requestCopyToClipboard = requestCopyToClipboard;
+        CreatedAt = scanEvent.CreatedAt.LocalDateTime;
+        EventType = scanEvent.EventType;
+        MainUrl = scanEvent.MainUrl;
+        ReferrerUrl = scanEvent.ReferrerUrl;
+        Detail = scanEvent.Detail;
+        Attempt = scanEvent.Attempt;
+    }
+
+    public DateTime CreatedAt { get; }
+    public string EventType { get; }
+    public string? MainUrl { get; }
+    public string? ReferrerUrl { get; }
+    public string? Detail { get; }
+    public int? Attempt { get; }
+
+    public bool IsWarningOrError => EventType.Contains("fail", StringComparison.OrdinalIgnoreCase) ||
+                                    EventType.Contains("retry", StringComparison.OrdinalIgnoreCase) ||
+                                    EventType.Contains("warning", StringComparison.OrdinalIgnoreCase) ||
+                                    EventType.Contains("error", StringComparison.OrdinalIgnoreCase);
+
+    public IBrush Background => IsWarningOrError ? Brushes.LightCoral : Brushes.Transparent;
+
+    public void CopyMainUrl()
+    {
+        if (!string.IsNullOrEmpty(MainUrl))
+            _ = requestCopyToClipboard?.Invoke(MainUrl);
+    }
+
+    public void CopyReferrerUrl()
+    {
+        if (!string.IsNullOrEmpty(ReferrerUrl))
+            _ = requestCopyToClipboard?.Invoke(ReferrerUrl);
     }
 }
 

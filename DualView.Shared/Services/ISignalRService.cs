@@ -1,4 +1,5 @@
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
 
 namespace DualView.Shared.Services;
 
@@ -19,6 +20,7 @@ public interface ISignalRService
     public event Action<long>? OnUploadSectionUpdated;
     public event Action<long>? OnUploadSectionContentsUpdated;
     public event Action? OnMissingTagsUpdated;
+    public event Action<RemoteScanEventDTO>? OnRemoteScanEventRecorded;
 
     // True = Connected, False = Disconnected
     public event Action<bool>? OnConnectionStatusChanged;

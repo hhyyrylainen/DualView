@@ -46,7 +46,8 @@
             <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="4">
                 <ToggleButton IsChecked="{Binding ImportTabSelected}" Command="{Binding SelectImportTab}">Import</ToggleButton>
                 <ToggleButton IsChecked="{Binding ScanTabSelected}" Command="{Binding SelectScanTab}">Scan</ToggleButton>
-                <ToggleButton IsChecked="{Binding StatusTabSelected}" Command="{Binding SelectStatusTab}">Status</ToggleButton>
+                <ToggleButton IsChecked="{Binding StatusTabSelected}" Command="{Binding SelectStatusTab}"
+                              Content="{Binding StatusHeader}" />
                 <ToggleButton IsChecked="{Binding MissingTagsTabSelected}" Command="{Binding SelectMissingTagsTab}"
                               Content="{Binding MissingTagsHeader}" />
                 <Button Command="{Binding OpenUploadWindow}">Upload media</Button>

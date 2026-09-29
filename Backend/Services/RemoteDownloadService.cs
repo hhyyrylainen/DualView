@@ -106,6 +106,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
         {
             EventType = "download-queued",
             ImageUrl = request.ImageUrl,
+            ReferrerUrl = request.Referrer,
         }, cancellationToken);
         await downloadQueue.Writer.WriteAsync(new DownloadWorkItem(request, failureCallback, cancellationToken),
             cancellationToken);
@@ -144,6 +145,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                         {
                             EventType = "download-worker-fail",
                             ImageUrl = workItem.Request.ImageUrl,
+                            ReferrerUrl = workItem.Request.Referrer,
                             Detail = ex.ToString(),
                         }, stoppingToken);
                     }
@@ -187,6 +189,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                     {
                         EventType = "download-succeeded",
                         ImageUrl = enrichedRequest.ImageUrl,
+                        ReferrerUrl = enrichedRequest.Referrer,
                         Attempt = attempt,
                     }, cancellationToken);
                     return null;
@@ -201,6 +204,7 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                     {
                         EventType = attempt == MaximumAttempts ? "download-failed" : "download-retry",
                         ImageUrl = request.ImageUrl,
+                        ReferrerUrl = request.Referrer,
                         Detail = ex.Message,
                         Attempt = attempt,
                     }, cancellationToken);
