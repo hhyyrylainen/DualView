@@ -67,6 +67,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         signalRService.OnMissingTagsUpdated += OnMissingTagsUpdated;
         signalRService.OnRemoteScanEventRecorded += OnRemoteScanEventRecorded;
 
+        _ = ReloadAsync();
         _ = LoadRemoteScanEventsAsync();
     }
 
