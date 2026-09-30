@@ -3016,6 +3016,37 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await SaveAsync();
     }
 
+    async Task<List<ScannedCollectionDTO>> IClientDatabaseService.GetScannedCollectionsAsync()
+    {
+        var collections = await GetScannedCollectionsAsync();
+        return collections.Select(collection => collection.GetDTO()).ToList();
+    }
+
+    async Task IClientDatabaseService.SetScannedMediaSelectedAsync(long mediaId, bool selected)
+    {
+        var media = await dbContext.FoundMedia.FindAsync(mediaId) ??
+                    throw new ArgumentException("Scanned media not found", nameof(mediaId));
+        media.Selected = selected;
+        await SaveAsync();
+    }
+
+    public async Task<ScannedCollection?> GetScannedCollectionAsync(long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ScannedCollections
+            .Include(collection => collection.FoundMedia)
+            .FirstOrDefaultAsync(collection => collection.Id == id, cancellationToken);
+    }
+
+    public async Task<List<ScannedCollection>> GetScannedCollectionsAsync(
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ScannedCollections
+            .Include(collection => collection.FoundMedia)
+            .OrderByDescending(collection => collection.UpdatedAt)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2)
     {
         if (mediaId1 == mediaId2)

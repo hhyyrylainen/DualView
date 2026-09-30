@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
+using Backend.Utilities;
 using Microsoft.EntityFrameworkCore;
 
 namespace Backend.Models;
@@ -9,7 +11,7 @@ namespace Backend.Models;
 ///   Unlike <see cref="DownloadGallery"/>, this is the working collection shown to the user.
 /// </summary>
 [Index(nameof(Name))]
-public class ScannedCollection : UpdateableModel
+public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollectionDTO>
 {
     public ScannedCollection(string name)
     {
@@ -46,6 +48,31 @@ public class ScannedCollection : UpdateableModel
     public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
 
     public ICollection<FoundMedia> FoundMedia { get; set; } = new List<FoundMedia>();
+
+    public ScannedCollectionDTO GetDTO()
+    {
+        return new ScannedCollectionDTO
+        {
+            Id = Id,
+            GalleryUrl = GalleryUrl,
+            Name = Name,
+            ScanFailed = ScanFailed,
+            ScanPaused = ScanPaused,
+            ScanError = ScanError,
+            CurrentlyScannedUrl = CurrentlyScannedUrl,
+            FoundMediaCount = FoundMedia.Count,
+            SelectedMediaCount = FoundMedia.Count(media => media.Selected),
+            Media = FoundMedia.Select(media => new ScannedMediaDTO
+            {
+                Id = media.Id,
+                Name = media.OverrideName ?? media.DownloadUrl,
+                DownloadUrl = media.DownloadUrl,
+                ThumbnailUrl = media.ThumbnailUrl,
+                Selected = media.Selected,
+                Referrer = media.Referrer,
+            }).ToList(),
+        };
+    }
 }
 
 public class FoundMedia : UpdateableModel
