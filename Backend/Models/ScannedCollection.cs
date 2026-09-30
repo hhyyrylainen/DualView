@@ -24,6 +24,11 @@ public class ScannedCollection : UpdateableModel
 
     public bool ScanFailed { get; set; }
 
+    public bool ScanPaused { get; set; }
+
+    [MaxLength(2000)]
+    public string? ScanError { get; set; }
+
     [MaxLength(4096)]
     public string? CurrentlyScannedUrl { get; set; }
 

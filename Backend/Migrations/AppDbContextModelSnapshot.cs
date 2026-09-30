@@ -581,7 +581,14 @@ namespace Backend.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ScanError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("ScanFailed")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ScanPaused")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ScannerState")
