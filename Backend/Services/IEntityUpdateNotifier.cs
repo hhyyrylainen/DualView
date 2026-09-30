@@ -29,4 +29,5 @@ public interface IEntityUpdateNotifier
     public Task NotifyMissingTagsUpdated();
 
     public Task NotifyRemoteScanEvent(RemoteScanEvent scanEvent);
+    public Task NotifyScannedCollectionUpdated(long id);
 }

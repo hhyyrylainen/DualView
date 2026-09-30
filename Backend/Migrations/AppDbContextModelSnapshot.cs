@@ -277,6 +277,9 @@ namespace Backend.Migrations
                         .HasMaxLength(1024)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("MediaType")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("OverrideName")
                         .HasMaxLength(512)
                         .HasColumnType("TEXT");

@@ -155,6 +155,8 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task SaveFoundMediaAsync(FoundMedia media);
     public Task<ScannedCollection?> GetScannedCollectionAsync(long id, CancellationToken cancellationToken = default);
     public Task<List<ScannedCollection>> GetScannedCollectionsAsync(CancellationToken cancellationToken = default);
+    public Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id,
+        CancellationToken cancellationToken = default);
 
     // Ignored Duplicates
     public Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2);

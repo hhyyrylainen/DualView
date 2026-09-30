@@ -70,7 +70,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
             item.Id.ToString());
         Directory.CreateDirectory(directory);
 
-        var extension = GetSafeExtension(sourceUrl, ".jpg");
+        var extension = GetSafeExtension(sourceUrl, item.MediaType?.ExtensionFromType() ?? ".jpg");
         var destination = Path.Combine(directory, thumbnail ? "thumbnail.jpg" : "content" + extension);
 
         var settings = await database.GetAppSettingsAsync();
@@ -127,7 +127,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
 
                 if (thumbnail)
                 {
-                    if (IsVideo(sourceUrl))
+                    if (IsVideo(sourceUrl, item.MediaType))
                     {
                         var videoThumbnail = Path.Combine(directory, "thumbnail.webm");
                         await mediaProcessingService.ResizeVideoThumbnailAsync(destination, videoThumbnail,
@@ -195,8 +195,11 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
             : fallback;
     }
 
-    private static bool IsVideo(string url)
+    private static bool IsVideo(string url, MediaType? mediaType)
     {
+        if (mediaType.HasValue)
+            return !mediaType.Value.IsImage();
+
         try
         {
             return !MediaTypeExtensions.TypeFromExtension(GetSafeExtension(url, string.Empty)).IsImage();

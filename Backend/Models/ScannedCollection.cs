@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using DualView.Shared.Models;
 using DualView.Shared.Models.DTO;
+using DualView.Shared.Models.Enums;
 using Backend.Utilities;
 using Microsoft.EntityFrameworkCore;
 
@@ -70,7 +71,23 @@ public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollection
                 ThumbnailUrl = media.ThumbnailUrl,
                 Selected = media.Selected,
                 Referrer = media.Referrer,
+                MediaType = media.MediaType,
             }).ToList(),
+        };
+    }
+
+    public ScannedCollectionStatusDTO GetStatusDTO()
+    {
+        return new ScannedCollectionStatusDTO
+        {
+            Id = Id,
+            Name = Name,
+            ScanFailed = ScanFailed,
+            ScanPaused = ScanPaused,
+            ScanError = ScanError,
+            CurrentlyScannedUrl = CurrentlyScannedUrl,
+            FoundMediaCount = FoundMedia.Count,
+            SelectedMediaCount = FoundMedia.Count(media => media.Selected),
         };
     }
 }
@@ -101,6 +118,8 @@ public class FoundMedia : UpdateableModel
     public string? OverrideName { get; set; }
 
     public bool Selected { get; set; } = true;
+
+    public MediaType? MediaType { get; set; }
 
     [MaxLength(4096)]
     public string? Referrer { get; set; }

@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using DualView.Shared.Models.Enums;
 
 namespace DualView.Shared.Models;
 
@@ -78,6 +79,12 @@ public sealed class RemoteDownloadRequest
     public string? ThumbnailUrl { get; set; }
 
     /// <summary>
+    ///   Gets or sets the detected media type. Plugins should set this when the URL does not contain an extension.
+    /// </summary>
+    [JsonPropertyName("mediaType")]
+    public MediaType? MediaType { get; set; }
+
+    /// <summary>
     ///   Gets or sets cookies supplied for the target download URL.
     /// </summary>
     [JsonPropertyName("cookies")]
@@ -114,6 +121,7 @@ public sealed class RemoteDownloadRequest
             TargetImportSection = TargetImportSection,
             OverrideName = OverrideName,
             ThumbnailUrl = ThumbnailUrl,
+            MediaType = MediaType,
             Enriched = Enriched,
         };
     }
@@ -128,6 +136,7 @@ public sealed class RemoteDownloadRequest
             DownloadGalleryId = DownloadGalleryId,
             TargetImportSection = TargetImportSection,
             ThumbnailUrl = ThumbnailUrl,
+            MediaType = MediaType,
         };
     }
 }

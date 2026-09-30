@@ -21,6 +21,7 @@ public interface ISignalRService
     public event Action<long>? OnUploadSectionContentsUpdated;
     public event Action? OnMissingTagsUpdated;
     public event Action<RemoteScanEventDTO>? OnRemoteScanEventRecorded;
+    public event Action<long>? OnScannedCollectionUpdated;
 
     // True = Connected, False = Disconnected
     public event Action<bool>? OnConnectionStatusChanged;

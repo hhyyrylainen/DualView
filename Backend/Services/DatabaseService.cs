@@ -3022,6 +3022,16 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return collections.Select(collection => collection.GetDTO()).ToList();
     }
 
+    async Task<ScannedCollectionDTO?> IClientDatabaseService.GetScannedCollectionAsync(long id)
+    {
+        return (await GetScannedCollectionAsync(id))?.GetDTO();
+    }
+
+    async Task<ScannedCollectionStatusDTO?> IClientDatabaseService.GetScannedCollectionStatusAsync(long id)
+    {
+        return await GetScannedCollectionStatusAsync(id);
+    }
+
     async Task IClientDatabaseService.SetScannedMediaSelectedAsync(long mediaId, bool selected)
     {
         var media = await dbContext.FoundMedia.FindAsync(mediaId) ??
@@ -3045,6 +3055,25 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(collection => collection.FoundMedia)
             .OrderByDescending(collection => collection.UpdatedAt)
             .ToListAsync(cancellationToken);
+    }
+
+    public async Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ScannedCollections
+            .Where(collection => collection.Id == id)
+            .Select(collection => new ScannedCollectionStatusDTO
+            {
+                Id = collection.Id,
+                Name = collection.Name,
+                ScanFailed = collection.ScanFailed,
+                ScanPaused = collection.ScanPaused,
+                ScanError = collection.ScanError,
+                CurrentlyScannedUrl = collection.CurrentlyScannedUrl,
+                FoundMediaCount = collection.FoundMedia.Count,
+                SelectedMediaCount = collection.FoundMedia.Count(media => media.Selected),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
     }
 
     public async Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2)

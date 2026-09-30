@@ -28,6 +28,21 @@ public sealed class ScannedCollectionController : Controller
         return collections.Select(collection => collection.GetDTO()).ToList();
     }
 
+    [HttpGet("{id:long}")]
+    public async Task<ActionResult<ScannedCollectionDTO>> Get(long id, CancellationToken cancellationToken)
+    {
+        var collection = await databaseService.GetScannedCollectionAsync(id, cancellationToken);
+        return collection == null ? NotFound() : collection.GetDTO();
+    }
+
+    [HttpGet("{id:long}/status")]
+    public async Task<ActionResult<ScannedCollectionStatusDTO>> GetStatus(long id,
+        CancellationToken cancellationToken)
+    {
+        var status = await databaseService.GetScannedCollectionStatusAsync(id, cancellationToken);
+        return status == null ? NotFound() : status;
+    }
+
     [HttpGet("{id:long}/thumbnail/{mediaId:long}")]
     public async Task<ActionResult> GetThumbnail(long id, long mediaId, CancellationToken cancellationToken)
     {

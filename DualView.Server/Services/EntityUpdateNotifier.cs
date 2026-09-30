@@ -138,4 +138,9 @@ public class EntityUpdateNotifier : IEntityUpdateNotifier
         });
     }
 
+    public async Task NotifyScannedCollectionUpdated(long id)
+    {
+        await hubContext.Clients.All.ScannedCollectionUpdated(id);
+    }
+
 }

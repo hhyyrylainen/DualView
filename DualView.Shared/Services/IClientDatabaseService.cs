@@ -86,6 +86,8 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<List<DownloadGalleryDTO>> GetAllDownloadGalleriesAsync();
     public Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id);
     public Task<List<ScannedCollectionDTO>> GetScannedCollectionsAsync();
+    public Task<ScannedCollectionDTO?> GetScannedCollectionAsync(long id);
+    public Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id);
     public Task SetScannedMediaSelectedAsync(long mediaId, bool selected);
 
     public Task<List<MissingTagDTO>> GetMissingTagsAsync();

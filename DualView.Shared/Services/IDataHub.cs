@@ -29,4 +29,5 @@ public interface IDataHub
     public Task MissingTagsUpdated();
 
     public Task RemoteScanEventRecorded(RemoteScanEventDTO scanEvent);
+    public Task ScannedCollectionUpdated(long id);
 }

@@ -47,6 +47,7 @@ public class StubSignalRService : ISignalRService
     public event Action<long>? OnUploadSectionContentsUpdated;
     public event Action? OnMissingTagsUpdated;
     public event Action<RemoteScanEventDTO>? OnRemoteScanEventRecorded;
+    public event Action<long>? OnScannedCollectionUpdated;
 
     public event Action<bool>? OnConnectionStatusChanged;
 #pragma warning restore CS0067

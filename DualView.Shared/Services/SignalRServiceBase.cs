@@ -23,6 +23,7 @@ public abstract class SignalRServiceBase : ISignalRService
     public event Action<long>? OnUploadSectionContentsUpdated;
     public event Action? OnMissingTagsUpdated;
     public event Action<RemoteScanEventDTO>? OnRemoteScanEventRecorded;
+    public event Action<long>? OnScannedCollectionUpdated;
 
     public event Action<OperationStatusUpdate>? OnBackgroundOperationStatusUpdate;
 
@@ -95,5 +96,7 @@ public abstract class SignalRServiceBase : ISignalRService
         hubConnection.On(nameof(IDataHub.MissingTagsUpdated), () => OnMissingTagsUpdated?.Invoke());
         hubConnection.On(nameof(IDataHub.RemoteScanEventRecorded), (RemoteScanEventDTO scanEvent) =>
             OnRemoteScanEventRecorded?.Invoke(scanEvent));
+        hubConnection.On(nameof(IDataHub.ScannedCollectionUpdated), (long id) =>
+            OnScannedCollectionUpdated?.Invoke(id));
     }
 }
