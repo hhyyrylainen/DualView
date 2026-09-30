@@ -17,6 +17,18 @@ public interface IRemoteGalleryScannerService
     /// </summary>
     public Task RetryGalleryAsync(long galleryId, CancellationToken cancellationToken);
 
+    public Task PauseGalleryAsync(long galleryId, CancellationToken cancellationToken);
+
+    public Task ResumeGalleryAsync(long galleryId, CancellationToken cancellationToken);
+
+    /// <summary>
+    ///   Deletes a gallery and prevents queued or in-flight results from being saved to it.
+    /// </summary>
+    public Task DeleteGalleryAsync(long galleryId, CancellationToken cancellationToken);
+
+    public Task AcceptGalleryAsync(long galleryId, string name, IReadOnlyCollection<long>? mediaIds,
+        CancellationToken cancellationToken);
+
     /// <summary>
     ///   Stops accepting new work and lets the active page finish within the supplied timeout.
     /// </summary>

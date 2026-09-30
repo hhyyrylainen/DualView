@@ -107,6 +107,12 @@ public class HttpBackendAPI : IBackendAPI
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task DeleteScannedCollectionAsync(long id)
+    {
+        using var response = await HttpClient.DeleteAsync($"api/v1/scannedCollection/{id}");
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task AcceptScannedCollectionAsync(long id, string name, List<long> mediaIds)
     {
         using var response = await HttpClient.PostAsJsonAsync($"api/v1/scannedCollection/{id}/accept",

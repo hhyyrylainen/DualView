@@ -63,9 +63,14 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
-            <TextBlock Grid.Row="1" IsVisible="{Binding ScanTabSelected}"
-                       Text="Scanning is not implemented yet."
-                       Margin="12" />
+            <ScrollViewer Grid.Row="1" IsVisible="{Binding ScanTabSelected}"
+                          VerticalScrollBarVisibility="Visible" Padding="0 0 10 3">
+                <ItemsControl ItemsSource="{Binding ScannedCollections}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate><controls:ScannedCollectionControl /></DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
             <Grid Grid.Row="1" IsVisible="{Binding StatusTabSelected}" RowDefinitions="*,Auto" Margin="12">
                 <ListBox Grid.Row="0" ItemsSource="{Binding RemoteScanEvents}">
                     <ListBox.ItemTemplate>
