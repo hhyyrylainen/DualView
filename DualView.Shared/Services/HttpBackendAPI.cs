@@ -95,6 +95,25 @@ public class HttpBackendAPI : IBackendAPI
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task PauseScannedCollectionAsync(long id)
+    {
+        using var response = await HttpClient.PostAsync($"api/v1/scannedCollection/{id}/pause", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task ResumeScannedCollectionAsync(long id)
+    {
+        using var response = await HttpClient.PostAsync($"api/v1/scannedCollection/{id}/resume", null);
+        response.EnsureSuccessStatusCode();
+    }
+
+    public async Task AcceptScannedCollectionAsync(long id, string name, List<long> mediaIds)
+    {
+        using var response = await HttpClient.PostAsJsonAsync($"api/v1/scannedCollection/{id}/accept",
+            new AcceptScannedCollectionRequest { Name = name, MediaIds = mediaIds });
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<long> StartCollectionVisualSimilaritySort(long collectionId)
     {
         var response = await HttpClient.PostAsync($"api/v1/collection/{collectionId}/sortByVisualSimilarity", null);

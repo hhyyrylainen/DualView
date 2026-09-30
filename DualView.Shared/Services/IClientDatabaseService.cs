@@ -85,6 +85,8 @@ public interface IClientDatabaseService : IDatabaseCommonService
     public Task<UploadSectionImportResultDTO> ImportUploadSectionAsync(long sectionId, List<long>? mediaIds);
     public Task<List<DownloadGalleryDTO>> GetAllDownloadGalleriesAsync();
     public Task<DownloadGalleryDTO?> GetDownloadGalleryAsync(long id);
+    public Task<List<ScannedCollectionDTO>> GetScannedCollectionsAsync();
+    public Task SetScannedMediaSelectedAsync(long mediaId, bool selected);
 
     public Task<List<MissingTagDTO>> GetMissingTagsAsync();
 }

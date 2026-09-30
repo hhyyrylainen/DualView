@@ -21,6 +21,9 @@ public interface IBackendAPI
     public Task ClearCurrentMissingTagDetections();
     public Task<IReadOnlyList<RemoteScanEventDTO>> GetRemoteScanEvents();
     public Task ClearRemoteScanEvents();
+    public Task PauseScannedCollectionAsync(long id);
+    public Task ResumeScannedCollectionAsync(long id);
+    public Task AcceptScannedCollectionAsync(long id, string name, List<long> mediaIds);
     public Task<long> StartCollectionVisualSimilaritySort(long collectionId);
     public Task<long> StartCollectionVisualSimilaritySort(long collectionId, IReadOnlyList<long> selectedImageIds);
     public Task<long> StartImportSectionVisualSimilaritySort(long sectionId);

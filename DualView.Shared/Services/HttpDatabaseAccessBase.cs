@@ -885,6 +885,18 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         return await HttpClient.GetFromJsonAsync<DownloadGalleryDTO?>($"api/v1/downloadGallery/{id}");
     }
 
+    public async Task<List<ScannedCollectionDTO>> GetScannedCollectionsAsync()
+    {
+        return await HttpClient.GetFromJsonAsync<List<ScannedCollectionDTO>>("api/v1/scannedCollection") ?? new();
+    }
+
+    public async Task SetScannedMediaSelectedAsync(long mediaId, bool selected)
+    {
+        using var response = await HttpClient.PostAsJsonAsync($"api/v1/scannedCollection/media/{mediaId}/selection",
+            selected);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<List<MissingTagDTO>> GetMissingTagsAsync()
     {
         return await HttpClient.GetFromJsonAsync<List<MissingTagDTO>>("api/v1/missingTag") ?? new();
