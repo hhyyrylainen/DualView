@@ -29,10 +29,10 @@ public sealed class ScannedCollectionController : Controller
     }
 
     [HttpGet("{id:long}")]
-    public async Task<ActionResult<ScannedCollectionDTO>> Get(long id)
+    public async Task<ActionResult<ScannedCollectionDTO?>> Get(long id)
     {
         var collection = await databaseService.GetScannedCollectionAsync(id);
-        return collection == null ? NotFound() : collection.GetDTO();
+        return Json(collection?.GetDTO());
     }
 
     [HttpGet("{id:long}/status")]
