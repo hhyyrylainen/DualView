@@ -146,7 +146,10 @@ builder.Services.AddScoped<IMediaProcessingService, MediaProcessingService>();
 builder.Services.AddSingleton<IOperationsStorage, OperationsStorage>();
 builder.Services.AddSingleton<ITemporaryFolderService, TemporaryFolderService>();
 builder.Services.AddSingleton<ICurlDownloadService, CurlDownloadService>();
-builder.Services.AddSingleton<IRemoteScanService, RemoteScanService>();
+builder.Services.AddSingleton<RemoteScanService>();
+builder.Services.AddSingleton<IRemoteScanService>(sp =>
+    sp.GetRequiredService<RemoteScanService>());
+builder.Services.AddSingleton<IRemoteDownloadProvider>(sp => sp.GetRequiredService<RemoteScanService>());
 builder.Services.AddSingleton<IRemoteDownloadService, RemoteDownloadService>();
 builder.Services.AddSingleton<IRemoteGalleryMediaService, RemoteGalleryMediaService>();
 builder.Services.AddSingleton<IRemoteGalleryScannerService, RemoteGalleryScannerService>();
