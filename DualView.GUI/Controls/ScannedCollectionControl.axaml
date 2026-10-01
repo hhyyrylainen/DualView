@@ -17,7 +17,6 @@
                 <Button Grid.Column="4" Margin="4,0" Content="Delete" Command="{Binding DeleteAsync}"
                         Background="#C62828" />
             </Grid>
-            <TextBlock Grid.Row="1" Text="{Binding StatusText}" TextWrapping="Wrap" Margin="2" />
             <TextBlock Grid.Row="1" Text="{Binding ScanError}" Foreground="DarkRed" TextWrapping="Wrap"
                        IsVisible="{Binding ScanFailed}" Margin="2,20,2,2" />
             <ScrollViewer Grid.Row="2" MinHeight="150">
@@ -35,7 +34,13 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
             </ScrollViewer>
-            <TextBlock Grid.Row="3" Text="{Binding GalleryUrl}" TextWrapping="Wrap" Margin="2" />
+            <Grid Grid.Row="3" ColumnDefinitions="Auto,*" Margin="2">
+                <TextBlock Grid.Column="0" Text="{Binding StatusText}" Margin="0,0,8,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Grid.Column="1" Text="{Binding CurrentlyScannedUrl}" TextWrapping="NoWrap"
+                           TextTrimming="CharacterEllipsis" HorizontalAlignment="Stretch" TextAlignment="Right"
+                           VerticalAlignment="Center" ToolTip.Tip="{Binding CurrentlyScannedUrl}" />
+            </Grid>
         </Grid>
     </Border>
 </UserControl>

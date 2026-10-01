@@ -66,7 +66,7 @@ public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollection
             Media = FoundMedia.Select(media => new ScannedMediaDTO
             {
                 Id = media.Id,
-                Name = media.OverrideName ?? media.DownloadUrl,
+                Name = GetImportFileName(media),
                 DownloadUrl = media.DownloadUrl,
                 ThumbnailUrl = media.ThumbnailUrl,
                 Selected = media.Selected,
@@ -89,6 +89,20 @@ public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollection
             FoundMediaCount = FoundMedia.Count,
             SelectedMediaCount = FoundMedia.Count(media => media.Selected),
         };
+    }
+
+    private static string GetImportFileName(FoundMedia media)
+    {
+        if (!string.IsNullOrWhiteSpace(media.OverrideName) && Path.GetExtension(media.OverrideName).Length > 0)
+            return media.OverrideName;
+
+        if (Uri.TryCreate(media.DownloadUrl, UriKind.Absolute, out var uri) &&
+            Path.GetFileName(uri.AbsolutePath) is { Length: > 0 } fileName)
+        {
+            return fileName;
+        }
+
+        return media.DownloadUrl;
     }
 }
 

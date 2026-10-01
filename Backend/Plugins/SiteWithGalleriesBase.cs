@@ -166,8 +166,52 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin
             }
 
             case UrlInformation.GalleryPage:
-                // TODO: implement this
-                throw new NotImplementedException("general gallery scanning not done yet");
+            case UrlInformation.GalleryPageContent:
+            {
+                // TODO: tags for gallery page
+
+                var result = new PageScanResult
+                {
+                    GalleryInfo = new DualView.Shared.Models.DTO.DownloadGalleryDTO(request.HtmlUrl)
+                    {
+                        // TODO: title filtering
+                        GalleryName = document.Title,
+                    },
+                };
+
+                foreach (var link in document.QuerySelectorAll<IHtmlAnchorElement>("a"))
+                {
+                    if (string.IsNullOrWhiteSpace(link.Href))
+                        continue;
+
+                    if (GalleryPageLink.IsMatch(link.Href) || ContentPageRegex.IsMatch(link.Href))
+                    {
+                        var subpage = request.OverrideForScan(link.Href);
+                        subpage.Referrer = request.HtmlUrl;
+
+                        // TODO: thumbnail grabbing
+
+                        result.Subpages.Add(subpage);
+                        continue;
+                    }
+
+                    if (FullSizeMediaLink.IsMatch(link.Href))
+                    {
+                        var thumbnail = link.QuerySelector<IHtmlImageElement>("img")?.Source;
+                        result.Content.Add(new RemoteDownloadRequest
+                        {
+                            ImageUrl = link.Href,
+                            ThumbnailUrl = string.IsNullOrWhiteSpace(thumbnail) ? null : thumbnail,
+                            Referrer = request.HtmlUrl,
+                            CanonicalUrl = ConvertToCanonicalUrl(link.Href),
+                            ImpersonationHeaders = request.ImpersonationHeaders.CloneShallow(),
+                            Cookies = request.Cookies.CloneShallow(),
+                        });
+                    }
+                }
+
+                return result;
+            }
 
             case UrlInformation.ContentLink:
                 throw new InvalidOperationException("Cannot scan a content link");

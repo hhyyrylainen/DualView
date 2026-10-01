@@ -14,6 +14,12 @@ public sealed class ScannedMediaSource : ServerMediaSource
         this.collectionId = collectionId;
     }
 
+    private ScannedMediaSource(long collectionId, IConfiguredMediaInfo mediaInfo, IServiceProvider serviceProvider)
+        : base(mediaInfo, serviceProvider)
+    {
+        this.collectionId = collectionId;
+    }
+
     public override string GetThumbnailDownloadUrl()
     {
         return $"api/v1/scannedCollection/{collectionId}/thumbnail/{ServerId}";
@@ -22,6 +28,11 @@ public sealed class ScannedMediaSource : ServerMediaSource
     public override string GetFullDownloadUrl()
     {
         return $"api/v1/scannedCollection/{collectionId}/content/{ServerId}";
+    }
+
+    public override IVisualMediaSource Clone()
+    {
+        return new ScannedMediaSource(collectionId, Info, VideoPlayerServiceProvider);
     }
 
     private static ConfiguredMediaInfo CreateInfo(ScannedMediaDTO media)
