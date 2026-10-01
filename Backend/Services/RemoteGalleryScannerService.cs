@@ -41,7 +41,11 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         this.downloadProvider = downloadProvider;
 
         appEvents.ScannedCollectionCreated += QueueGallery;
-        workerTask = Task.Run(ProcessQueueAsync);
+        workerTask = Task.Run(async () =>
+        {
+            await PauseInterruptedScansAsync();
+            await ProcessQueueAsync();
+        });
     }
 
     public async Task<long> CreateGalleryAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
@@ -132,6 +136,10 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             var path = await remoteGalleryMediaService.GetFullMediaAsync(item.Id, cancellationToken);
             await using var stream = File.OpenRead(path);
             await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, name);
+
+            gallery.FoundMedia.Remove(item);
+            await database.SaveScannedCollectionAsync(gallery);
+            await NotifyScannedCollectionUpdatedAsync(galleryId);
         }
     }
 
@@ -164,6 +172,22 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
     private void QueueGallery(long galleryId)
     {
         galleryQueue.Writer.TryWrite(galleryId);
+    }
+
+    private async Task PauseInterruptedScansAsync()
+    {
+        using var scope = serviceScopeFactory.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var galleries = await database.GetScannedCollectionsAsync();
+
+        foreach (var gallery in galleries.Where(gallery => gallery.CurrentlyScannedUrl != null &&
+                                                             !gallery.ScanPaused && !gallery.ScanFailed))
+        {
+            gallery.ScanPaused = true;
+            gallery.ScanError = "Paused due to server restart";
+            await database.SaveScannedCollectionAsync(gallery);
+            logger.LogInformation("Paused remote gallery scan {GalleryId} after server restart", gallery.Id);
+        }
     }
 
     private async Task ProcessQueueAsync()
