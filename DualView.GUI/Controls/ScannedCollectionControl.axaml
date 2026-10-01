@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:DualView.GUI.ViewModels"
+             xmlns:controls="using:DualView.GUI.Controls"
+             x:Class="DualView.GUI.Controls.ScannedCollectionControl"
+             x:DataType="vm:ScannedCollectionViewModel">
+    <Border BorderBrush="Gray" BorderThickness="1" Margin="4" Padding="4">
+        <Grid RowDefinitions="Auto,Auto,*,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Height="34">
+                <TextBox Grid.Column="0" Text="{Binding TargetName}" PlaceholderText="Target import section name" />
+                <Button Grid.Column="1" Margin="4,0" Content="Pause" Command="{Binding PauseAsync}"
+                        IsVisible="{Binding CanPause}" />
+                <Button Grid.Column="2" Margin="4,0" Content="Resume" Command="{Binding ResumeAsync}"
+                        IsVisible="{Binding CanResume}" />
+                <Button Grid.Column="3" Margin="4,0" Content="Accept" Command="{Binding AcceptAsync}"
+                        Background="#2878D0" />
+                <Button Grid.Column="4" Margin="4,0" Content="Delete" Command="{Binding DeleteAsync}"
+                        Background="#C62828" />
+            </Grid>
+            <TextBlock Grid.Row="1" Text="{Binding StatusText}" TextWrapping="Wrap" Margin="2" />
+            <TextBlock Grid.Row="1" Text="{Binding ScanError}" Foreground="DarkRed" TextWrapping="Wrap"
+                       IsVisible="{Binding ScanFailed}" Margin="2,20,2,2" />
+            <ScrollViewer Grid.Row="2" MinHeight="150">
+                <ItemsControl ItemsSource="{Binding Media}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <controls:MediaViewer Width="{Binding CustomWidth}" Height="{Binding CustomHeight}"
+                                                  Margin="2" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+            <TextBlock Grid.Row="3" Text="{Binding GalleryUrl}" TextWrapping="Wrap" Margin="2" />
+        </Grid>
+    </Border>
+</UserControl>

@@ -66,9 +66,11 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         signalRService.OnUploadSectionActiveChanged += OnUploadSectionActiveChanged;
         signalRService.OnMissingTagsUpdated += OnMissingTagsUpdated;
         signalRService.OnRemoteScanEventRecorded += OnRemoteScanEventRecorded;
+        signalRService.OnScannedCollectionUpdated += OnScannedCollectionUpdated;
 
         _ = ReloadAsync();
         _ = LoadRemoteScanEventsAsync();
+        _ = LoadScannedCollectionsAsync();
     }
 
     public ObservableCollection<ImportSectionViewModel> Sections { get; } = new();
@@ -118,6 +120,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     public ObservableCollection<MissingTagViewModel> MissingTags { get; } = new();
 
     public ObservableCollection<RemoteScanEventViewModel> RemoteScanEvents { get; } = new();
+    public ObservableCollection<ScannedCollectionViewModel> ScannedCollections { get; } = new();
 
     public string StatusHeader
     {
@@ -369,8 +372,11 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
         signalRService?.OnMissingTagsUpdated -= OnMissingTagsUpdated;
         signalRService?.OnRemoteScanEventRecorded -= OnRemoteScanEventRecorded;
+        signalRService?.OnScannedCollectionUpdated -= OnScannedCollectionUpdated;
         foreach (var section in Sections)
             section.Dispose();
+        foreach (var collection in ScannedCollections)
+            collection.Dispose();
         Hamburger.Dispose();
     }
 
@@ -434,6 +440,74 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         RemoteScanEvents.Add(CreateRemoteScanEventViewModel(scanEvent));
         while (RemoteScanEvents.Count > 1000)
             RemoteScanEvents.RemoveAt(0);
+    }
+
+    private async Task LoadScannedCollectionsAsync()
+    {
+        if (databaseService == null)
+            return;
+
+        try
+        {
+            var collections = await databaseService.GetScannedCollectionsAsync();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var collection in collections)
+                {
+                    AddOrUpdateScannedCollection(collection);
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(ex, "Failed to load scanned galleries");
+        }
+    }
+
+    private async void OnScannedCollectionUpdated(long collectionId)
+    {
+        if (databaseService == null)
+            return;
+
+        try
+        {
+            var collection = await databaseService.GetScannedCollectionAsync(collectionId);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (collection == null)
+                {
+                    var removed = ScannedCollections.FirstOrDefault(item => item.Id == collectionId);
+                    if (removed == null)
+                        return;
+                    removed.Dispose();
+                    ScannedCollections.Remove(removed);
+                    return;
+                }
+
+                AddOrUpdateScannedCollection(collection);
+            });
+        }
+        catch (Exception ex)
+        {
+            logger?.LogDebug(ex, "Failed to refresh scanned gallery {GalleryId}", collectionId);
+        }
+    }
+
+    private void AddOrUpdateScannedCollection(ScannedCollectionDTO collection)
+    {
+        if (backendAPI == null || serviceProvider == null || windowService == null)
+            return;
+
+        var existing = ScannedCollections.FirstOrDefault(item => item.Id == collection.Id);
+        if (existing == null)
+        {
+            ScannedCollections.Add(new ScannedCollectionViewModel(collection, databaseService!, backendAPI,
+                serviceProvider, logger!, windowService));
+        }
+        else
+        {
+            existing.UpdateFromServer(collection);
+        }
     }
 
     private RemoteScanEventViewModel CreateRemoteScanEventViewModel(RemoteScanEventDTO scanEvent)
