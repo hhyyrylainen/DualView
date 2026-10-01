@@ -101,6 +101,12 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin
         return Task.FromResult(UrlInformation.Unknown);
     }
 
+    /// <summary>
+    ///   Converts a URL to a canonical identity for deduplication. The returned value may be synthetic and must not
+    ///   be used to download or scan the page; keep using the original URL for those operations.
+    /// </summary>
+    /// <param name="url">URL to convert.</param>
+    /// <returns>A canonical URL for comparing URL identity.</returns>
     public virtual string ConvertToCanonicalUrl(string url)
     {
         // Based on the URL definitions, we can only make canonical gallery pages

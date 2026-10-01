@@ -17,8 +17,8 @@ public interface IRemoteDownloadPlugin : IPlugin
         IRemoteDownloadProvider downloadProvider, CancellationToken cancellationToken);
 
     /// <summary>
-    ///   For supported websites, this will convert a URL to a canonical URL. This ensures that the same URL is not
-    ///   downloaded multiple times.
+    ///   For supported websites, this converts a URL to its canonical identity for deduplication. The result may be a
+    ///   synthetic URL and must not be used to download or scan the page; use the original URL for those operations.
     /// </summary>
     /// <param name="url">
     ///   Url to convert to canonical (what this most often does is strip unnecessary query parameters)
