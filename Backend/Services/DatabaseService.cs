@@ -3011,6 +3011,33 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.FoundMedia.FindAsync(id);
     }
 
+    public async Task<ScannedCollection?> GetScannedCollectionByUrlAsync(string url,
+        CancellationToken cancellationToken = default)
+    {
+        return await dbContext.ScannedCollections
+            .FirstOrDefaultAsync(collection => collection.GalleryUrl == url, cancellationToken);
+    }
+
+    public async Task CreateScannedCollectionAsync(ScannedCollection collection,
+        CancellationToken cancellationToken = default)
+    {
+        await dbContext.ScannedCollections.AddAsync(collection, cancellationToken);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SaveScannedCollectionAsync(ScannedCollection collection,
+        CancellationToken cancellationToken = default)
+    {
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task DeleteScannedCollectionAsync(ScannedCollection collection,
+        CancellationToken cancellationToken = default)
+    {
+        dbContext.ScannedCollections.Remove(collection);
+        await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task SaveFoundMediaAsync(FoundMedia media)
     {
         await SaveAsync();

@@ -153,9 +153,17 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<DownloadGallery?> GetDownloadGalleryByUrlAsync(string url);
     public Task<FoundMedia?> GetFoundMediaAsync(long id);
     public Task SaveFoundMediaAsync(FoundMedia media);
+    public Task<ScannedCollection?> GetScannedCollectionByUrlAsync(string url,
+        CancellationToken cancellationToken = default);
     public Task<ScannedCollection?> GetScannedCollectionAsync(long id, CancellationToken cancellationToken = default);
     public Task<List<ScannedCollection>> GetScannedCollectionsAsync(CancellationToken cancellationToken = default);
     public Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id,
+        CancellationToken cancellationToken = default);
+    public Task CreateScannedCollectionAsync(ScannedCollection collection,
+        CancellationToken cancellationToken = default);
+    public Task SaveScannedCollectionAsync(ScannedCollection collection,
+        CancellationToken cancellationToken = default);
+    public Task DeleteScannedCollectionAsync(ScannedCollection collection,
         CancellationToken cancellationToken = default);
 
     // Ignored Duplicates
