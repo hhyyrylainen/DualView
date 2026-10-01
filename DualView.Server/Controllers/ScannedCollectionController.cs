@@ -22,59 +22,57 @@ public sealed class ScannedCollectionController : Controller
     }
 
     [HttpGet]
-    public async Task<ActionResult<List<ScannedCollectionDTO>>> GetAll(CancellationToken cancellationToken)
+    public async Task<ActionResult<List<ScannedCollectionDTO>>> GetAll()
     {
-        var collections = await databaseService.GetScannedCollectionsAsync(cancellationToken);
+        var collections = await databaseService.GetScannedCollectionsAsync();
         return collections.Select(collection => collection.GetDTO()).ToList();
     }
 
     [HttpGet("{id:long}")]
-    public async Task<ActionResult<ScannedCollectionDTO>> Get(long id, CancellationToken cancellationToken)
+    public async Task<ActionResult<ScannedCollectionDTO>> Get(long id)
     {
-        var collection = await databaseService.GetScannedCollectionAsync(id, cancellationToken);
+        var collection = await databaseService.GetScannedCollectionAsync(id);
         return collection == null ? NotFound() : collection.GetDTO();
     }
 
     [HttpGet("{id:long}/status")]
-    public async Task<ActionResult<ScannedCollectionStatusDTO>> GetStatus(long id,
-        CancellationToken cancellationToken)
+    public async Task<ActionResult<ScannedCollectionStatusDTO>> GetStatus(long id)
     {
-        var status = await databaseService.GetScannedCollectionStatusAsync(id, cancellationToken);
+        var status = await databaseService.GetScannedCollectionStatusAsync(id);
         return status == null ? NotFound() : status;
     }
 
     [HttpGet("{id:long}/thumbnail/{mediaId:long}")]
-    public async Task<ActionResult> GetThumbnail(long id, long mediaId, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetThumbnail(long id, long mediaId)
     {
-        var collection = await databaseService.GetScannedCollectionAsync(id, cancellationToken);
+        var collection = await databaseService.GetScannedCollectionAsync(id);
         if (collection == null || collection.FoundMedia.All(media => media.Id != mediaId))
             return NotFound();
-        var path = await mediaService.GetThumbnailAsync(mediaId, cancellationToken);
+        var path = await mediaService.GetThumbnailAsync(mediaId, HttpContext.RequestAborted);
         var mediaType = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(path));
         return PhysicalFile(path, mediaType.ToMimeType());
     }
 
     [HttpGet("{id:long}/content/{mediaId:long}")]
-    public async Task<ActionResult> GetContent(long id, long mediaId, CancellationToken cancellationToken)
+    public async Task<ActionResult> GetContent(long id, long mediaId)
     {
-        var collection = await databaseService.GetScannedCollectionAsync(id, cancellationToken);
+        var collection = await databaseService.GetScannedCollectionAsync(id);
         if (collection == null || collection.FoundMedia.All(media => media.Id != mediaId))
             return NotFound();
-        var path = await mediaService.GetFullMediaAsync(mediaId, cancellationToken);
+        var path = await mediaService.GetFullMediaAsync(mediaId, HttpContext.RequestAborted);
         var mediaType = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(path));
         return PhysicalFile(path, mediaType.ToMimeType());
     }
 
     [HttpPost("{id:long}/pause")]
-    public async Task<IActionResult> Pause(long id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Pause(long id)
     {
-        await scannerService.PauseGalleryAsync(id, cancellationToken);
+        await scannerService.PauseGalleryAsync(id, CancellationToken.None);
         return Ok();
     }
 
     [HttpPost("media/{mediaId:long}/selection")]
-    public async Task<IActionResult> SetSelection(long mediaId, [FromBody] bool selected,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> SetSelection(long mediaId, [FromBody] bool selected)
     {
         var media = await databaseService.GetFoundMediaAsync(mediaId);
         if (media == null)
@@ -85,26 +83,25 @@ public sealed class ScannedCollectionController : Controller
     }
 
     [HttpPost("{id:long}/resume")]
-    public async Task<IActionResult> Resume(long id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Resume(long id)
     {
-        await scannerService.ResumeGalleryAsync(id, cancellationToken);
+        await scannerService.ResumeGalleryAsync(id, HttpContext.RequestAborted);
         return Ok();
     }
 
     [HttpDelete("{id:long}")]
-    public async Task<IActionResult> Delete(long id, CancellationToken cancellationToken)
+    public async Task<IActionResult> Delete(long id)
     {
-        await scannerService.DeleteGalleryAsync(id, cancellationToken);
+        await scannerService.DeleteGalleryAsync(id, CancellationToken.None);
         return NoContent();
     }
 
     [HttpPost("{id:long}/accept")]
-    public async Task<IActionResult> Accept(long id, AcceptScannedCollectionRequest request,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> Accept(long id, AcceptScannedCollectionRequest request)
     {
         try
         {
-            await scannerService.AcceptGalleryAsync(id, request.Name, request.MediaIds, cancellationToken);
+            await scannerService.AcceptGalleryAsync(id, request.Name, request.MediaIds, CancellationToken.None);
             return Ok();
         }
         catch (ArgumentException ex)

@@ -3011,31 +3011,27 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.FoundMedia.FindAsync(id);
     }
 
-    public async Task<ScannedCollection?> GetScannedCollectionByUrlAsync(string url,
-        CancellationToken cancellationToken = default)
+    public async Task<ScannedCollection?> GetScannedCollectionByUrlAsync(string url)
     {
         return await dbContext.ScannedCollections
-            .FirstOrDefaultAsync(collection => collection.GalleryUrl == url, cancellationToken);
+            .FirstOrDefaultAsync(collection => collection.GalleryUrl == url);
     }
 
-    public async Task CreateScannedCollectionAsync(ScannedCollection collection,
-        CancellationToken cancellationToken = default)
+    public async Task CreateScannedCollectionAsync(ScannedCollection collection)
     {
-        await dbContext.ScannedCollections.AddAsync(collection, cancellationToken);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.ScannedCollections.AddAsync(collection);
+        await dbContext.SaveChangesAsync();
     }
 
-    public async Task SaveScannedCollectionAsync(ScannedCollection collection,
-        CancellationToken cancellationToken = default)
+    public async Task SaveScannedCollectionAsync(ScannedCollection collection)
     {
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync();
     }
 
-    public async Task DeleteScannedCollectionAsync(ScannedCollection collection,
-        CancellationToken cancellationToken = default)
+    public async Task DeleteScannedCollectionAsync(ScannedCollection collection)
     {
         dbContext.ScannedCollections.Remove(collection);
-        await dbContext.SaveChangesAsync(cancellationToken);
+        await dbContext.SaveChangesAsync();
     }
 
     public async Task SaveFoundMediaAsync(FoundMedia media)
@@ -3067,25 +3063,22 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         await SaveAsync();
     }
 
-    public async Task<ScannedCollection?> GetScannedCollectionAsync(long id,
-        CancellationToken cancellationToken = default)
+    public async Task<ScannedCollection?> GetScannedCollectionAsync(long id)
     {
         return await dbContext.ScannedCollections
             .Include(collection => collection.FoundMedia)
-            .FirstOrDefaultAsync(collection => collection.Id == id, cancellationToken);
+            .FirstOrDefaultAsync(collection => collection.Id == id);
     }
 
-    public async Task<List<ScannedCollection>> GetScannedCollectionsAsync(
-        CancellationToken cancellationToken = default)
+    public async Task<List<ScannedCollection>> GetScannedCollectionsAsync()
     {
         return await dbContext.ScannedCollections
             .Include(collection => collection.FoundMedia)
             .OrderByDescending(collection => collection.UpdatedAt)
-            .ToListAsync(cancellationToken);
+            .ToListAsync();
     }
 
-    public async Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id,
-        CancellationToken cancellationToken = default)
+    public async Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id)
     {
         return await dbContext.ScannedCollections
             .Where(collection => collection.Id == id)
@@ -3100,7 +3093,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
                 FoundMediaCount = collection.FoundMedia.Count,
                 SelectedMediaCount = collection.FoundMedia.Count(media => media.Selected),
             })
-            .FirstOrDefaultAsync(cancellationToken);
+            .FirstOrDefaultAsync();
     }
 
     public async Task AddIgnoredDuplicateAsync(long mediaId1, long mediaId2)
