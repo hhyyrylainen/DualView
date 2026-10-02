@@ -907,6 +907,13 @@ public abstract class HttpDatabaseAccessBase : IClientDatabaseService
         response.EnsureSuccessStatusCode();
     }
 
+    public async Task SetScannedCollectionMediaSelectionAsync(long collectionId, bool selected)
+    {
+        using var response = await HttpClient.PostAsJsonAsync($"api/v1/scannedCollection/{collectionId}/selection",
+            selected);
+        response.EnsureSuccessStatusCode();
+    }
+
     public async Task<List<MissingTagDTO>> GetMissingTagsAsync()
     {
         return await HttpClient.GetFromJsonAsync<List<MissingTagDTO>>("api/v1/missingTag") ?? new();

@@ -23,6 +23,7 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable, ICo
     private readonly ILogger logger;
     private readonly IWindowService? windowService;
     private CancellationTokenSource? statusRefreshCancellation;
+    private bool updatingSelectionBatch;
     private int targetNameSearchVersion;
     private long id;
 
@@ -340,6 +341,16 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable, ICo
             viewer.Selected = selected;
     }
 
+    public Task SelectAllAsync()
+    {
+        return SetAllMediaSelectedAsync(true);
+    }
+
+    public Task DeselectAllAsync()
+    {
+        return SetAllMediaSelectedAsync(false);
+    }
+
     public void NotifySelectionChanged(long mediaId, bool selected)
     {
         OnSelectionChanged?.Invoke(mediaId, selected);
@@ -347,13 +358,43 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable, ICo
 
     private void OnMediaSelectionChanged(object? sender, EventArgs e)
     {
-        AcceptText = $"Accept ({Media.Count(item => item.Selected)})";
+        if (!updatingSelectionBatch)
+            AcceptText = $"Accept ({Media.Count(item => item.Selected)})";
+
         if ((sender as MediaViewerViewModel)?.MediaToShow is ScannedMediaSource source && databaseService != null &&
             sender is MediaViewerViewModel viewer)
         {
-            _ = databaseService.SetScannedMediaSelectedAsync(source.ServerId, viewer.Selected);
+            if (!updatingSelectionBatch)
+                _ = databaseService.SetScannedMediaSelectedAsync(source.ServerId, viewer.Selected);
             NotifySelectionChanged(source.ServerId, viewer.Selected);
         }
+    }
+
+    private async Task SetAllMediaSelectedAsync(bool selected)
+    {
+        try
+        {
+            if (databaseService != null)
+                await databaseService.SetScannedCollectionMediaSelectionAsync(id, selected);
+        }
+        catch (Exception ex)
+        {
+            windowService?.ShowErrorWindow("Failed to update gallery selection", ex);
+            return;
+        }
+
+        updatingSelectionBatch = true;
+        try
+        {
+            foreach (var item in Media)
+                item.Selected = selected;
+        }
+        finally
+        {
+            updatingSelectionBatch = false;
+        }
+
+        UpdateDerivedProperties();
     }
 
     private async Task PollStatusLoopAsync()

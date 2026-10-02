@@ -123,6 +123,9 @@ public interface IDatabaseCommonService
 
     public Task DeleteDownloadGalleryAsync(long id);
 
+    public Task SetScannedMediaSelectedAsync(long mediaId, bool selected);
+    public Task SetScannedCollectionMediaSelectionAsync(long collectionId, bool selected);
+
     public Task AddIgnoredTagAsync(string tag);
     public Task ClearIgnoredTagsAsync();
 }

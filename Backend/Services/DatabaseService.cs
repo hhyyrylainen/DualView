@@ -2980,7 +2980,8 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     Task IClientDatabaseService.SetUploadSectionActiveAsync(long? sectionId) => SetUploadSectionActiveAsync(sectionId);
 
-    Task<UploadSectionImportResultDTO> IClientDatabaseService.ImportUploadSectionAsync(long sectionId, List<long>? mediaIds) =>
+    Task<UploadSectionImportResultDTO> IClientDatabaseService.ImportUploadSectionAsync(long sectionId,
+        List<long>? mediaIds) =>
         ImportUploadSectionAsync(sectionId, mediaIds);
 
     public async Task<List<DownloadGallery>> GetDownloadGalleriesAsync()
@@ -3049,12 +3050,25 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await GetScannedCollectionStatusAsync(id);
     }
 
-    async Task IClientDatabaseService.SetScannedMediaSelectedAsync(long mediaId, bool selected)
+    public async Task SetScannedMediaSelectedAsync(long mediaId, bool selected)
     {
         var media = await dbContext.FoundMedia.FindAsync(mediaId) ??
                     throw new ArgumentException("Scanned media not found", nameof(mediaId));
+
+        // Explicit no update, even though EF should automatically not update non-changed values, but as the client
+        // can send a lot of these requests, we don't act on them if the state matches.
+        if (media.Selected == selected)
+            return;
+
         media.Selected = selected;
         await SaveAsync();
+    }
+
+    public async Task SetScannedCollectionMediaSelectionAsync(long collectionId, bool selected)
+    {
+        await dbContext.FoundMedia
+            .Where(media => media.ScannedCollectionId == collectionId)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(media => media.Selected, selected));
     }
 
     public async Task<ScannedCollection?> GetScannedCollectionAsync(long id)

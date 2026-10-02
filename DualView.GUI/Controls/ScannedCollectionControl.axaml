@@ -23,8 +23,8 @@
                         Background="#C62828" />
             </Grid>
             <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*">
-                <Button Grid.Column="0" Margin="2" Command="{Binding SelectAll}">Select All</Button>
-                <Button Grid.Column="1" Margin="2" Command="{Binding DeselectAll}">Deselect All</Button>
+                <Button Grid.Column="0" Margin="2" Command="{Binding SelectAllAsync}">Select All</Button>
+                <Button Grid.Column="1" Margin="2" Command="{Binding DeselectAllAsync}">Deselect All</Button>
                 <TextBlock Grid.Column="2" Text="{Binding ScanError}" Foreground="DarkRed" TextWrapping="Wrap"
                            IsVisible="{Binding ScanFailed}" Margin="2,20,2,2" />
             </Grid>

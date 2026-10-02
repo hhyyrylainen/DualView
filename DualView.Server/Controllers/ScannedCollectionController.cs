@@ -82,6 +82,13 @@ public sealed class ScannedCollectionController : Controller
         return Ok();
     }
 
+    [HttpPost("{id:long}/selection")]
+    public async Task<IActionResult> SetCollectionSelection(long id, [FromBody] bool selected)
+    {
+        await databaseService.SetScannedCollectionMediaSelectionAsync(id, selected);
+        return Ok();
+    }
+
     [HttpPost("{id:long}/resume")]
     public async Task<IActionResult> Resume(long id)
     {
