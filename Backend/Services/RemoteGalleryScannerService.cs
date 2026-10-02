@@ -130,6 +130,7 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
         var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
         var tagParser = scope.ServiceProvider.GetRequiredService<ITagParser>();
+        var missingTagService = scope.ServiceProvider.GetRequiredService<IMissingTagService>();
         var gallery = await database.GetScannedCollectionAsync(galleryId) ??
                       throw new ArgumentException("Gallery not found", nameof(galleryId));
         var uploadSection = await database.GetOrCreateUploadSectionAsync(name);
@@ -142,6 +143,7 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             {
                 logger.LogWarning("Could not parse scanned gallery tag '{Tag}' for gallery {GalleryId}", tag,
                     galleryId);
+                await missingTagService.ReportTagAsync(tag, MissingTagTarget.UploadSection, uploadSection.Id);
                 continue;
             }
 

@@ -40,6 +40,10 @@ public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollection
 
     public long TargetFolderId { get; set; } = MediaFolder.RootFolderId;
 
+    /// <summary>
+    ///   NOTE: the name says "unrecognized tags" but it's actually a list of all tags that will be applied once
+    ///   accepted. A more apt name would be "TagsToApply".
+    /// </summary>
     [MaxLength(4096)]
     public string UnrecognizedTags { get; set; } = string.Empty;
 

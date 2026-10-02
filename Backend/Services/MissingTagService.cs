@@ -209,6 +209,12 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
                             mediaIds.Add(import.MediaFileId);
                     }
                     break;
+                case MissingTagTarget.UploadSection:
+                    if (await database.GetUploadSectionAsync(entry.TargetId) != null)
+                    {
+                        await database.AddParsedAppliedTagToUploadSectionAsync(entry.TargetId, parsedTag);
+                    }
+                    break;
             }
         }
 
