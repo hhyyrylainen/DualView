@@ -392,15 +392,47 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
 
         var plugin = await FindGalleryPluginAsync(page, cancellationToken) ??
                      throw new InvalidOperationException("Plugin disappeared while scanning");
-        state.SeenUrls.Add(plugin.ConvertToCanonicalUrl(page.HtmlUrl));
+        var currentCanonicalUrl = plugin.ConvertToCanonicalUrl(page.HtmlUrl);
+        state.SeenUrls.Add(currentCanonicalUrl);
+
+        var pendingPages = new List<(RemoteDownloadRequest Page, bool IsContentPage)>();
+        var queuedCanonicalUrls = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var pendingPage in state.PendingPages)
+        {
+            var canonicalUrl = plugin.ConvertToCanonicalUrl(pendingPage.HtmlUrl);
+            if (canonicalUrl == currentCanonicalUrl || !queuedCanonicalUrls.Add(canonicalUrl))
+                continue;
+
+            var information = await plugin.InspectWebsiteRequest(pendingPage, downloadProvider, cancellationToken);
+            var isContentPage = IsContentPage(information);
+
+            state.SeenUrls.Add(canonicalUrl);
+            pendingPages.Add((pendingPage, isContentPage));
+        }
+
+        var discoveredPages = new List<(RemoteDownloadRequest Page, bool IsContentPage)>();
         foreach (var subpage in result.Subpages)
         {
             var canonicalUrl = plugin.ConvertToCanonicalUrl(subpage.HtmlUrl);
-            if (state.SeenUrls.Add(canonicalUrl))
-            {
-                state.PendingPages.Add(subpage);
-            }
+            if (queuedCanonicalUrls.Contains(canonicalUrl) || state.SeenUrls.Contains(canonicalUrl))
+                continue;
+
+            var information = await plugin.InspectWebsiteRequest(subpage, downloadProvider, cancellationToken);
+            var isContentPage = IsContentPage(information);
+
+            queuedCanonicalUrls.Add(canonicalUrl);
+            state.SeenUrls.Add(canonicalUrl);
+            discoveredPages.Add((subpage, isContentPage));
         }
+
+        // Sort found pages for optimal scan order
+        var orderedPages = pendingPages.Concat(discoveredPages);
+        if (plugin.ScanContentPagesFirst)
+            orderedPages = orderedPages.OrderBy(candidate => candidate.IsContentPage ? 0 : 1);
+
+        state.PendingPages = orderedPages
+            .Select(candidate => candidate.Page)
+            .ToList();
 
         foreach (var content in result.Content)
         {
@@ -549,6 +581,12 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         }
 
         return null;
+    }
+
+    private static bool IsContentPage(UrlInformation information)
+    {
+        return (information & UrlInformation.ContentPage) != 0 &&
+               (information & UrlInformation.GalleryPage) == 0;
     }
 
     private static GalleryScanState DeserializeState(string state)

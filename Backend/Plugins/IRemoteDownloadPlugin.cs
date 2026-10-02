@@ -7,6 +7,11 @@ namespace Backend.Plugins;
 public interface IRemoteDownloadPlugin : IPlugin
 {
     /// <summary>
+    ///   Whether content pages discovered while scanning a gallery should be scanned before gallery pages.
+    /// </summary>
+    public bool ScanContentPagesFirst => true;
+
+    /// <summary>
     ///   Checks if this plugin can handle the given request and returns some info.
     /// </summary>
     /// <param name="request">Request to check</param>

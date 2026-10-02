@@ -32,6 +32,8 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
 
     public abstract string Version { get; }
 
+    public virtual bool ScanContentPagesFirst => true;
+
     /// <summary>
     ///   Regex that matches only full-size media links.
     /// </summary>
