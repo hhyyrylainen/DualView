@@ -24,7 +24,7 @@
             </Grid>
             <TextBlock Grid.Row="1" Text="{Binding ScanError}" Foreground="DarkRed" TextWrapping="Wrap"
                        IsVisible="{Binding ScanFailed}" Margin="2,20,2,2" />
-            <ScrollViewer Grid.Row="2" MinHeight="150">
+            <ScrollViewer Grid.Row="2" MinHeight="150" MaxHeight="500">
                 <ItemsControl ItemsSource="{Binding Media}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
