@@ -307,6 +307,25 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             await database.SaveScannedCollectionAsync(gallery);
             await NotifyScannedCollectionUpdatedAsync(galleryId);
         }
+
+        await DeleteEmptyAcceptedGalleryAsync(galleryId);
+    }
+
+    private async Task DeleteEmptyAcceptedGalleryAsync(long galleryId)
+    {
+        using var scope = serviceScopeFactory.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var gallery = await database.GetScannedCollectionAsync(galleryId);
+        if (gallery == null)
+            return;
+
+        var hasPendingScanPages = DeserializeState(gallery.ScannerState).PendingPages.Count > 0;
+        if (gallery.FoundMedia.Count > 0 || gallery.CurrentlyScannedUrl != null || hasPendingScanPages)
+            return;
+
+        await database.DeleteScannedCollectionAsync(gallery);
+        logger.LogInformation("Deleted empty accepted scanned gallery {GalleryId}", galleryId);
+        await NotifyScannedCollectionUpdatedAsync(galleryId);
     }
 
     private async Task ScanGalleryAsync(long galleryId, CancellationToken cancellationToken)
