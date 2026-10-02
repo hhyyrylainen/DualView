@@ -407,13 +407,6 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
     /// <returns>Distinct matching media URLs in document order, or an empty list if no URL matches.</returns>
     protected virtual List<string> GetDownloadUrlsFromPage(IDocument document)
     {
-        var videoUrls = GetVideoUrlsFromPage(document);
-        if (videoUrls.Count > 0)
-        {
-            // TODO: should we filter video URLs with a regex here?
-            return videoUrls;
-        }
-
         var anchorUrls = document.QuerySelectorAll<IHtmlAnchorElement>("a").Select(link => link.Href);
         var imageUrls = document.QuerySelectorAll<IHtmlImageElement>("img").Select(image => image.Source);
         var validAnchorUrls = anchorUrls
@@ -430,6 +423,13 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
         if (fullSizeAnchorUrls.Count > 0)
             return fullSizeAnchorUrls;
 
+        var fullSizeImageUrls = validImageUrls
+            .Where(url => FullSizeMediaLink.IsMatch(url))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (fullSizeImageUrls.Count > 0)
+            return fullSizeImageUrls;
+
         if (AllowFallbackSmallImage)
         {
             var previewAnchorUrls = validAnchorUrls
@@ -440,12 +440,13 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                 return previewAnchorUrls;
         }
 
-        var fullSizeImageUrls = validImageUrls
-            .Where(url => FullSizeMediaLink.IsMatch(url))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-        if (fullSizeImageUrls.Count > 0)
-            return fullSizeImageUrls;
+        // Handle video URLs here with the reasoning to prefer full size download links over embedded videos
+        var videoUrls = GetVideoUrlsFromPage(document);
+        if (videoUrls.Count > 0)
+        {
+            // TODO: should we filter video URLs with a regex here?
+            return videoUrls;
+        }
 
         if (AllowFallbackSmallImage)
         {
