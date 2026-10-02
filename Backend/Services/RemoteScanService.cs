@@ -356,8 +356,25 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
             {
                 throw;
             }
+            // Use normal retry logic, in case a browser scan fails, but it might still be able to handle a later request
+            /*catch (BrowserPageScanException ex)
+            {
+                await RecordEventAsync(new RemoteScanEvent
+                {
+                    EventType = "scan-failed",
+                    ImageUrl = pageRequest.HtmlUrl,
+                    ReferrerUrl = pageRequest.Referrer,
+                    Detail = ex.Message,
+                    Attempt = attempt,
+                }, cancellation);
+                throw;
+            }*/
             catch (Exception ex)
             {
+                // Retry browser scan entirely
+                if(pageRequest.BrowserScannedHtml != null)
+                    pageRequest.BrowserScannedHtml = null;
+
                 await RecordEventAsync(new RemoteScanEvent
                 {
                     EventType = attempt == MaximumScanAttempts ? "scan-failed" : "scan-retry",
