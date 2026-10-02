@@ -129,8 +129,25 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         using var scope = serviceScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
         var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
+        var tagParser = scope.ServiceProvider.GetRequiredService<ITagParser>();
         var gallery = await database.GetScannedCollectionAsync(galleryId) ??
                       throw new ArgumentException("Gallery not found", nameof(galleryId));
+        var uploadSection = await database.GetOrCreateUploadSectionAsync(name);
+
+        foreach (var tag in gallery.UnrecognizedTags.Split(',',
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parsedTag = await tagParser.ParseTag(tag);
+            if (parsedTag == null)
+            {
+                logger.LogWarning("Could not parse scanned gallery tag '{Tag}' for gallery {GalleryId}", tag,
+                    galleryId);
+                continue;
+            }
+
+            await database.AddParsedAppliedTagToUploadSectionAsync(uploadSection.Id, parsedTag.GetDTO());
+        }
+
         var selected = gallery.FoundMedia
             .Where(item => mediaIds?.Contains(item.Id) ?? item.Selected)
             .ToList();
@@ -138,7 +155,7 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         {
             var path = await remoteGalleryMediaService.GetFullMediaAsync(item.Id, cancellationToken);
             await using var stream = File.OpenRead(path);
-            await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, name);
+            await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
 
             gallery.FoundMedia.Remove(item);
             await database.SaveScannedCollectionAsync(gallery);

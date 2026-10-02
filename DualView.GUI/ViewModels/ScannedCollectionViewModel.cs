@@ -248,6 +248,7 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable, ICo
 
         try
         {
+            await databaseService!.GetOrCreateUploadSectionAsync(name);
             await backendAPI!.AcceptScannedCollectionAsync(id, name,
                 Media.Where(item => item.Selected)
                     .Select(item => ((ScannedMediaSource)item.MediaToShow!).ServerId).ToList());

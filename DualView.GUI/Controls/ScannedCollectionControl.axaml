@@ -7,7 +7,7 @@
     <Border BorderBrush="Gray" BorderThickness="1" Margin="4" Padding="4">
         <Grid RowDefinitions="Auto,Auto,*,Auto">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Height="34">
-                <AutoCompleteBox Grid.Column="0" Text="{Binding TargetName}"
+                <AutoCompleteBox x:Name="TargetNameInput" Grid.Column="0" Text="{Binding TargetName}"
                                  ItemsSource="{Binding TargetNameSuggestions}"
                                  MinimumPrefixLength="3"
                                  FilterMode="None"
@@ -17,7 +17,7 @@
                         IsVisible="{Binding CanPause}" />
                 <Button Grid.Column="2" Margin="4,0" Content="Resume" Command="{Binding ResumeAsync}"
                         IsVisible="{Binding CanResume}" />
-                <Button Grid.Column="3" Margin="4,0" Content="Accept" Command="{Binding AcceptAsync}"
+                <Button Grid.Column="3" Margin="4,0" Content="Accept" Click="OnAcceptClick"
                         Background="#2878D0" />
                 <Button Grid.Column="4" Margin="4,0" Content="Delete" Command="{Binding DeleteAsync}"
                         Background="#C62828" />
