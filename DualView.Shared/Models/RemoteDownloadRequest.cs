@@ -72,11 +72,11 @@ public sealed class RemoteDownloadRequest
     public string? OverrideName { get; set; }
 
     /// <summary>
-    ///   Optional preview image URL discovered while scanning a gallery page. Makes displaying this in the GUI
-    ///   much more efficient due to delaying the full size download.
+    ///   Optional thumbnail information discovered while scanning a gallery page. Makes displaying this in the GUI
+    ///   more efficient by delaying the full size download.
     /// </summary>
-    [JsonPropertyName("thumbnailUrl")]
-    public string? ThumbnailUrl { get; set; }
+    [JsonPropertyName("thumbnail")]
+    public RemoteThumbnailInfo? Thumbnail { get; set; }
 
     /// <summary>
     ///   Gets or sets the detected media type. Plugins should set this when the URL does not contain an extension.
@@ -120,7 +120,7 @@ public sealed class RemoteDownloadRequest
             DownloadGalleryId = DownloadGalleryId,
             TargetImportSection = TargetImportSection,
             OverrideName = OverrideName,
-            ThumbnailUrl = ThumbnailUrl,
+            Thumbnail = Thumbnail,
             MediaType = MediaType,
             Enriched = Enriched,
         };
@@ -135,8 +135,67 @@ public sealed class RemoteDownloadRequest
             PageUrl = targetScan,
             DownloadGalleryId = DownloadGalleryId,
             TargetImportSection = TargetImportSection,
-            ThumbnailUrl = ThumbnailUrl,
+            Thumbnail = Thumbnail,
             MediaType = MediaType,
         };
+    }
+}
+
+/// <summary>
+///   Pixel rectangle to extract from a remote thumbnail source image.
+/// </summary>
+public sealed class RemoteThumbnailCrop
+{
+    /// <summary>
+    ///   Gets or sets the horizontal pixel offset in the source image.
+    /// </summary>
+    [JsonPropertyName("x")]
+    public int X { get; set; }
+
+    /// <summary>
+    ///   Gets or sets the vertical pixel offset in the source image.
+    /// </summary>
+    [JsonPropertyName("y")]
+    public int Y { get; set; }
+
+    /// <summary>
+    ///   Gets or sets the crop width in pixels.
+    /// </summary>
+    [JsonPropertyName("width")]
+    public int Width { get; set; }
+
+    /// <summary>
+    ///   Gets or sets the crop height in pixels.
+    /// </summary>
+    [JsonPropertyName("height")]
+    public int Height { get; set; }
+}
+
+/// <summary>
+///   Describes a thumbnail URL and an optional sprite-sheet crop rectangle.
+/// </summary>
+public sealed class RemoteThumbnailInfo
+{
+    /// <summary>
+    ///   Gets the URL of the thumbnail image.
+    /// </summary>
+    [JsonPropertyName("url")]
+    public string Url { get; init; }
+
+    /// <summary>
+    ///   Gets the optional rectangle to extract from the thumbnail image.
+    /// </summary>
+    [JsonPropertyName("crop")]
+    public RemoteThumbnailCrop? Crop { get; init; }
+
+    /// <summary>
+    ///   Creates thumbnail information with an optional source crop rectangle.
+    /// </summary>
+    /// <param name="url">The thumbnail image URL.</param>
+    /// <param name="crop">The optional rectangle to crop from the image.</param>
+    public RemoteThumbnailInfo(string url, RemoteThumbnailCrop? crop = null)
+    {
+        Url = url;
+        Crop = crop;
     }
 }
