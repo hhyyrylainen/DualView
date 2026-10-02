@@ -197,7 +197,7 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         var galleries = await database.GetScannedCollectionsAsync();
 
         foreach (var gallery in galleries.Where(gallery => gallery.CurrentlyScannedUrl != null &&
-                                                             !gallery.ScanPaused && !gallery.ScanFailed))
+                                                           !gallery.ScanPaused && !gallery.ScanFailed))
         {
             gallery.ScanPaused = true;
             gallery.ScanError = "Paused due to server restart";
@@ -386,6 +386,10 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             return;
         }
 
+        logger.LogInformation(
+            "Finished scanning {Url} for remote gallery {GalleryId}, found {Count1} content item(s) and " +
+            "{Count2} subpage(s)", page.HtmlUrl, galleryId, result.Content.Count, result.Subpages.Count);
+
         var state = DeserializeState(gallery.ScannerState);
         state.PendingPages.RemoveAll(candidate => candidate.HtmlUrl == page.HtmlUrl);
         var collectionContentChanged = false;
@@ -419,6 +423,9 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
 
             var information = await plugin.InspectWebsiteRequest(subpage, downloadProvider, cancellationToken);
             var isContentPage = IsContentPage(information);
+
+            if (!isContentPage)
+                logger.LogInformation("Found new gallery sub-page: {Url}", subpage.HtmlUrl);
 
             queuedCanonicalUrls.Add(canonicalUrl);
             state.SeenUrls.Add(canonicalUrl);
@@ -467,6 +474,11 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         }
 
         gallery.ScannerState = JsonSerializer.Serialize(state);
+
+        logger.LogDebug(
+            "Scanner state is {Kb} KiB for gallery {Name} ({Id}), with pending scan queue size: {PendingPagesCount}",
+            gallery.ScannerState.Length / 1024, gallery.Name, gallery.Id, state.PendingPages.Count);
+
         gallery.CurrentlyScannedUrl = state.PendingPages.FirstOrDefault()?.HtmlUrl;
         try
         {
