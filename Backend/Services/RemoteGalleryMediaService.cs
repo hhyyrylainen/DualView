@@ -1,5 +1,9 @@
 using System.Net;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using AsyncKeyedLock;
+using Backend.Models;
 using ImageMagick;
 using DualView.Shared.Models.Enums;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,6 +23,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
     private readonly IDataFolderService dataFolderService;
     private readonly ICurlDownloadService curlDownloadService;
     private readonly HttpClient httpClient;
+    private readonly AsyncKeyedLocker<string> spriteSheetLocks = new();
 
     public RemoteGalleryMediaService(ILogger<RemoteGalleryMediaService> logger,
         IServiceScopeFactory serviceScopeFactory, IDataFolderService dataFolderService,
@@ -85,59 +90,31 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
         {
             try
             {
-                string? temporaryPath = null;
-                try
+                if (thumbnail && TryGetThumbnailCrop(item, out var crop))
                 {
-                    if (settings.UseCurlForRemoteDownloads)
-                    {
-                        temporaryPath = await curlDownloadService.DownloadAsync(sourceUrl,
-                            new BrowserImpersonationHeaders(headers).PassedHeaders(), referrer, cookies,
-                            cancellationToken);
-                        await using var input = File.OpenRead(temporaryPath);
-                        await using var output = File.Create(destination);
-                        await input.CopyToAsync(output, cancellationToken);
-                    }
-                    else
-                    {
-                        using var request = new HttpRequestMessage(HttpMethod.Get, sourceUrl);
-                        new BrowserImpersonationHeaders(headers).ConfigureHttpRequest(request, false);
-                        if (referrer != null)
-                            request.Headers.Referrer = new Uri(referrer);
+                    var spriteSheetPath = await GetSpriteSheetPathAsync(sourceUrl, settings.UseCurlForRemoteDownloads,
+                        headers, referrer, cookies, cancellationToken);
+                    await CreateCroppedThumbnailAsync(spriteSheetPath, destination, crop, cancellationToken);
+                }
+                else
+                {
+                    await DownloadFileAsync(sourceUrl, destination, settings.UseCurlForRemoteDownloads, headers,
+                        referrer, cookies, cancellationToken);
 
-                        if (cookies.Count > 0)
+                    if (thumbnail)
+                    {
+                        if (IsVideo(sourceUrl, item.MediaType))
                         {
-                            request.Headers.TryAddWithoutValidation("Cookie",
-                                string.Join("; ", cookies.Select(cookie => $"{cookie.Key}={cookie.Value}")));
+                            var videoThumbnail = Path.Combine(directory, "thumbnail.webm");
+                            await mediaProcessingService.ResizeVideoThumbnailAsync(destination, videoThumbnail,
+                                cancellationToken);
+                            File.Delete(destination);
+                            destination = videoThumbnail;
                         }
-
-                        using var response = await httpClient.SendAsync(request,
-                            HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                        response.EnsureSuccessStatusCode();
-
-                        await using var input = await response.Content.ReadAsStreamAsync(cancellationToken);
-                        await using var output = File.Create(destination);
-                        await input.CopyToAsync(output, cancellationToken);
-                    }
-                }
-                finally
-                {
-                    if (temporaryPath != null)
-                        File.Delete(temporaryPath);
-                }
-
-                if (thumbnail)
-                {
-                    if (IsVideo(sourceUrl, item.MediaType))
-                    {
-                        var videoThumbnail = Path.Combine(directory, "thumbnail.webm");
-                        await mediaProcessingService.ResizeVideoThumbnailAsync(destination, videoThumbnail,
-                            cancellationToken);
-                        File.Delete(destination);
-                        destination = videoThumbnail;
-                    }
-                    else
-                    {
-                        await ResizeThumbnailAsync(destination, cancellationToken);
+                        else
+                        {
+                            await ResizeThumbnailAsync(destination, cancellationToken);
+                        }
                     }
                 }
 
@@ -161,6 +138,121 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
         }
 
         throw new InvalidOperationException("Remote media download exhausted its retry budget");
+    }
+
+    private async Task<string> GetSpriteSheetPathAsync(string sourceUrl, bool useCurl,
+        Dictionary<string, string> headers, string? referrer, Dictionary<string, string> cookies,
+        CancellationToken cancellationToken)
+    {
+        var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sourceUrl))).ToLowerInvariant();
+        var directory = Path.Combine(dataFolderService.GetDataFolderPath(), "remoteThumbnails");
+        Directory.CreateDirectory(directory);
+        var path = Path.Combine(directory, hash + GetSafeExtension(sourceUrl, ".img"));
+        using var spriteSheetLock = await spriteSheetLocks.LockAsync(path, cancellationToken);
+        if (File.Exists(path))
+        {
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+            return path;
+        }
+
+        var temporaryPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            await DownloadFileAsync(sourceUrl, temporaryPath, useCurl, headers, referrer, cookies,
+                cancellationToken);
+            File.Move(temporaryPath, path, true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
+
+        return path;
+    }
+
+    private async Task DownloadFileAsync(string sourceUrl, string destination, bool useCurl,
+        Dictionary<string, string> headers, string? referrer, Dictionary<string, string> cookies,
+        CancellationToken cancellationToken)
+    {
+        if (useCurl)
+        {
+            var temporaryPath = await curlDownloadService.DownloadAsync(sourceUrl,
+                new BrowserImpersonationHeaders(headers).PassedHeaders(), referrer, cookies, cancellationToken);
+            try
+            {
+                await using var input = File.OpenRead(temporaryPath);
+                await using var output = File.Create(destination);
+                await input.CopyToAsync(output, cancellationToken);
+            }
+            finally
+            {
+                File.Delete(temporaryPath);
+            }
+
+            return;
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, sourceUrl);
+        new BrowserImpersonationHeaders(headers).ConfigureHttpRequest(request, false);
+        if (referrer != null)
+            request.Headers.Referrer = new Uri(referrer);
+
+        if (cookies.Count > 0)
+        {
+            request.Headers.TryAddWithoutValidation("Cookie",
+                string.Join("; ", cookies.Select(cookie => $"{cookie.Key}={cookie.Value}")));
+        }
+
+        using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        await using var outputStream = File.Create(destination);
+        await responseStream.CopyToAsync(outputStream, cancellationToken);
+    }
+
+    private static bool TryGetThumbnailCrop(FoundMedia item, out DualView.Shared.Models.RemoteThumbnailCrop crop)
+    {
+        crop = new DualView.Shared.Models.RemoteThumbnailCrop();
+        if (!item.ThumbnailCropX.HasValue || !item.ThumbnailCropY.HasValue ||
+            !item.ThumbnailCropWidth.HasValue || !item.ThumbnailCropHeight.HasValue ||
+            item.ThumbnailCropX.Value < 0 || item.ThumbnailCropY.Value < 0 ||
+            item.ThumbnailCropWidth.Value <= 0 || item.ThumbnailCropHeight.Value <= 0)
+        {
+            return false;
+        }
+
+        crop.X = item.ThumbnailCropX.Value;
+        crop.Y = item.ThumbnailCropY.Value;
+        crop.Width = item.ThumbnailCropWidth.Value;
+        crop.Height = item.ThumbnailCropHeight.Value;
+        return true;
+    }
+
+    private static async Task CreateCroppedThumbnailAsync(string spriteSheetPath, string destination,
+        DualView.Shared.Models.RemoteThumbnailCrop crop, CancellationToken cancellationToken)
+    {
+        using var images = new MagickImageCollection();
+        await using (var input = File.OpenRead(spriteSheetPath))
+        {
+            await images.ReadAsync(input, cancellationToken);
+        }
+
+        if (images.Count == 0)
+            throw new InvalidOperationException("Downloaded sprite sheet contains no image frames");
+
+        images.Coalesce();
+        foreach (var image in images)
+        {
+            image.Crop(new MagickGeometry(crop.X, crop.Y, (uint)crop.Width, (uint)crop.Height));
+            image.AutoOrient();
+            MediaProcessingService.ResizeWithDivisibleByTwoDimensions(image);
+            image.Strip();
+        }
+
+        await images.WriteAsync(destination, MagickFormat.WebP, cancellationToken);
     }
 
     private static async Task ResizeThumbnailAsync(string path, CancellationToken cancellationToken)

@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using AngleSharp;
+using AngleSharp.Css.Parser;
 using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using Backend.Models;
@@ -17,7 +18,8 @@ namespace Backend.Plugins;
 /// </summary>
 public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGalleryNameFilter
 {
-    private static Regex grabCssUrl = new Regex(@"url\((.*)\)", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+    private static readonly Regex GrabCssUrl = new(@"url\([""']?(.*?)[""']?\)", RegexOptions.Compiled,
+        TimeSpan.FromSeconds(1));
 
     protected readonly ILogger Logger;
 
@@ -150,7 +152,7 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                 result.Content.Add(new RemoteDownloadRequest
                 {
                     ImageUrl = download,
-                    ThumbnailUrl = downloadUrls.Count == 1 ? request.ThumbnailUrl : null,
+                    Thumbnail = downloadUrls.Count == 1 ? request.Thumbnail : null,
                     Referrer = request.HtmlUrl,
                     PageUrl = request.HtmlUrl,
                     CanonicalUrl = ConvertToCanonicalUrl(download),
@@ -194,7 +196,7 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                         // Gallery pages link to the items, and those can be represented by thumbnails. Content pages
                         // can also link to other content pages, so we basically always want to try to detect a
                         // thumbnail for the link here.
-                        subpage.ThumbnailUrl = GetThumbnailUrlForContentPage(link);
+                        subpage.Thumbnail = GetThumbnailForContentPage(link);
 
                         result.Subpages.Add(subpage);
                         continue;
@@ -205,7 +207,7 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                         result.Content.Add(new RemoteDownloadRequest
                         {
                             ImageUrl = link.Href,
-                            ThumbnailUrl = GetThumbnailUrlForContentPage(link),
+                            Thumbnail = GetThumbnailForContentPage(link),
                             Referrer = request.HtmlUrl,
                             CanonicalUrl = ConvertToCanonicalUrl(link.Href),
                             ImpersonationHeaders = request.ImpersonationHeaders.CloneShallow(),
@@ -258,20 +260,119 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
         // More advanced case. Find any child element with a background set to an URL that looks like media
         foreach (var descendant in contentPageLink.Descendants<IHtmlElement>())
         {
-            if (descendant.GetAttribute("style")?.Contains("url") == true)
-            {
-                var match = grabCssUrl.Match(descendant.GetAttribute("style") ?? "");
-                if (match.Success)
-                {
-                    var url = match.Groups[1].Value;
+            var style = descendant.GetAttribute("style");
+            if (string.IsNullOrWhiteSpace(style) || !style.Contains("url", StringComparison.OrdinalIgnoreCase))
+                continue;
 
-                    if (MediaPreviewLink.IsMatch(url))
-                        return url;
+            var declaration = new CssParser().ParseDeclaration(style);
+            if (declaration == null)
+                continue;
+
+            var match = GrabCssUrl.Match(declaration.GetPropertyValue("background-image"));
+            if (match.Success)
+            {
+                var url = match.Groups[1].Value;
+
+                if (MediaPreviewLink.IsMatch(url))
+                {
+                    return url;
                 }
             }
         }
 
         return null;
+    }
+
+    /// <summary>
+    ///   Gets the thumbnail URL and optional sprite-sheet crop for a content page link.
+    /// </summary>
+    /// <param name="contentPageLink">The gallery link that points to a content page.</param>
+    /// <returns>The thumbnail information, or null if the link has no thumbnail.</returns>
+    protected virtual RemoteThumbnailInfo? GetThumbnailForContentPage(IHtmlAnchorElement contentPageLink)
+    {
+        var thumbnailUrl = GetThumbnailUrlForContentPage(contentPageLink);
+        if (string.IsNullOrWhiteSpace(thumbnailUrl))
+            return null;
+
+        // Postprocessing in case background uses cropping
+        foreach (var descendant in contentPageLink.Descendants<IHtmlElement>())
+        {
+            var style = descendant.GetAttribute("style");
+            if (string.IsNullOrWhiteSpace(style))
+                continue;
+
+            var declaration = new CssParser().ParseDeclaration(style);
+            if (declaration == null)
+                continue;
+
+            var backgroundImage = declaration.GetPropertyValue("background-image") ?? string.Empty;
+            var backgroundMatch = GrabCssUrl.Match(backgroundImage);
+            if (!backgroundMatch.Success || backgroundMatch.Groups[1].Value != thumbnailUrl)
+                continue;
+
+            if (TryGetPixelValue(declaration.GetPropertyValue("width"), out var width) &&
+                TryGetPixelValue(declaration.GetPropertyValue("height"), out var height) &&
+                TryGetBackgroundPosition(declaration.GetPropertyValue("background-position-x"),
+                    declaration.GetPropertyValue("background-position-y"), out var x, out var y))
+            {
+                return new RemoteThumbnailInfo(thumbnailUrl, new RemoteThumbnailCrop
+                {
+                    X = x,
+                    Y = y,
+                    Width = width,
+                    Height = height,
+                });
+            }
+
+            break;
+        }
+
+        return new RemoteThumbnailInfo(thumbnailUrl);
+    }
+
+    private static bool TryGetPixelValue(string? value, out int pixels)
+    {
+        pixels = 0;
+        value ??= string.Empty;
+        value = value.Trim();
+        if (value == "0")
+            return true;
+
+        return value.EndsWith("px", StringComparison.OrdinalIgnoreCase) &&
+               int.TryParse(value.AsSpan(0, value.Length - 2), out pixels) && pixels > 0;
+    }
+
+    private static bool TryGetBackgroundPosition(string? horizontalPosition, string? verticalPosition,
+        out int x, out int y)
+    {
+        x = 0;
+        y = 0;
+        return TryParsePosition(horizontalPosition, true, out x) &&
+               TryParsePosition(verticalPosition, false, out y);
+    }
+
+    private static bool TryParsePosition(string? value, bool horizontal, out int position)
+    {
+        position = 0;
+        value ??= string.Empty;
+        value = value.Trim();
+        if ((horizontal && value.Equals("left", StringComparison.OrdinalIgnoreCase)) ||
+            (!horizontal && value.Equals("top", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (int.TryParse(value, out var unitlessOffset) && unitlessOffset == 0)
+            return true;
+
+        if (!value.EndsWith("px", StringComparison.OrdinalIgnoreCase) ||
+            !int.TryParse(value.AsSpan(0, value.Length - 2), out var offset))
+        {
+            return false;
+        }
+
+        position = -offset;
+        return position >= 0;
     }
 
     /// <summary>
