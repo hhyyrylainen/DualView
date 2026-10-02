@@ -170,14 +170,14 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
             case UrlInformation.GalleryPage:
             case UrlInformation.GalleryPageContent:
             {
-                // TODO: tags for gallery page
+                var tags = await GetTagsForGalleryPage(document, request);
 
                 var result = new PageScanResult
                 {
                     GalleryInfo = new DualView.Shared.Models.DTO.DownloadGalleryDTO(request.HtmlUrl)
                     {
-                        // TODO: title filtering
-                        GalleryName = document.Title,
+                        GalleryName = FilterGalleryName(document.Title),
+                        TagsString = tags.Count == 0 ? null : string.Join(", ", tags),
                     },
                 };
 
