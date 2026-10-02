@@ -3078,6 +3078,13 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .ToListAsync();
     }
 
+    public Task<int> DeleteScannedCollectionsOlderThanAsync(DateTime cutoff, CancellationToken cancellationToken)
+    {
+        return dbContext.ScannedCollections
+            .Where(collection => collection.UpdatedAt < cutoff)
+            .ExecuteDeleteAsync(cancellationToken);
+    }
+
     public async Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id)
     {
         return await dbContext.ScannedCollections

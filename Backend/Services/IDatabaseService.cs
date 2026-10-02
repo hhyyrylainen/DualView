@@ -156,6 +156,7 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<ScannedCollection?> GetScannedCollectionByUrlAsync(string url);
     public Task<ScannedCollection?> GetScannedCollectionAsync(long id);
     public Task<List<ScannedCollection>> GetScannedCollectionsAsync();
+    public Task<int> DeleteScannedCollectionsOlderThanAsync(DateTime cutoff, CancellationToken cancellationToken);
     public Task<ScannedCollectionStatusDTO?> GetScannedCollectionStatusAsync(long id);
     public Task CreateScannedCollectionAsync(ScannedCollection collection);
     public Task SaveScannedCollectionAsync(ScannedCollection collection);

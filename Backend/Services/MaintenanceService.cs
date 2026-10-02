@@ -722,29 +722,36 @@ public class MaintenanceService : IMaintenanceService
 
         public override TimeSpan Interval => TimeSpan.FromDays(1);
 
-        protected override Task<bool> RunInternal(MaintenanceJobRecord jobRecord, IDatabaseService databaseService,
+        protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord, IDatabaseService databaseService,
             IServiceScope scope, CancellationToken cancellationToken)
         {
-            var remoteMedia = Path.Combine(scope.ServiceProvider.GetRequiredService<IDataFolderService>().GetDataFolderPath(),
-                "remoteMedia");
-            if (!Directory.Exists(remoteMedia))
-                return Task.FromResult(true);
-
+            var dataFolder = scope.ServiceProvider.GetRequiredService<IDataFolderService>().GetDataFolderPath();
             var cutoff = DateTime.UtcNow - RemoteMediaTime;
             var deleted = 0;
-            foreach (var file in Directory.EnumerateFiles(remoteMedia, "*", SearchOption.AllDirectories))
+            foreach (var folderName in new[] { "remoteMedia", "remoteThumbnails" })
             {
-                if (cancellationToken.IsCancellationRequested)
-                    break;
-
-                if (File.GetLastWriteTimeUtc(file) >= cutoff)
+                var folder = Path.Combine(dataFolder, folderName);
+                if (!Directory.Exists(folder))
                     continue;
 
-                File.Delete(file);
-                ++deleted;
+                foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                        break;
+
+                    if (File.GetLastWriteTimeUtc(file) >= cutoff)
+                        continue;
+
+                    File.Delete(file);
+                    ++deleted;
+                }
             }
-            jobRecord.StatusMessage = $"Deleted {deleted} old remote media files";
-            return Task.FromResult(true);
+
+            var collectionsDeleted = await databaseService.DeleteScannedCollectionsOlderThanAsync(cutoff,
+                cancellationToken);
+
+            jobRecord.StatusMessage = $"Deleted {deleted} old remote files and {collectionsDeleted} inactive remote scans";
+            return true;
         }
     }
 
