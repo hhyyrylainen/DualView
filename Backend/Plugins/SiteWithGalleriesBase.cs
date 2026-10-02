@@ -5,6 +5,7 @@ using AngleSharp.Dom;
 using AngleSharp.Html.Dom;
 using Backend.Models;
 using DualView.Shared.Models;
+using DualView.Shared.Models.Enums;
 using DualView.Shared.Utils;
 using Microsoft.Extensions.Logging;
 
@@ -227,6 +228,19 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                     }
                 }
 
+                // For now, assume gallery pages have no useful videos
+                /*foreach (var videoUrl in GetVideoUrlsFromPage(document))
+                {
+                    result.Content.Add(new RemoteDownloadRequest
+                    {
+                        ImageUrl = videoUrl,
+                        Referrer = request.HtmlUrl,
+                        CanonicalUrl = ConvertToCanonicalUrl(videoUrl),
+                        ImpersonationHeaders = request.ImpersonationHeaders.CloneShallow(),
+                        Cookies = request.Cookies.CloneShallow(),
+                    });
+                }*/
+
                 return result;
             }
 
@@ -393,6 +407,13 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
     /// <returns>Distinct matching media URLs in document order, or an empty list if no URL matches.</returns>
     protected virtual List<string> GetDownloadUrlsFromPage(IDocument document)
     {
+        var videoUrls = GetVideoUrlsFromPage(document);
+        if (videoUrls.Count > 0)
+        {
+            // TODO: should we filter video URLs with a regex here?
+            return videoUrls;
+        }
+
         var anchorUrls = document.QuerySelectorAll<IHtmlAnchorElement>("a").Select(link => link.Href);
         var imageUrls = document.QuerySelectorAll<IHtmlImageElement>("img").Select(image => image.Source);
         var validAnchorUrls = anchorUrls
@@ -437,6 +458,61 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
         }
 
         return new List<string>();
+    }
+
+    private static List<string> GetVideoUrlsFromPage(IDocument document)
+    {
+        var videoUrls = new List<string>();
+        foreach (var video in document.QuerySelectorAll<IHtmlVideoElement>("video"))
+        {
+            var videoUrl = !string.IsNullOrWhiteSpace(video.Source) && IsSupportedVideoSource(video.Source, null)
+                ? video.Source
+                : video.QuerySelectorAll<IHtmlSourceElement>("source")
+                    .Where(source => !string.IsNullOrWhiteSpace(source.Source))
+                    .Where(source => IsSupportedVideoSource(source.Source, source.Type))
+                    .Select(source => source.Source)
+                    .FirstOrDefault();
+
+            if (!string.IsNullOrWhiteSpace(videoUrl))
+                videoUrls.Add(videoUrl);
+        }
+
+        return videoUrls.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private static bool IsSupportedVideoSource(string? url, string? mimeType)
+    {
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out var parsedUrl) ||
+            parsedUrl.Scheme is not ("http" or "https"))
+        {
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(mimeType))
+        {
+            var normalizedMimeType = mimeType.Split(';', 2)[0].Trim().ToLowerInvariant();
+            try
+            {
+                var mediaType = MediaTypeExtensions.TypeFromMime(normalizedMimeType);
+                if (mediaType is MediaType.Mp4 or MediaType.Mkv or MediaType.Webm)
+                    return true;
+            }
+            catch (ArgumentException)
+            {
+                // Fall back to the source URL extension when the media type is missing or unsupported.
+            }
+        }
+
+        try
+        {
+            var extension = Path.GetExtension(parsedUrl.AbsolutePath).ToLowerInvariant();
+            var mediaType = MediaTypeExtensions.TypeFromExtension(extension);
+            return mediaType is MediaType.Mp4 or MediaType.Mkv or MediaType.Webm;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
     }
 
     /// <summary>
