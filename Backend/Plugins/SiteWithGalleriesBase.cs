@@ -17,6 +17,8 @@ namespace Backend.Plugins;
 /// </summary>
 public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGalleryNameFilter
 {
+    private static Regex grabCssUrl = new Regex(@"url\((.*)\)", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
+
     protected readonly ILogger Logger;
 
     protected SiteWithGalleriesBase(ILogger logger)
@@ -37,8 +39,6 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
     ///   Regex that matches preview media links. (may also match full-size media links)
     /// </summary>
     protected abstract Regex MediaPreviewLink { get; }
-
-    // TODO: regex for gallery thumbnails to allow downloading those for more efficiency of browsing
 
     /// <summary>
     ///   Matches a page of a gallery on this site. Should have capture groups for the gallery ID and page number.
@@ -191,8 +191,10 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                         var subpage = request.OverrideForScan(link.Href);
                         subpage.Referrer = request.HtmlUrl;
 
-                        if (ContentPageRegex.IsMatch(link.Href))
-                            subpage.ThumbnailUrl = GetThumbnailUrlForContentPage(link);
+                        // Gallery pages link to the items, and those can be represented by thumbnails. Content pages
+                        // can also link to other content pages, so we basically always want to try to detect a
+                        // thumbnail for the link here.
+                        subpage.ThumbnailUrl = GetThumbnailUrlForContentPage(link);
 
                         result.Subpages.Add(subpage);
                         continue;
@@ -200,11 +202,10 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
 
                     if (FullSizeMediaLink.IsMatch(link.Href))
                     {
-                        var thumbnail = link.QuerySelector<IHtmlImageElement>("img")?.Source;
                         result.Content.Add(new RemoteDownloadRequest
                         {
                             ImageUrl = link.Href,
-                            ThumbnailUrl = string.IsNullOrWhiteSpace(thumbnail) ? null : thumbnail,
+                            ThumbnailUrl = GetThumbnailUrlForContentPage(link),
                             Referrer = request.HtmlUrl,
                             CanonicalUrl = ConvertToCanonicalUrl(link.Href),
                             ImpersonationHeaders = request.ImpersonationHeaders.CloneShallow(),
@@ -248,7 +249,29 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
     protected virtual string? GetThumbnailUrlForContentPage(IHtmlAnchorElement contentPageLink)
     {
         var thumbnailUrl = contentPageLink.QuerySelector<IHtmlImageElement>("img")?.Source;
-        return string.IsNullOrWhiteSpace(thumbnailUrl) ? null : thumbnailUrl;
+
+        if (!string.IsNullOrWhiteSpace(thumbnailUrl))
+        {
+            return thumbnailUrl;
+        }
+
+        // More advanced case. Find any child element with a background set to an URL that looks like media
+        foreach (var descendant in contentPageLink.Descendants<IHtmlElement>())
+        {
+            if (descendant.GetAttribute("style")?.Contains("url") == true)
+            {
+                var match = grabCssUrl.Match(descendant.GetAttribute("style") ?? "");
+                if (match.Success)
+                {
+                    var url = match.Groups[1].Value;
+
+                    if (MediaPreviewLink.IsMatch(url))
+                        return url;
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
