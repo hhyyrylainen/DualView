@@ -128,6 +128,12 @@ public class FoundMedia : UpdateableModel
     [MaxLength(4096)]
     public string? ThumbnailUrl { get; set; }
 
+    // If these are set, the thumbnail is a spritesheet that needs cropping
+    public int? ThumbnailCropX { get; set; }
+    public int? ThumbnailCropY { get; set; }
+    public int? ThumbnailCropWidth { get; set; }
+    public int? ThumbnailCropHeight { get; set; }
+
     [MaxLength(512)]
     public string? OverrideName { get; set; }
 

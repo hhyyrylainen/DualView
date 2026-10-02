@@ -294,6 +294,18 @@ namespace Backend.Migrations
                     b.Property<bool>("Selected")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("ThumbnailCropHeight")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ThumbnailCropWidth")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ThumbnailCropX")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("ThumbnailCropY")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("ThumbnailUrl")
                         .HasMaxLength(4096)
                         .HasColumnType("TEXT");
