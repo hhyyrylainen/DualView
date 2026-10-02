@@ -24,9 +24,13 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
     private readonly IRemoteGalleryMediaService remoteGalleryMediaService;
     private readonly IAppEvents appEvents;
     private readonly Channel<long> galleryQueue = Channel.CreateUnbounded<long>();
+    private readonly Channel<GalleryAcceptRequest> galleryAcceptQueue = Channel.CreateUnbounded<GalleryAcceptRequest>();
     private readonly CancellationTokenSource shutdownCancellationSource = new();
+    private readonly HashSet<long> acceptingGalleryIds = new();
+    private readonly Lock acceptingGalleryLock = new();
 
     private readonly Task workerTask;
+    private readonly Task acceptWorkerTask;
     private int stopped;
 
     public RemoteGalleryScannerService(IServiceScopeFactory serviceScopeFactory, IRemoteScanService remoteScanService,
@@ -47,6 +51,8 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             await PauseInterruptedScansAsync();
             await ProcessQueueAsync();
         });
+
+        acceptWorkerTask = Task.Run(ProcessAcceptQueueAsync);
     }
 
     public async Task<long> CreateGalleryAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
@@ -123,63 +129,33 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
     public async Task AcceptGalleryAsync(long galleryId, string name, IReadOnlyCollection<long>? mediaIds,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         name = name.Trim();
         if (name.Length == 0)
             throw new ArgumentException("A target import section name is required", nameof(name));
 
         using var scope = serviceScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
-        var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
-        var tagParser = scope.ServiceProvider.GetRequiredService<ITagParser>();
-        var missingTagService = scope.ServiceProvider.GetRequiredService<IMissingTagService>();
-        var gallery = await database.GetScannedCollectionAsync(galleryId) ??
-                      throw new ArgumentException("Gallery not found", nameof(galleryId));
-        var uploadSection = await database.GetOrCreateUploadSectionAsync(name);
+        _ = await database.GetScannedCollectionAsync(galleryId) ??
+            throw new ArgumentException("Gallery not found", nameof(galleryId));
 
-        foreach (var tag in gallery.UnrecognizedTags.Split(',',
-                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        lock (acceptingGalleryLock)
         {
-            var parsedTag = await tagParser.ParseTag(tag);
-            if (parsedTag == null)
-            {
-                logger.LogWarning("Could not parse scanned gallery tag '{Tag}' for gallery {GalleryId}", tag,
-                    galleryId);
-                await missingTagService.ReportTagAsync(tag, MissingTagTarget.UploadSection, uploadSection.Id);
-                continue;
-            }
-
-            await database.AddParsedAppliedTagToUploadSectionAsync(uploadSection.Id, parsedTag.GetDTO());
+            if (!acceptingGalleryIds.Add(galleryId))
+                return;
         }
 
-        var selected = gallery.FoundMedia
-            .Where(item => mediaIds?.Contains(item.Id) ?? item.Selected)
-            .ToList();
-        foreach (var item in selected)
+        if (galleryAcceptQueue.Writer.TryWrite(new GalleryAcceptRequest(galleryId, name, mediaIds?.ToArray())))
         {
-            var path = await remoteGalleryMediaService.GetFullMediaAsync(item.Id, cancellationToken);
-            await using var stream = File.OpenRead(path);
-            var media = await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
-
-            var parsedTags = new List<AppliedTagDTO>();
-            foreach (var tag in item.UnparsedTags)
-            {
-                var parsedTag = await tagParser.ParseTag(tag);
-                if (parsedTag == null)
-                {
-                    await missingTagService.ReportTagAsync(tag, MissingTagTarget.MediaFile, media.Id);
-                    continue;
-                }
-
-                parsedTags.Add(parsedTag.GetDTO());
-            }
-
-            if (parsedTags.Count > 0)
-                await database.AddParsedAppliedTagsToMediaAsync([media.Id], parsedTags);
-
-            gallery.FoundMedia.Remove(item);
-            await database.SaveScannedCollectionAsync(gallery);
-            await NotifyScannedCollectionUpdatedAsync(galleryId);
+            return;
         }
+
+        lock (acceptingGalleryLock)
+        {
+            acceptingGalleryIds.Remove(galleryId);
+        }
+
+        throw new InvalidOperationException("The scanned gallery accept queue is stopping");
     }
 
     public async Task StopAsync(TimeSpan timeout)
@@ -188,10 +164,11 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             return;
 
         galleryQueue.Writer.TryComplete();
+        galleryAcceptQueue.Writer.TryComplete();
         shutdownCancellationSource.CancelAfter(timeout);
         try
         {
-            await workerTask.WaitAsync(timeout + TimeSpan.FromSeconds(1));
+            await Task.WhenAll(workerTask, acceptWorkerTask).WaitAsync(timeout + TimeSpan.FromSeconds(1));
         }
         catch (OperationCanceledException)
         {
@@ -244,6 +221,91 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             {
                 logger.LogError(e, "Remote gallery scanner failed for gallery {GalleryId}", galleryId);
             }
+        }
+    }
+
+    private async Task ProcessAcceptQueueAsync()
+    {
+        await foreach (var request in galleryAcceptQueue.Reader.ReadAllAsync(shutdownCancellationSource.Token))
+        {
+            try
+            {
+                await ProcessAcceptGalleryAsync(request.GalleryId, request.Name, request.MediaIds,
+                    shutdownCancellationSource.Token);
+            }
+            catch (OperationCanceledException) when (shutdownCancellationSource.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Accepting scanned gallery {GalleryId} failed", request.GalleryId);
+            }
+            finally
+            {
+                lock (acceptingGalleryLock)
+                {
+                    acceptingGalleryIds.Remove(request.GalleryId);
+                }
+            }
+        }
+    }
+
+    private async Task ProcessAcceptGalleryAsync(long galleryId, string name, IReadOnlyCollection<long>? mediaIds,
+        CancellationToken cancellationToken)
+    {
+        using var scope = serviceScopeFactory.CreateScope();
+        var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
+        var mediaImportHandler = scope.ServiceProvider.GetRequiredService<IMediaImportHandler>();
+        var tagParser = scope.ServiceProvider.GetRequiredService<ITagParser>();
+        var missingTagService = scope.ServiceProvider.GetRequiredService<IMissingTagService>();
+        var gallery = await database.GetScannedCollectionAsync(galleryId) ??
+                      throw new ArgumentException("Gallery not found", nameof(galleryId));
+        var uploadSection = await database.GetOrCreateUploadSectionAsync(name);
+
+        foreach (var tag in gallery.UnrecognizedTags.Split(',',
+                     StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var parsedTag = await tagParser.ParseTag(tag);
+            if (parsedTag == null)
+            {
+                logger.LogWarning("Could not parse scanned gallery tag '{Tag}' for gallery {GalleryId}", tag,
+                    galleryId);
+                await missingTagService.ReportTagAsync(tag, MissingTagTarget.UploadSection, uploadSection.Id);
+                continue;
+            }
+
+            await database.AddParsedAppliedTagToUploadSectionAsync(uploadSection.Id, parsedTag.GetDTO());
+        }
+
+        var selected = gallery.FoundMedia
+            .Where(item => mediaIds?.Contains(item.Id) ?? item.Selected)
+            .ToList();
+        foreach (var item in selected)
+        {
+            var path = await remoteGalleryMediaService.GetFullMediaAsync(item.Id, cancellationToken);
+            await using var stream = File.OpenRead(path);
+            var media = await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
+
+            var parsedTags = new List<AppliedTagDTO>();
+            foreach (var tag in item.UnparsedTags)
+            {
+                var parsedTag = await tagParser.ParseTag(tag);
+                if (parsedTag == null)
+                {
+                    await missingTagService.ReportTagAsync(tag, MissingTagTarget.MediaFile, media.Id);
+                    continue;
+                }
+
+                parsedTags.Add(parsedTag.GetDTO());
+            }
+
+            if (parsedTags.Count > 0)
+                await database.AddParsedAppliedTagsToMediaAsync([media.Id], parsedTags);
+
+            gallery.FoundMedia.Remove(item);
+            await database.SaveScannedCollectionAsync(gallery);
+            await NotifyScannedCollectionUpdatedAsync(galleryId);
         }
     }
 
@@ -482,4 +544,6 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         public List<RemoteDownloadRequest> PendingPages { get; set; } = new();
         public HashSet<string> SeenUrls { get; set; } = new(StringComparer.Ordinal);
     }
+
+    private sealed record GalleryAcceptRequest(long GalleryId, string Name, long[]? MediaIds);
 }

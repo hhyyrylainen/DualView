@@ -101,8 +101,8 @@ public sealed class ScannedCollectionController : Controller
     {
         try
         {
-            await scannerService.AcceptGalleryAsync(id, request.Name, request.MediaIds, CancellationToken.None);
-            return Ok();
+            await scannerService.AcceptGalleryAsync(id, request.Name, request.MediaIds, HttpContext.RequestAborted);
+            return Accepted();
         }
         catch (ArgumentException ex)
         {

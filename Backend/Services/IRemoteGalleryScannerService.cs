@@ -26,6 +26,9 @@ public interface IRemoteGalleryScannerService
     /// </summary>
     public Task DeleteGalleryAsync(long galleryId, CancellationToken cancellationToken);
 
+    /// <summary>
+    ///   Validates and queues a gallery acceptance for background processing.
+    /// </summary>
     public Task AcceptGalleryAsync(long galleryId, string name, IReadOnlyCollection<long>? mediaIds,
         CancellationToken cancellationToken);
 
