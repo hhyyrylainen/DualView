@@ -71,7 +71,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
         Directory.CreateDirectory(directory);
 
         var extension = GetSafeExtension(sourceUrl, item.MediaType?.ExtensionFromType() ?? ".jpg");
-        var destination = Path.Combine(directory, thumbnail ? "thumbnail.jpg" : "content" + extension);
+        var destination = Path.Combine(directory, thumbnail ? "thumbnail.webp" : "content" + extension);
 
         var settings = await database.GetAppSettingsAsync();
 
@@ -183,7 +183,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
             image.Strip();
         }
 
-        await images.WriteAsync(path, MagickFormat.Jpeg, cancellationToken);
+        await images.WriteAsync(path, MagickFormat.WebP, cancellationToken);
     }
 
     private static Dictionary<string, string> DeserializeDictionary(string? value)
