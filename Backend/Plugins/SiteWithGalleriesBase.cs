@@ -34,6 +34,8 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
 
     public virtual bool ScanContentPagesFirst => true;
 
+    public abstract int DefaultFirstPageNumber { get; }
+
     /// <summary>
     ///   Regex that matches only full-size media links.
     /// </summary>
@@ -117,6 +119,11 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
         var match = GalleryPageLink.Match(url);
         if (match.Success)
         {
+            if (string.IsNullOrEmpty(match.Groups[2].Value))
+            {
+                return SiteBaseUrl + "gallerySynth/" + match.Groups[1].Value + "&page=" + DefaultFirstPageNumber;
+            }
+
             return SiteBaseUrl + "gallerySynth/" + match.Groups[1].Value + "&page=" + match.Groups[2].Value;
         }
 
