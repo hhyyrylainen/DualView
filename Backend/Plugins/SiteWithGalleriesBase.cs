@@ -145,10 +145,12 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin
             {
                 var tags = await GetTagsForContentPage(document, request);
                 var download = GetDownloadUrlFromPage(document);
+                var downloadUrls = GetDownloadUrlsFromPage(document);
                 var result = new PageScanResult();
                 result.Content.Add(new RemoteDownloadRequest
                 {
                     ImageUrl = download,
+                    ThumbnailUrl = downloadUrls.Count == 1 ? request.ThumbnailUrl : null,
                     Referrer = request.HtmlUrl,
                     PageUrl = request.HtmlUrl,
                     CanonicalUrl = ConvertToCanonicalUrl(download),
@@ -189,7 +191,8 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin
                         var subpage = request.OverrideForScan(link.Href);
                         subpage.Referrer = request.HtmlUrl;
 
-                        // TODO: thumbnail grabbing
+                        if (ContentPageRegex.IsMatch(link.Href))
+                            subpage.ThumbnailUrl = GetThumbnailUrlForContentPage(link);
 
                         result.Subpages.Add(subpage);
                         continue;
@@ -233,55 +236,72 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin
 
     protected virtual string GetDownloadUrlFromPage(IDocument document)
     {
-        foreach (var tagLink in document.QuerySelectorAll<IHtmlAnchorElement>("a"))
-        {
-            if (string.IsNullOrEmpty(tagLink.Href))
-                continue;
+        return GetDownloadUrlsFromPage(document).FirstOrDefault() ??
+               throw new InvalidOperationException("Cannot find download link");
+    }
 
-            var match = FullSizeMediaLink.Match(tagLink.Href);
-            if (match.Success)
-                return tagLink.Href;
-        }
+    /// <summary>
+    ///   Gets the thumbnail associated with a content page link in a gallery listing.
+    /// </summary>
+    /// <param name="contentPageLink">The gallery link that points to a content page.</param>
+    /// <returns>The thumbnail URL, or null if the link has no thumbnail.</returns>
+    protected virtual string? GetThumbnailUrlForContentPage(IHtmlAnchorElement contentPageLink)
+    {
+        var thumbnailUrl = contentPageLink.QuerySelector<IHtmlImageElement>("img")?.Source;
+        return string.IsNullOrWhiteSpace(thumbnailUrl) ? null : thumbnailUrl;
+    }
 
-        // If no full size link, use fallback
+    /// <summary>
+    ///   Finds the media URLs on a content page using the same priority as <see cref="GetDownloadUrlFromPage"/>.
+    /// </summary>
+    /// <param name="document">The parsed content page.</param>
+    /// <returns>Distinct matching media URLs in document order, or an empty list if no URL matches.</returns>
+    protected virtual List<string> GetDownloadUrlsFromPage(IDocument document)
+    {
+        var anchorUrls = document.QuerySelectorAll<IHtmlAnchorElement>("a").Select(link => link.Href);
+        var imageUrls = document.QuerySelectorAll<IHtmlImageElement>("img").Select(image => image.Source);
+        var validAnchorUrls = anchorUrls
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .ToList();
+        var validImageUrls = imageUrls.OfType<string>()
+            .Where(url => !string.IsNullOrWhiteSpace(url))
+            .ToList();
+
+        var fullSizeAnchorUrls = validAnchorUrls
+            .Where(url => FullSizeMediaLink.IsMatch(url))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (fullSizeAnchorUrls.Count > 0)
+            return fullSizeAnchorUrls;
+
         if (AllowFallbackSmallImage)
         {
-            foreach (var tagLink in document.QuerySelectorAll<IHtmlAnchorElement>("a"))
-            {
-                if (string.IsNullOrEmpty(tagLink.Href))
-                    continue;
-
-                var match = MediaPreviewLink.Match(tagLink.Href);
-                if (match.Success)
-                    return tagLink.Href;
-            }
+            var previewAnchorUrls = validAnchorUrls
+                .Where(url => MediaPreviewLink.IsMatch(url))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (previewAnchorUrls.Count > 0)
+                return previewAnchorUrls;
         }
 
-        // Then scan image elements on the page
-        foreach (var tagLink in document.QuerySelectorAll<IHtmlImageElement>("img"))
-        {
-            if (string.IsNullOrEmpty(tagLink.Source))
-                continue;
-
-            var match = FullSizeMediaLink.Match(tagLink.Source);
-            if (match.Success)
-                return tagLink.Source;
-        }
+        var fullSizeImageUrls = validImageUrls
+            .Where(url => FullSizeMediaLink.IsMatch(url))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (fullSizeImageUrls.Count > 0)
+            return fullSizeImageUrls;
 
         if (AllowFallbackSmallImage)
         {
-            foreach (var tagLink in document.QuerySelectorAll<IHtmlImageElement>("img"))
-            {
-                if (string.IsNullOrEmpty(tagLink.Source))
-                    continue;
-
-                var match = MediaPreviewLink.Match(tagLink.Source);
-                if (match.Success)
-                    return tagLink.Source;
-            }
+            var previewImageUrls = validImageUrls
+                .Where(url => MediaPreviewLink.IsMatch(url))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            if (previewImageUrls.Count > 0)
+                return previewImageUrls;
         }
 
-        throw new InvalidOperationException("Cannot find download link");
+        return new List<string>();
     }
 
     /// <summary>
