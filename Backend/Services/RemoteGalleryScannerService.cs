@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using Backend.Models;
 using Backend.Plugins;
 using DualView.Shared.Models;
+using DualView.Shared.Models.DTO;
 using DualView.Shared.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -157,7 +158,23 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         {
             var path = await remoteGalleryMediaService.GetFullMediaAsync(item.Id, cancellationToken);
             await using var stream = File.OpenRead(path);
-            await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
+            var media = await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
+
+            var parsedTags = new List<AppliedTagDTO>();
+            foreach (var tag in item.UnparsedTags)
+            {
+                var parsedTag = await tagParser.ParseTag(tag);
+                if (parsedTag == null)
+                {
+                    await missingTagService.ReportTagAsync(tag, MissingTagTarget.MediaFile, media.Id);
+                    continue;
+                }
+
+                parsedTags.Add(parsedTag.GetDTO());
+            }
+
+            if (parsedTags.Count > 0)
+                await database.AddParsedAppliedTagsToMediaAsync([media.Id], parsedTags);
 
             gallery.FoundMedia.Remove(item);
             await database.SaveScannedCollectionAsync(gallery);
@@ -318,6 +335,7 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
                     ThumbnailCropY = content.Thumbnail?.Crop?.Y,
                     ThumbnailCropWidth = content.Thumbnail?.Crop?.Width,
                     ThumbnailCropHeight = content.Thumbnail?.Crop?.Height,
+                    UnparsedTags = content.Tags.ToList(),
                     MediaType = content.MediaType ?? TryGetMediaType(content.ImageUrl),
                     Cookies = JsonSerializer.Serialize(content.Cookies),
                     ImpersonationHeaders = JsonSerializer.Serialize(content.ImpersonationHeaders),

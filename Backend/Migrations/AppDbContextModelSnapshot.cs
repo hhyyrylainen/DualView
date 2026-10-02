@@ -32,21 +32,6 @@ namespace Backend.Migrations
                     b.ToTable("CollectionAppliedTags", (string)null);
                 });
 
-            modelBuilder.Entity("AppliedTagFoundMedia", b =>
-                {
-                    b.Property<long>("AppliedTagsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<long>("FoundMediaId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("AppliedTagsId", "FoundMediaId");
-
-                    b.HasIndex("FoundMediaId");
-
-                    b.ToTable("FoundMediaAppliedTags", (string)null);
-                });
-
             modelBuilder.Entity("AppliedTagMediaFile", b =>
                 {
                     b.Property<long>("AppliedTagsId")
@@ -60,21 +45,6 @@ namespace Backend.Migrations
                     b.HasIndex("MediaFilesId");
 
                     b.ToTable("MediaFileAppliedTags", (string)null);
-                });
-
-            modelBuilder.Entity("AppliedTagScannedCollection", b =>
-                {
-                    b.Property<long>("AppliedTagsId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<long>("ScannedCollectionsId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("AppliedTagsId", "ScannedCollectionsId");
-
-                    b.HasIndex("ScannedCollectionsId");
-
-                    b.ToTable("ScannedCollectionAppliedTags", (string)null);
                 });
 
             modelBuilder.Entity("AppliedTagTagModifier", b =>
@@ -972,21 +942,6 @@ namespace Backend.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("AppliedTagFoundMedia", b =>
-                {
-                    b.HasOne("Backend.Models.AppliedTag", null)
-                        .WithMany()
-                        .HasForeignKey("AppliedTagsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Backend.Models.FoundMedia", null)
-                        .WithMany()
-                        .HasForeignKey("FoundMediaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("AppliedTagMediaFile", b =>
                 {
                     b.HasOne("Backend.Models.AppliedTag", null)
@@ -998,21 +953,6 @@ namespace Backend.Migrations
                     b.HasOne("Backend.Models.MediaFile", null)
                         .WithMany()
                         .HasForeignKey("MediaFilesId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("AppliedTagScannedCollection", b =>
-                {
-                    b.HasOne("Backend.Models.AppliedTag", null)
-                        .WithMany()
-                        .HasForeignKey("AppliedTagsId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Backend.Models.ScannedCollection", null)
-                        .WithMany()
-                        .HasForeignKey("ScannedCollectionsId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

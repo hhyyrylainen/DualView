@@ -50,8 +50,6 @@ public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollection
     [MaxLength(1000000)]
     public string ScannerState { get; set; } = string.Empty;
 
-    public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
-
     public ICollection<FoundMedia> FoundMedia { get; set; } = new List<FoundMedia>();
 
     public ScannedCollectionDTO GetDTO()
@@ -163,7 +161,8 @@ public class FoundMedia : UpdateableModel
     [MaxLength(1024)]
     public string? LocalFullFilePath { get; set; }
 
-    public ICollection<AppliedTag> AppliedTags { get; set; } = new List<AppliedTag>();
-
+    /// <summary>
+    ///   Raw tags discovered for this media, parsed and applied when the scan is accepted.
+    /// </summary>
     public List<string> UnparsedTags { get; set; } = new();
 }

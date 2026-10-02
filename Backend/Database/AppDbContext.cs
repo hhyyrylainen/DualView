@@ -211,10 +211,6 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(scannedCollection => scannedCollection.TargetFolderId)
                 .OnDelete(DeleteBehavior.Restrict);
-
-            builder.HasMany(scannedCollection => scannedCollection.AppliedTags)
-                .WithMany(appliedTag => appliedTag.ScannedCollections)
-                .UsingEntity(j => j.ToTable("ScannedCollectionAppliedTags"));
         });
 
         modelBuilder.Entity<FoundMedia>(builder =>
@@ -223,10 +219,6 @@ public class AppDbContext : DbContext
                 .WithMany(scannedCollection => scannedCollection.FoundMedia)
                 .HasForeignKey(foundMedia => foundMedia.ScannedCollectionId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            builder.HasMany(foundMedia => foundMedia.AppliedTags)
-                .WithMany(appliedTag => appliedTag.FoundMedia)
-                .UsingEntity(j => j.ToTable("FoundMediaAppliedTags"));
 
             var unparsedTagsComparer = new ValueComparer<List<string>>(
                 (left, right) => left == null ? right == null : right != null && left.SequenceEqual(right),

@@ -27,8 +27,6 @@ public class AppliedTag : IDTOProvider<AppliedTagDTO>
     public ICollection<MediaFile> MediaFiles { get; set; } = new List<MediaFile>();
     public ICollection<Collection> Collections { get; set; } = new List<Collection>();
     public ICollection<UploadSection> UploadSections { get; set; } = new List<UploadSection>();
-    public ICollection<ScannedCollection> ScannedCollections { get; set; } = new List<ScannedCollection>();
-    public ICollection<FoundMedia> FoundMedia { get; set; } = new List<FoundMedia>();
 
     public AppliedTagDTO GetDTO()
     {

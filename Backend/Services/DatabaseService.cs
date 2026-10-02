@@ -2254,8 +2254,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .Include(appliedTag => appliedTag.MediaFiles)
             .Include(appliedTag => appliedTag.Collections)
             .Include(appliedTag => appliedTag.UploadSections)
-            .Include(appliedTag => appliedTag.ScannedCollections)
-            .Include(appliedTag => appliedTag.FoundMedia)
             .AsSplitQuery()
             .ToListAsync();
         var targetAppliedTags = appliedTags.Where(appliedTag => appliedTag.TagId == targetTagId).ToList();
@@ -2277,8 +2275,6 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             MergeAppliedTagReferences(sourceAppliedTag.MediaFiles, targetAppliedTag.MediaFiles);
             MergeAppliedTagReferences(sourceAppliedTag.Collections, targetAppliedTag.Collections);
             MergeAppliedTagReferences(sourceAppliedTag.UploadSections, targetAppliedTag.UploadSections);
-            MergeAppliedTagReferences(sourceAppliedTag.ScannedCollections, targetAppliedTag.ScannedCollections);
-            MergeAppliedTagReferences(sourceAppliedTag.FoundMedia, targetAppliedTag.FoundMedia);
             dbContext.AppliedTags.Remove(sourceAppliedTag);
         }
 
@@ -2490,9 +2486,7 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
             .IgnoreQueryFilters()
             .Where(appliedTag => !appliedTag.MediaFiles.Any() &&
                                  !appliedTag.Collections.Any() &&
-                                 !appliedTag.UploadSections.Any() &&
-                                 !appliedTag.ScannedCollections.Any() &&
-                                 !appliedTag.FoundMedia.Any())
+                                 !appliedTag.UploadSections.Any())
             .ToListAsync();
 
         if (orphanedAppliedTags.Count == 0)
