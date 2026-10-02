@@ -50,6 +50,19 @@ public interface IRemoteDownloadPlugin : IPlugin
         CancellationToken cancellationToken);
 }
 
+/// <summary>
+///   Optional capability for plugins that filter gallery names before the initial scan completes.
+/// </summary>
+public interface IRemoteGalleryNameFilter
+{
+    /// <summary>
+    ///   Filters a gallery name supplied before the gallery page has been scanned.
+    /// </summary>
+    /// <param name="galleryName">The name supplied with the scan request.</param>
+    /// <returns>The filtered name, or null to leave the supplied name unchanged.</returns>
+    public string? FilterGalleryName(string? galleryName);
+}
+
 public interface IRemoteDownloadProvider
 {
     public Task<string> DownloadHtmlAsync(RemoteDownloadRequest request, CancellationToken cancellationToken);

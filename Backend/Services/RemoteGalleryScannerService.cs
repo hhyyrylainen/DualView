@@ -60,7 +60,10 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         if (existing != null)
             return existing.Id;
 
-        var gallery = new ScannedCollection(request.PageTitle)
+        var initialGalleryName = plugin is IRemoteGalleryNameFilter nameFilter
+            ? nameFilter.FilterGalleryName(request.PageTitle) ?? request.PageTitle
+            : request.PageTitle;
+        var gallery = new ScannedCollection(initialGalleryName)
         {
             GalleryUrl = canonicalUrl,
             CurrentlyScannedUrl = request.HtmlUrl,

@@ -15,7 +15,7 @@ namespace Backend.Plugins;
 ///   -> gallery page links eventually have content page links -> content pages have links to the full size images.
 ///   Note: this doesn't use the top level gallery metaphor as browsing over the galleries is not supported.
 /// </summary>
-public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin
+public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGalleryNameFilter
 {
     protected readonly ILogger Logger;
 
@@ -317,5 +317,27 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin
         RemoteDownloadRequest contentHtmlRequest)
     {
         return Task.FromResult(new List<string>());
+    }
+
+    /// <summary>
+    ///   Allows getting tags for a gallery page. By default, doesn't find any tags.
+    /// </summary>
+    /// <param name="document">Parsed HTML of the gallery page.</param>
+    /// <param name="galleryPageRequest">Request done for the gallery page.</param>
+    /// <returns>Tags list or an empty list.</returns>
+    protected virtual Task<List<string>> GetTagsForGalleryPage(IDocument document,
+        RemoteDownloadRequest galleryPageRequest)
+    {
+        return Task.FromResult(new List<string>());
+    }
+
+    /// <summary>
+    ///   Filters a gallery name extracted from a gallery page. By default, leaves the name unchanged.
+    /// </summary>
+    /// <param name="galleryName">The name extracted from the page.</param>
+    /// <returns>The filtered gallery name.</returns>
+    public virtual string? FilterGalleryName(string? galleryName)
+    {
+        return galleryName;
     }
 }
