@@ -19,6 +19,13 @@ public static class StringUtils
         return result;
     }
 
+    public static string RemovePrefixIfExists(this string str, string prefix)
+    {
+        if (str.StartsWith(prefix))
+            return str[prefix.Length..];
+        return str;
+    }
+
     [return: NotNullIfNotNull(nameof(str))]
     public static string? RemoveDuplicatePromptParts(string? str)
     {
