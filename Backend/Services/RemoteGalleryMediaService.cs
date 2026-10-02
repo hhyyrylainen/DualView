@@ -166,7 +166,13 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
     private static async Task ResizeThumbnailAsync(string path, CancellationToken cancellationToken)
     {
         using var images = new MagickImageCollection();
-        await images.ReadAsync(path, cancellationToken);
+
+        // Read any supported file type without caring about the format.
+        await using (var input = File.OpenRead(path))
+        {
+            await images.ReadAsync(input, cancellationToken);
+        }
+
         if (images.Count == 0)
             throw new InvalidOperationException("Downloaded thumbnail contains no image frames");
         images.Coalesce();
