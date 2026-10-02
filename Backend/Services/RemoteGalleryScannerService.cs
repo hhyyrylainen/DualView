@@ -369,7 +369,30 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
                 return;
             }
 
-            await SavePageResultAsync(database, galleryId, page, result, cancellationToken);
+            try
+            {
+                await SavePageResultAsync(database, galleryId, page, result, cancellationToken);
+            }
+            catch (Exception e) when (!cancellationToken.IsCancellationRequested)
+            {
+                await remoteScanService.RecordEventAsync(new RemoteScanEvent
+                {
+                    EventType = "scan-failed",
+                    ImageUrl = page.HtmlUrl,
+                    ReferrerUrl = page.Referrer,
+                    Detail = e.Message,
+                }, cancellationToken);
+                await MarkGalleryFailedAsync(galleryId, e.Message);
+                return;
+            }
+
+            await remoteScanService.RecordEventAsync(new RemoteScanEvent
+            {
+                EventType = "scan-succeeded",
+                ImageUrl = page.HtmlUrl,
+                ReferrerUrl = page.Referrer,
+            }, cancellationToken);
+
             if (result.AdditionalWaitTime > TimeSpan.Zero)
                 await Task.Delay(result.AdditionalWaitTime, cancellationToken);
         }

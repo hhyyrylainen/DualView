@@ -469,6 +469,7 @@ public sealed class BrowserPluginWebSocketHandler
     private async Task ProcessSupportedRequestAsync(WebSocket socket, RemoteDownloadRequest pageRequest,
         string? requestId, UrlInformation result, CancellationToken cancellation)
     {
+        var scannerFailureWasLogged = false;
         try
         {
             if (result == UrlInformation.ContentLink)
@@ -492,7 +493,17 @@ public sealed class BrowserPluginWebSocketHandler
                 await ThrottleScanIfDownloadQueueIsLong(cancellation);
 
                 logger.LogInformation("It is a content page link, will scan it and add the result media immediately");
-                var scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
+                PageScanResult scanResult;
+                try
+                {
+                    scanResult = await remoteScanService.ScanContentPage(pageRequest, true, cancellation);
+                }
+                catch
+                {
+                    scannerFailureWasLogged = true;
+                    throw;
+                }
+
                 if (scanResult.Content is not { Count: > 0 })
                 {
                     throw new InvalidOperationException("No content found from scanning page");
@@ -511,6 +522,17 @@ public sealed class BrowserPluginWebSocketHandler
         catch (Exception ex)
         {
             logger.LogError(ex, "Remote scan failed for {Url}", pageRequest.HtmlUrl);
+            if (!scannerFailureWasLogged)
+            {
+                await remoteScanService.RecordEventAsync(new RemoteScanEvent
+                {
+                    EventType = "scan-failed",
+                    ImageUrl = pageRequest.HtmlUrl,
+                    ReferrerUrl = pageRequest.Referrer,
+                    Detail = ex.Message,
+                }, cancellation);
+            }
+
             await SendErrorAsync(socket, requestId, ex.Message, cancellation);
         }
     }
