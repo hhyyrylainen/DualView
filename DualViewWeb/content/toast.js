@@ -1,4 +1,8 @@
-browser.runtime.onMessage.addListener(message => {
+browser.runtime.onMessage.addListener(async message => {
+  if (message.type === "get-page-html") {
+    return document.documentElement?.outerHTML ?? "";
+  }
+
   if (message.type !== "show-toast") {
     return;
   }

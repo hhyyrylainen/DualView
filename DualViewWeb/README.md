@@ -12,3 +12,5 @@ Firefox Manifest V3 extension for sending browser content to DualView.
 The extension connects to `/api/v3/browser-plugin`. Page context menus are available on pages, tabs, and multiple selected tabs. The tab menu sends the clicked tab, while **Send Tab Group to DualView** sends selected tabs in tab-index order and waits for each matching server acknowledgment before continuing. A failed or timed-out request stops the group.
 
 The server acknowledges queued `sendImage` requests with the request ID supplied by the extension.
+
+JavaScript-dependent scans can use a temporary background tab when **Allow DualView to open pages for JavaScript scanning** is enabled in Settings. This option is off by default; the extension captures the rendered page after it loads or after 15 seconds and returns its HTML to the server.

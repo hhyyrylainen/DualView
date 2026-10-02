@@ -1,9 +1,11 @@
 using System.Buffers.Binary;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Backend.Models;
+using Backend.Plugins;
 using DualView.Server.Models;
 using DualView.Shared.Models;
 using Backend.Services;
@@ -26,6 +28,8 @@ public sealed class BrowserPluginWebSocketHandler
     private readonly IRemoteDownloadService remoteDownloadService;
     private readonly IRemoteScanService remoteScanService;
     private readonly IRemoteGalleryScannerService remoteGalleryScannerService;
+    private readonly IAppEvents appEvents;
+    private readonly ConcurrentDictionary<string, byte> activeBrowserPageScans = new();
     private readonly SemaphoreSlim sendLock = new(1, 1);
     private readonly Lock orderedProcessingLock = new();
 
@@ -36,11 +40,14 @@ public sealed class BrowserPluginWebSocketHandler
 
     private BrowserImpersonationHeaders impersonationHeaders =
         new(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase));
+    private WebSocket? browserScanSocket;
+    private CancellationToken browserScanCancellation;
+    private int pageScanningEnabled;
 
     public BrowserPluginWebSocketHandler(IServiceScopeFactory serviceScopeFactory,
         ILogger<BrowserPluginWebSocketHandler> logger, IHostApplicationLifetime applicationLifetime,
         IRemoteDownloadService remoteDownloadService, IRemoteScanService remoteScanService,
-        IRemoteGalleryScannerService remoteGalleryScannerService)
+        IRemoteGalleryScannerService remoteGalleryScannerService, IAppEvents appEvents)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
@@ -48,6 +55,7 @@ public sealed class BrowserPluginWebSocketHandler
         this.remoteDownloadService = remoteDownloadService;
         this.remoteScanService = remoteScanService;
         this.remoteGalleryScannerService = remoteGalleryScannerService;
+        this.appEvents = appEvents;
     }
 
     // TODO: should we have some key already in the query parameters?
@@ -85,7 +93,26 @@ public sealed class BrowserPluginWebSocketHandler
             }
 
             await SendTextAsync(socket, ReadyResponse, cancellation);
-            await ProcessMessagesAsync(socket, cancellation);
+            browserScanSocket = socket;
+            browserScanCancellation = cancellation;
+            appEvents.BrowserPageScanRequested += OnBrowserPageScanRequested;
+            try
+            {
+                await ProcessMessagesAsync(socket, cancellation);
+            }
+            finally
+            {
+                appEvents.BrowserPageScanRequested -= OnBrowserPageScanRequested;
+                browserScanSocket = null;
+                foreach (var scanId in activeBrowserPageScans.Keys)
+                {
+                    if (activeBrowserPageScans.TryRemove(scanId, out _))
+                    {
+                        appEvents.NotifyBrowserPageScanResponseReceived(new BrowserPageScanResponse(scanId, null,
+                            "Browser connection closed during page scan"));
+                    }
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
         {
@@ -159,6 +186,22 @@ public sealed class BrowserPluginWebSocketHandler
                     using var messageScope = serviceScopeFactory.CreateScope();
                     _ = messageScope.ServiceProvider.GetRequiredService<IDatabaseService>();
                     await SendMessageAsync(socket, new BrowserPluginMessage { Type = "pong" }, cancellation);
+                    break;
+                }
+                case "pageScannerStatus":
+                {
+                    if (!message.Data.TryGetValue("enabled", out var enabled) ||
+                        enabled.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                    {
+                        throw new JsonException("The page scanner status has no enabled value");
+                    }
+
+                    Volatile.Write(ref pageScanningEnabled, enabled.GetBoolean() ? 1 : 0);
+                    break;
+                }
+                case "pageScanResult":
+                {
+                    await HandleBrowserPageScanResponseAsync(socket, message, cancellation);
                     break;
                 }
                 case "sendImage":
@@ -298,6 +341,92 @@ public sealed class BrowserPluginWebSocketHandler
         }
 
         throw new InvalidOperationException("The URL type cannot be scanned");
+    }
+
+    private void OnBrowserPageScanRequested(BrowserPageScanRequest request)
+    {
+        var socket = browserScanSocket;
+        if (socket == null || Volatile.Read(ref pageScanningEnabled) == 0 || !request.TryClaim())
+            return;
+
+        activeBrowserPageScans.TryAdd(request.ScanId, 0);
+        _ = ForgetExpiredBrowserPageScanAsync(request.ScanId, browserScanCancellation);
+        _ = SendBrowserPageScanRequestAsync(socket, request, browserScanCancellation);
+    }
+
+    private async Task ForgetExpiredBrowserPageScanAsync(string scanId, CancellationToken cancellation)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMinutes(1), cancellation);
+            activeBrowserPageScans.TryRemove(scanId, out _);
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task SendBrowserPageScanRequestAsync(WebSocket socket, BrowserPageScanRequest request,
+        CancellationToken cancellation)
+    {
+        try
+        {
+            await SendMessageAsync(socket, new BrowserPluginMessage
+            {
+                Type = "pageScanRequest",
+                RequestId = request.ScanId,
+                Data = new Dictionary<string, JsonElement>
+                {
+                    ["scanId"] = JsonSerializer.SerializeToElement(request.ScanId),
+                    ["pageUrl"] = JsonSerializer.SerializeToElement(request.Url),
+                },
+            }, cancellation);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or WebSocketException or ObjectDisposedException)
+        {
+            logger.LogWarning(ex, "Failed to send browser page scan request for {Url}", request.Url);
+            if (activeBrowserPageScans.TryRemove(request.ScanId, out _))
+            {
+                appEvents.NotifyBrowserPageScanResponseReceived(new BrowserPageScanResponse(request.ScanId, null,
+                    "Unable to send page scan request to the browser"));
+            }
+        }
+    }
+
+    private async Task HandleBrowserPageScanResponseAsync(WebSocket socket, BrowserPluginMessage message,
+        CancellationToken cancellation)
+    {
+        var scanId = GetRequiredString(message, "scanId", "browser page scan response");
+        if (!activeBrowserPageScans.TryRemove(scanId, out _))
+        {
+            await SendMessageAsync(socket, new BrowserPluginMessage
+            {
+                Type = "pageScanFailed",
+                RequestId = scanId,
+                Message = "The page scan request is no longer active",
+            }, cancellation);
+            return;
+        }
+
+        string? html = null;
+        string? error = null;
+        if (message.Data.TryGetValue("html", out var htmlElement) &&
+            htmlElement.ValueKind == JsonValueKind.String)
+            html = htmlElement.GetString();
+        if (message.Data.TryGetValue("error", out var errorElement) &&
+            errorElement.ValueKind == JsonValueKind.String)
+            error = errorElement.GetString();
+
+        if (error == null && html == null)
+            error = "The browser returned no page HTML";
+
+        appEvents.NotifyBrowserPageScanResponseReceived(new BrowserPageScanResponse(scanId, html, error));
+        await SendMessageAsync(socket, new BrowserPluginMessage
+        {
+            Type = error == null ? "pageScanAccepted" : "pageScanFailed",
+            RequestId = scanId,
+            Message = error,
+        }, cancellation);
     }
 
     private void QueueOrderedProcessing(Func<Task> operation)

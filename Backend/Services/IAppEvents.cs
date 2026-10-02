@@ -1,3 +1,5 @@
+using Backend.Models;
+
 namespace Backend.Services;
 
 /// <summary>
@@ -12,6 +14,8 @@ public interface IAppEvents
     public delegate void TagCreatedEventHandler(string tagName, long tagId);
     public delegate void TagUpdatedEventHandler(long tagId);
     public delegate void ScannedCollectionEventHandler(long collectionId);
+    public delegate void BrowserPageScanRequestedEventHandler(BrowserPageScanRequest request);
+    public delegate void BrowserPageScanResponseEventHandler(BrowserPageScanResponse response);
 
     // Events
     public event NoParamsEventHandler SettingsChanged;
@@ -22,6 +26,8 @@ public interface IAppEvents
     public event TagCreatedEventHandler TagCreated;
     public event TagUpdatedEventHandler TagUpdated;
     public event ScannedCollectionEventHandler ScannedCollectionCreated;
+    public event BrowserPageScanRequestedEventHandler BrowserPageScanRequested;
+    public event BrowserPageScanResponseEventHandler BrowserPageScanResponseReceived;
 
     // Triggering events
     public void NotifySettingsChanged();
@@ -32,4 +38,6 @@ public interface IAppEvents
     public void NotifyTagCreated(string tagName, long tagId);
     public void NotifyTagUpdated(long tagId);
     public void NotifyScannedCollectionCreated(long collectionId);
+    public void NotifyBrowserPageScanRequested(BrowserPageScanRequest request);
+    public void NotifyBrowserPageScanResponseReceived(BrowserPageScanResponse response);
 }

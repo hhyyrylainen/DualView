@@ -97,6 +97,12 @@ public sealed class RemoteDownloadRequest
     [JsonIgnore]
     public Dictionary<string, string> ImpersonationHeaders { get; set; } = new();
 
+    /// <summary>
+    ///   Rendered page HTML supplied by a browser for a JavaScript-dependent scan.
+    /// </summary>
+    [JsonIgnore]
+    public string? BrowserScannedHtml { get; set; }
+
     public bool Enriched { get; set; }
 
     /// <summary>
@@ -114,6 +120,7 @@ public sealed class RemoteDownloadRequest
             ImageUrl = ImageUrl,
             Cookies = Cookies,
             ImpersonationHeaders = ImpersonationHeaders,
+            BrowserScannedHtml = BrowserScannedHtml,
             PageUrl = PageUrl,
             LinkUrl = LinkUrl,
             PageTitle = PageTitle,

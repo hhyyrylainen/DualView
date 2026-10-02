@@ -34,6 +34,8 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
 
     public virtual bool ScanContentPagesFirst => true;
 
+    public virtual bool RequiresJavaScriptForScanning => false;
+
     public abstract int DefaultFirstPageNumber { get; }
 
     /// <summary>

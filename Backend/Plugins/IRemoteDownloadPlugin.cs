@@ -12,6 +12,12 @@ public interface IRemoteDownloadPlugin : IPlugin
     public bool ScanContentPagesFirst => true;
 
     /// <summary>
+    ///   Whether this plugin needs a browser-rendered page when scanning pages. Set to true for websites that use
+    ///   tricks to hide their content.
+    /// </summary>
+    public bool RequiresJavaScriptForScanning => false;
+
+    /// <summary>
     ///   Checks if this plugin can handle the given request and returns some info.
     /// </summary>
     /// <param name="request">Request to check</param>

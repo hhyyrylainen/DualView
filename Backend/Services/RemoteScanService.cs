@@ -21,6 +21,7 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
     private readonly IServiceScopeFactory serviceScopeFactory;
     private readonly ILogger<RemoteScanService> logger;
     private readonly IPluginRegistry pluginRegistry;
+    private readonly IAppEvents appEvents;
 
     private readonly SemaphoreSlim eventLock = new(1, 1);
     private readonly List<RemoteScanEvent> events = new();
@@ -32,17 +33,23 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
     /// </summary>
     private readonly AsyncKeyedLocker<string> domainScanLocks = new();
 
+    private readonly SemaphoreSlim browserPageScanLock = new(1, 1);
+    private readonly Dictionary<string, TaskCompletionSource<string>> pendingBrowserPageScans = new();
+    private readonly Lock pendingBrowserPageScansLock = new();
+
     private readonly Channel<ScanWorkItem> scanQueue = Channel.CreateUnbounded<ScanWorkItem>();
 
     private readonly Task scanWorkerTask;
     private readonly CancellationTokenSource shutdownCancellationSource = new();
 
     public RemoteScanService(IServiceScopeFactory serviceScopeFactory, ILogger<RemoteScanService> logger,
-        IPluginRegistry pluginRegistry)
+        IPluginRegistry pluginRegistry, IAppEvents appEvents)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
         this.pluginRegistry = pluginRegistry;
+        this.appEvents = appEvents;
+        appEvents.BrowserPageScanResponseReceived += CompleteBrowserPageScan;
 
         var httpHandler = new SocketsHttpHandler
         {
@@ -123,6 +130,7 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         scanQueue.Writer.TryComplete();
         shutdownCancellationSource.Cancel();
         scanWorkerTask.GetAwaiter().GetResult();
+        appEvents.BrowserPageScanResponseReceived -= CompleteBrowserPageScan;
     }
 
     public async Task<UrlInformation> InspectUrlAsync(RemoteDownloadRequest request,
@@ -193,6 +201,12 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
 
     public async Task<string> DownloadHtmlAsync(RemoteDownloadRequest request, CancellationToken cancellationToken)
     {
+        if (request.BrowserScannedHtml != null)
+        {
+            logger.LogDebug("Browser-scanned HTML found, using it");
+            return request.BrowserScannedHtml;
+        }
+
         using var scanLock =
             await domainScanLocks.LockAsync(GetDomainForRequestScan(request.HtmlUrl), cancellationToken);
 
@@ -322,6 +336,13 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
                     var result = await plugin.InspectWebsiteRequest(pageRequest, this, cancellation);
                     if ((result & (UrlInformation.Gallery | UrlInformation.GalleryPageContent)) != 0)
                     {
+                        if (plugin.RequiresJavaScriptForScanning && pageRequest.BrowserScannedHtml == null)
+                        {
+                            logger.LogInformation("Requesting browser scanned HTML for {Url}", pageRequest.HtmlUrl);
+                            pageRequest.BrowserScannedHtml = await RequestBrowserPageHtmlAsync(pageRequest,
+                                cancellation);
+                        }
+
                         var scanResult = await plugin.ScanPageAsync(pageRequest, this, cancellation);
                         if (scanResult.Subpages.Count == 0 && scanResult.Content.Count == 0)
                             throw new InvalidOperationException("Page scan returned no subpages or content");
@@ -357,6 +378,74 @@ public sealed class RemoteScanService : IRemoteScanService, IRemoteDownloadProvi
         }
 
         throw new InvalidOperationException("Scan retry loop ended unexpectedly");
+    }
+
+    private async Task<string> RequestBrowserPageHtmlAsync(RemoteDownloadRequest pageRequest,
+        CancellationToken cancellationToken)
+    {
+        await browserPageScanLock.WaitAsync(cancellationToken);
+        var scanId = Guid.NewGuid().ToString("N");
+        var completion = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (pendingBrowserPageScansLock)
+        {
+            pendingBrowserPageScans.Add(scanId, completion);
+        }
+
+        try
+        {
+            appEvents.NotifyBrowserPageScanRequested(new BrowserPageScanRequest(scanId, pageRequest.HtmlUrl));
+            try
+            {
+                return await completion.Task.WaitAsync(TimeSpan.FromSeconds(45), cancellationToken);
+            }
+            catch (TimeoutException ex)
+            {
+                throw new BrowserPageScanException("No browser returned rendered page HTML within 45 seconds", ex);
+            }
+        }
+        finally
+        {
+            lock (pendingBrowserPageScansLock)
+            {
+                pendingBrowserPageScans.Remove(scanId);
+            }
+
+            browserPageScanLock.Release();
+        }
+    }
+
+    private void CompleteBrowserPageScan(BrowserPageScanResponse response)
+    {
+        TaskCompletionSource<string>? completion;
+        lock (pendingBrowserPageScansLock)
+        {
+            pendingBrowserPageScans.TryGetValue(response.ScanId, out completion);
+        }
+
+        if (completion == null)
+            return;
+
+        if (!string.IsNullOrEmpty(response.Error))
+        {
+            completion.TrySetException(new BrowserPageScanException(response.Error));
+            return;
+        }
+
+        if (response.Html == null)
+        {
+            completion.TrySetException(new BrowserPageScanException("The browser returned no page HTML"));
+            return;
+        }
+
+        completion.TrySetResult(response.Html);
+    }
+
+    private sealed class BrowserPageScanException : Exception
+    {
+        public BrowserPageScanException(string message, Exception? innerException = null) : base(message,
+            innerException)
+        {
+        }
     }
 
     private sealed class ScanWorkItem

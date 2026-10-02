@@ -2,6 +2,7 @@ const DEFAULT_SETTINGS = {
   serverUrl: "",
   accessKey: "",
   sendCookies: false,
+  allowPageScanning: false,
 };
 
 const READY_MESSAGE = "DVREADY";
@@ -11,6 +12,9 @@ const RECONNECT_DELAY_MS = 500;
 const CONNECTION_CHECK_TIMEOUT_MS = 2500;
 const MAX_SERVER_REPLY_TIME_MS = 10000;
 const MAX_REQUEST_TRACKING_TIME_MS = 30 * 60 * 1000;
+const PAGE_SCAN_LOAD_TIMEOUT_MS = 15000;
+const PAGE_SCAN_ACK_TIMEOUT_MS = 45000;
+const MAX_PAGE_SCAN_HTML_SIZE = 25 * 1024 * 1024;
 
 let socket;
 let status = "disconnected";
@@ -18,6 +22,7 @@ let statusDetail = "Not connected";
 let reconnectRequested = false;
 let pendingTabIds = new Set();
 let pendingRequests = new Map();
+let activePageScans = new Map();
 let pongWaiter;
 
 browser.runtime.onInstalled.addListener(async () => {
@@ -31,6 +36,12 @@ browser.runtime.onStartup.addListener(async () => {
   createContextMenus();
   await browser.alarms.create(RECONNECT_ALARM, { periodInMinutes: 1 });
   await connectIfConfigured();
+});
+
+browser.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === "local" && changes.allowPageScanning && status === "connected") {
+    sendPageScannerStatus(changes.allowPageScanning.newValue === true);
+  }
 });
 
 browser.alarms.onAlarm.addListener(async alarm => {
@@ -104,6 +115,7 @@ browser.runtime.onMessage.addListener(async message => {
       serverUrl: message.serverUrl.trim(),
       accessKey: message.accessKey.trim(),
       sendCookies: message.sendCookies === true,
+      allowPageScanning: message.allowPageScanning === true,
     });
     await disconnect("Settings changed");
     await connectIfConfigured();
@@ -194,6 +206,7 @@ async function getSettings() {
     serverUrl: settings.serverUrl ?? "",
     accessKey: settings.accessKey ?? "",
     sendCookies: settings.sendCookies === true,
+    allowPageScanning: settings.allowPageScanning === true,
   };
 }
 
@@ -265,7 +278,7 @@ function createSocketUrl(serverUrl) {
   return parsedUrl.toString();
 }
 
-function handleSocketMessage(event, messageSocket) {
+async function handleSocketMessage(event, messageSocket) {
   if (socket !== messageSocket) {
     return;
   }
@@ -274,6 +287,7 @@ function handleSocketMessage(event, messageSocket) {
     if (event.data === READY_MESSAGE) {
       reconnectRequested = true;
       setStatus("connected", "Connected to DualView");
+      await sendPageScannerStatus();
       sendPing();
     }
     return;
@@ -291,6 +305,14 @@ function handleSocketMessage(event, messageSocket) {
 
   if (message?.type === "downloadQueued" || message?.type === "scanAccepted") {
     acknowledgeRequest(message.requestId);
+  }
+
+  if (message?.type === "pageScanRequest") {
+    void handlePageScanRequest(message);
+  }
+
+  if (message?.type === "pageScanAccepted" || message?.type === "pageScanFailed") {
+    void finishPageScan(message);
   }
 
   if (message?.type === "error") {
@@ -333,6 +355,15 @@ function handleSocketClosed(event, closedSocket) {
   }
 
   socket = undefined;
+  for (const scan of activePageScans.values()) {
+    if (scan.acknowledgementTimeout) {
+      window.clearTimeout(scan.acknowledgementTimeout);
+    }
+    if (scan.tabId !== undefined) {
+      browser.tabs.remove(scan.tabId).catch(() => {});
+    }
+  }
+  activePageScans.clear();
   const wasConnected = status === "connected";
   if (pongWaiter) {
     const resolvePong = pongWaiter;
@@ -374,6 +405,168 @@ async function disconnect(reason) {
 function sendPing() {
   if (status === "connected") {
     sendProtocolMessage({ type: "ping" });
+  }
+}
+
+async function sendPageScannerStatus(allowPageScanning) {
+  const settings = await getSettings();
+  sendProtocolMessage({
+    type: "pageScannerStatus",
+    enabled: allowPageScanning ?? settings.allowPageScanning,
+  });
+}
+
+async function handlePageScanRequest(message) {
+  const scanId = message.scanId ?? message.requestId;
+  let scanTabId;
+  try {
+    if (!scanId || typeof message.pageUrl !== "string") {
+      throw new Error("DualView sent an invalid page scan request.");
+    }
+
+    const settings = await getSettings();
+    if (!settings.allowPageScanning) {
+      throw new Error("Page scanning is disabled in the DualView Web settings.");
+    }
+
+    const url = new URL(message.pageUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("DualView can only scan HTTP and HTTPS pages.");
+    }
+
+    const tab = await browser.tabs.create({ url: url.toString(), active: false });
+    scanTabId = tab.id;
+    activePageScans.set(scanId, { tabId: scanTabId });
+    await waitForPageLoad(scanTabId);
+    const html = await getRenderedPageHtml(scanTabId);
+    if (typeof html !== "string" || html.length === 0) {
+      throw new Error("The browser could not read HTML from the page.");
+    }
+    if (new TextEncoder().encode(html).byteLength > MAX_PAGE_SCAN_HTML_SIZE) {
+      throw new Error("The rendered page HTML is too large to send to DualView.");
+    }
+
+    await sendPageScanResult(scanId, html, undefined, scanTabId);
+  } catch (error) {
+    await sendPageScanResult(scanId, undefined, error.message, scanTabId);
+  }
+}
+
+async function getRenderedPageHtml(tabId) {
+  const deadline = Date.now() + 2000;
+  let lastError;
+  while (Date.now() < deadline) {
+    try {
+      return await browser.tabs.sendMessage(tabId, { type: "get-page-html" });
+    } catch (error) {
+      lastError = error;
+      await new Promise(resolve => window.setTimeout(resolve, 100));
+    }
+  }
+
+  throw new Error(lastError?.message || "The page did not provide its rendered HTML.");
+}
+
+function waitForPageLoad(tabId) {
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const finish = (error) => {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      window.clearTimeout(timeout);
+      browser.tabs.onUpdated.removeListener(onUpdated);
+      if (error) {
+        reject(error);
+      } else {
+        resolve();
+      }
+    };
+    const onUpdated = (updatedTabId, changeInfo) => {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        finish();
+      }
+    };
+    const timeout = window.setTimeout(() => finish(), PAGE_SCAN_LOAD_TIMEOUT_MS);
+    browser.tabs.onUpdated.addListener(onUpdated);
+    browser.tabs.get(tabId).then(tab => {
+      if (tab.status === "complete") {
+        finish();
+      }
+    }).catch(error => finish(error));
+  });
+}
+
+async function sendPageScanResult(scanId, html, error, tabId) {
+  if (!scanId) {
+    if (tabId !== undefined) {
+      await browser.tabs.remove(tabId).catch(() => {});
+    }
+    return;
+  }
+
+  const scan = { tabId };
+  scan.acknowledgementTimeout = window.setTimeout(() => {
+    if (activePageScans.get(scanId) !== scan) {
+      return;
+    }
+    activePageScans.delete(scanId);
+    closeScannedTab(tabId);
+    showBrowserScanError("DualView did not acknowledge the rendered page.");
+  }, PAGE_SCAN_ACK_TIMEOUT_MS);
+  activePageScans.set(scanId, scan);
+
+  const sent = sendProtocolMessage({
+    type: "pageScanResult",
+    scanId,
+    html,
+    error,
+  });
+  if (!sent) {
+    window.clearTimeout(scan.acknowledgementTimeout);
+    activePageScans.delete(scanId);
+    await closeScannedTab(tabId);
+    showBrowserScanError("DualView connection was lost while sending the rendered page.");
+  }
+}
+
+async function finishPageScan(message) {
+  const scanId = message.requestId ?? message.scanId;
+  const scan = activePageScans.get(scanId);
+  if (!scan) {
+    return;
+  }
+
+  activePageScans.delete(scanId);
+  window.clearTimeout(scan.acknowledgementTimeout);
+  await closeScannedTab(scan.tabId);
+  if (message.type === "pageScanFailed") {
+    showBrowserScanError(message.message || "DualView could not use the rendered page.");
+  }
+}
+
+async function closeScannedTab(tabId) {
+  if (tabId === undefined) {
+    return;
+  }
+  try {
+    await browser.tabs.remove(tabId);
+  } catch (error) {
+    console.debug("Unable to close a DualView page scan tab", error);
+  }
+}
+
+async function showBrowserScanError(message) {
+  try {
+    await browser.notifications.create(`dualview-page-scan-${crypto.randomUUID()}`, {
+      type: "basic",
+      iconUrl: browser.runtime.getURL("icons/dualview.svg"),
+      title: "DualView page scan failed",
+      message,
+    });
+  } catch (error) {
+    console.debug("Unable to show a DualView page scan notification", error);
   }
 }
 

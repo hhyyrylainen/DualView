@@ -1,4 +1,5 @@
 using Backend.Services;
+using Backend.Models;
 
 namespace DualView.Server.Services;
 
@@ -17,6 +18,8 @@ public class AppEvents : IAppEvents
     private event IAppEvents.TagCreatedEventHandler? TagCreatedInternal;
     private event IAppEvents.TagUpdatedEventHandler? TagUpdatedInternal;
     private event IAppEvents.ScannedCollectionEventHandler? ScannedCollectionCreatedInternal;
+    private event IAppEvents.BrowserPageScanRequestedEventHandler? BrowserPageScanRequestedInternal;
+    private event IAppEvents.BrowserPageScanResponseEventHandler? BrowserPageScanResponseReceivedInternal;
 
     public event IAppEvents.NoParamsEventHandler? SettingsChanged
     {
@@ -114,6 +117,30 @@ public class AppEvents : IAppEvents
         }
     }
 
+    public event IAppEvents.BrowserPageScanRequestedEventHandler? BrowserPageScanRequested
+    {
+        add
+        {
+            lock (@lock) BrowserPageScanRequestedInternal += value;
+        }
+        remove
+        {
+            lock (@lock) BrowserPageScanRequestedInternal -= value;
+        }
+    }
+
+    public event IAppEvents.BrowserPageScanResponseEventHandler? BrowserPageScanResponseReceived
+    {
+        add
+        {
+            lock (@lock) BrowserPageScanResponseReceivedInternal += value;
+        }
+        remove
+        {
+            lock (@lock) BrowserPageScanResponseReceivedInternal -= value;
+        }
+    }
+
     public void NotifySettingsChanged()
     {
         lock (@lock)
@@ -183,6 +210,24 @@ public class AppEvents : IAppEvents
         {
             var handlers = ScannedCollectionCreatedInternal;
             handlers?.Invoke(collectionId);
+        }
+    }
+
+    public void NotifyBrowserPageScanRequested(BrowserPageScanRequest request)
+    {
+        lock (@lock)
+        {
+            var handlers = BrowserPageScanRequestedInternal;
+            handlers?.Invoke(request);
+        }
+    }
+
+    public void NotifyBrowserPageScanResponseReceived(BrowserPageScanResponse response)
+    {
+        lock (@lock)
+        {
+            var handlers = BrowserPageScanResponseReceivedInternal;
+            handlers?.Invoke(response);
         }
     }
 }
