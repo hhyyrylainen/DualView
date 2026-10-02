@@ -15,7 +15,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace DualView.GUI.ViewModels;
 
-public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
+public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable, ICollectionBrowse, IMediaSelectionBrowse
 {
     private readonly IClientDatabaseService? databaseService;
     private readonly IBackendAPI? backendAPI;
@@ -23,6 +23,7 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
     private readonly ILogger logger;
     private readonly IWindowService? windowService;
     private CancellationTokenSource? statusRefreshCancellation;
+    private int targetNameSearchVersion;
     private long id;
 
     public ScannedCollectionViewModel()
@@ -66,6 +67,22 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
         get;
         set => SetProperty(ref field, value);
     } = string.Empty;
+
+    public string? SelectedTargetName
+    {
+        get;
+        set
+        {
+            if (SetProperty(ref field, value) && value != null && TargetName != value)
+                TargetName = value;
+        }
+    }
+
+    public List<string> TargetNameSuggestions
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = new();
 
     public string? ScanError
     {
@@ -115,6 +132,8 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
         private set => SetProperty(ref field, value);
     }
 
+    public event Action<long, bool>? OnSelectionChanged;
+
     public void UpdateFromServer(ScannedCollectionDTO collection)
     {
         id = collection.Id;
@@ -140,13 +159,16 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
         {
             if (existing.Remove(item.Id, out var viewer))
             {
+                viewer.Name = item.Name;
                 viewer.Selected = item.Selected;
             }
             else
             {
                 viewer = new MediaViewerViewModel(logger, windowService!)
                 {
+                    Name = item.Name,
                     MediaToShow = new ScannedMediaSource(collection.Id, item, serviceProvider!),
+                    MediaOpenResources = new ShowMediaInSeparateWindow(windowService!, this),
                     ShowingThumbnail = true,
                     AllowSelection = true,
                     Selected = item.Selected,
@@ -154,7 +176,7 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
                     CustomHeight = 145,
                 };
 
-                viewer.OnSelectionChanged += OnSelectionChanged;
+                viewer.OnSelectionChanged += OnMediaSelectionChanged;
             }
 
             refreshedMedia.Add(viewer);
@@ -162,7 +184,7 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
 
         foreach (var removedViewer in existing.Values)
         {
-            removedViewer.OnSelectionChanged -= OnSelectionChanged;
+            removedViewer.OnSelectionChanged -= OnMediaSelectionChanged;
             removedViewer.Dispose();
             Media.Remove(removedViewer);
         }
@@ -229,6 +251,10 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
             await backendAPI!.AcceptScannedCollectionAsync(id, name,
                 Media.Where(item => item.Selected)
                     .Select(item => ((ScannedMediaSource)item.MediaToShow!).ServerId).ToList());
+
+            var collection = await databaseService!.GetScannedCollectionAsync(id);
+            if (collection != null)
+                UpdateFromServer(collection);
         }
         catch (Exception ex)
         {
@@ -250,18 +276,82 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable
 
         foreach (var item in Media)
         {
-            item.OnSelectionChanged -= OnSelectionChanged;
+            item.OnSelectionChanged -= OnMediaSelectionChanged;
             item.Dispose();
         }
     }
 
-    private void OnSelectionChanged(object? sender, EventArgs e)
+    public async Task LoadTargetNameSuggestionsAsync(string search)
+    {
+        var searchVersion = ++targetNameSearchVersion;
+        if (search.Trim().Length <= 2 || databaseService == null)
+        {
+            TargetNameSuggestions = [];
+            return;
+        }
+
+        try
+        {
+            var names = await databaseService.SearchUploadTargetNamesAsync(search);
+            if (searchVersion != targetNameSearchVersion)
+                return;
+
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (searchVersion == targetNameSearchVersion)
+                    TargetNameSuggestions = names;
+            });
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to load scanned gallery target name suggestions");
+        }
+    }
+
+    public Task<(int Count, int? Index)> GetBrowseInfoAsync(long? mediaId)
+    {
+        var index = mediaId.HasValue
+            ? Media.ToList().FindIndex(item => item.MediaToShow is ScannedMediaSource source &&
+                                                source.ServerId == mediaId.Value)
+            : -1;
+        return Task.FromResult<(int Count, int? Index)>((Media.Count, index >= 0 ? index : null));
+    }
+
+    public Task<IVisualMediaSource?> GetMediaAsync(int index)
+    {
+        if (index < 0 || index >= Media.Count || Media[index].MediaToShow is not IVisualMediaSource mediaSource)
+            return Task.FromResult<IVisualMediaSource?>(null);
+
+        return Task.FromResult<IVisualMediaSource?>(mediaSource.Clone());
+    }
+
+    public bool IsSelected(long mediaId)
+    {
+        return Media.FirstOrDefault(item => item.MediaToShow is ScannedMediaSource source &&
+                                            source.ServerId == mediaId)?.Selected ?? false;
+    }
+
+    public void SetSelected(long mediaId, bool selected)
+    {
+        var viewer = Media.FirstOrDefault(item => item.MediaToShow is ScannedMediaSource source &&
+                                                 source.ServerId == mediaId);
+        if (viewer != null)
+            viewer.Selected = selected;
+    }
+
+    public void NotifySelectionChanged(long mediaId, bool selected)
+    {
+        OnSelectionChanged?.Invoke(mediaId, selected);
+    }
+
+    private void OnMediaSelectionChanged(object? sender, EventArgs e)
     {
         AcceptText = $"Accept ({Media.Count(item => item.Selected)})";
         if ((sender as MediaViewerViewModel)?.MediaToShow is ScannedMediaSource source && databaseService != null &&
             sender is MediaViewerViewModel viewer)
         {
             _ = databaseService.SetScannedMediaSelectedAsync(source.ServerId, viewer.Selected);
+            NotifySelectionChanged(source.ServerId, viewer.Selected);
         }
     }
 

@@ -7,7 +7,12 @@
     <Border BorderBrush="Gray" BorderThickness="1" Margin="4" Padding="4">
         <Grid RowDefinitions="Auto,Auto,*,Auto">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Height="34">
-                <TextBox Grid.Column="0" Text="{Binding TargetName}" PlaceholderText="Target import section name" />
+                <AutoCompleteBox Grid.Column="0" Text="{Binding TargetName}"
+                                 ItemsSource="{Binding TargetNameSuggestions}"
+                                 MinimumPrefixLength="3"
+                                 FilterMode="None"
+                                 SelectedItem="{Binding SelectedTargetName}"
+                                 TextChanged="OnTargetNameTextChanged" />
                 <Button Grid.Column="1" Margin="4,0" Content="Pause" Command="{Binding PauseAsync}"
                         IsVisible="{Binding CanPause}" />
                 <Button Grid.Column="2" Margin="4,0" Content="Resume" Command="{Binding ResumeAsync}"
