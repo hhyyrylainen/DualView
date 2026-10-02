@@ -13,6 +13,7 @@ const CONNECTION_CHECK_TIMEOUT_MS = 2500;
 const MAX_SERVER_REPLY_TIME_MS = 10000;
 const MAX_REQUEST_TRACKING_TIME_MS = 30 * 60 * 1000;
 const PAGE_SCAN_LOAD_TIMEOUT_MS = 15000;
+const MIN_PAGE_LOAD_SETTLE_TIME_MS = 900;
 const PAGE_SCAN_ACK_TIMEOUT_MS = 45000;
 const MAX_PAGE_SCAN_HTML_SIZE = 25 * 1024 * 1024;
 
@@ -438,6 +439,9 @@ async function handlePageScanRequest(message) {
     scanTabId = tab.id;
     activePageScans.set(scanId, { tabId: scanTabId });
     await waitForPageLoad(scanTabId);
+    // Wait for any JS operations to probably finish on the page
+    await new Promise(resolve => window.setTimeout(resolve, MIN_PAGE_LOAD_SETTLE_TIME_MS));
+
     const html = await getRenderedPageHtml(scanTabId);
     if (typeof html !== "string" || html.length === 0) {
       throw new Error("The browser could not read HTML from the page.");
