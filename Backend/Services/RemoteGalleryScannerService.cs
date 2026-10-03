@@ -293,8 +293,33 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         foreach (var item in selected)
         {
             var path = await remoteGalleryMediaService.GetFullMediaAsync(item.Id, cancellationToken);
-            await using var stream = File.OpenRead(path);
-            var media = await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
+            MediaFile media;
+            try
+            {
+                await using var stream = File.OpenRead(path);
+                media = await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
+            }
+            catch
+            {
+                try
+                {
+                    logger.LogInformation("Deleting locally downloaded file due to import failure for remote item");
+
+                    if (File.Exists(path))
+                        File.Delete(path);
+
+                    item.LocalFullFilePath = null;
+                    await database.SaveFoundMediaAsync(item);
+                }
+                catch (Exception cleanupException)
+                {
+                    logger.LogError(cleanupException,
+                        "Failed to clear cached remote media after import failure for item {MediaId}", item.Id);
+                }
+
+                throw;
+            }
+
             await SaveMediaImportInfoAsync(database, media.Id, item, downloadGalleryId);
 
             var parsedTags = new List<AppliedTagDTO>();

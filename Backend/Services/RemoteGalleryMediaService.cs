@@ -17,6 +17,7 @@ namespace Backend.Services;
 public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
 {
     private const int DownloadAttempts = 5;
+    private const long MinimumDownloadedFileSize = 100;
 
     private readonly ILogger<RemoteGalleryMediaService> logger;
     private readonly IServiceScopeFactory serviceScopeFactory;
@@ -184,6 +185,7 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
                 await using var input = File.OpenRead(temporaryPath);
                 await using var output = File.Create(destination);
                 await input.CopyToAsync(output, cancellationToken);
+                EnsureMinimumDownloadedFileSize(output.Length);
             }
             finally
             {
@@ -211,6 +213,13 @@ public sealed class RemoteGalleryMediaService : IRemoteGalleryMediaService
         await using var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken);
         await using var outputStream = File.Create(destination);
         await responseStream.CopyToAsync(outputStream, cancellationToken);
+        EnsureMinimumDownloadedFileSize(outputStream.Length);
+    }
+
+    private static void EnsureMinimumDownloadedFileSize(long fileSize)
+    {
+        if (fileSize < MinimumDownloadedFileSize)
+            throw new InvalidDataException($"Downloaded remote media is too small ({fileSize} bytes)");
     }
 
     private static bool TryGetThumbnailCrop(FoundMedia item, out DualView.Shared.Models.RemoteThumbnailCrop crop)
