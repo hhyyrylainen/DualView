@@ -9,16 +9,19 @@ public sealed class ScannedMediaSource : ServerMediaSource
     private readonly long collectionId;
 
     public ScannedMediaSource(long collectionId, ScannedMediaDTO media, IServiceProvider serviceProvider)
-        : base(CreateInfo(media), serviceProvider)
+        : this(collectionId, CreateInfo(media), string.Join(", ", media.Tags), serviceProvider)
     {
-        this.collectionId = collectionId;
     }
 
-    private ScannedMediaSource(long collectionId, IConfiguredMediaInfo mediaInfo, IServiceProvider serviceProvider)
+    private ScannedMediaSource(long collectionId, IConfiguredMediaInfo mediaInfo, string tagsString,
+        IServiceProvider serviceProvider)
         : base(mediaInfo, serviceProvider)
     {
         this.collectionId = collectionId;
+        TagsString = tagsString;
     }
+
+    public string TagsString { get; }
 
     public override string GetThumbnailDownloadUrl()
     {
@@ -32,7 +35,7 @@ public sealed class ScannedMediaSource : ServerMediaSource
 
     public override IVisualMediaSource Clone()
     {
-        return new ScannedMediaSource(collectionId, Info, VideoPlayerServiceProvider);
+        return new ScannedMediaSource(collectionId, Info, TagsString, VideoPlayerServiceProvider);
     }
 
     private static ConfiguredMediaInfo CreateInfo(ScannedMediaDTO media)

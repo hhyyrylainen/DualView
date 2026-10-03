@@ -66,14 +66,16 @@ public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
 
     public bool HasViewAction => true;
     public bool HasThumbnailAction => false;
-    public bool HasEditAction => true;
+    public bool HasEditAction { get; private set; }
     public bool HasMoveToFolderAction => false;
     public bool HasAddToFolderAction => false;
     public bool HasManageFoldersAction { get; private set; }
 
     public void RefreshAvailableOptions(IVisualMediaSource? mediaSource)
     {
-        HasManageFoldersAction = mediaSource is ServerMediaSource;
+        var isRegularServerMedia = mediaSource is ServerMediaSource && mediaSource is not ScannedMediaSource;
+        HasEditAction = isRegularServerMedia;
+        HasManageFoldersAction = isRegularServerMedia;
     }
 
     public void ShowView(IVisualMediaSource? mediaSource)
@@ -100,7 +102,7 @@ public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
 
     public void StartEditAction(IVisualMediaSource mediaSource)
     {
-        if (mediaSource is ServerMediaSource serverMediaSource)
+        if (mediaSource is ServerMediaSource serverMediaSource && mediaSource is not ScannedMediaSource)
         {
             windowService.ShowMediaEditSetup(serverMediaSource.ServerId);
             return;
@@ -121,7 +123,7 @@ public class ShowMediaInSeparateWindow : IMediaAssociatedWindows
 
     public void StartManageFoldersAction(IVisualMediaSource mediaSource)
     {
-        if (mediaSource is ServerMediaSource serverMediaSource)
+        if (mediaSource is ServerMediaSource serverMediaSource && mediaSource is not ScannedMediaSource)
         {
             windowService.ShowEditMediaFolders(serverMediaSource.Info);
             return;

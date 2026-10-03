@@ -30,7 +30,9 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     private string currentMediaName = string.Empty;
     private int mediaDisplayVersion;
     private int? previousBrowseIndex;
+    private HamburgerMenuItem? editMediaMenuItem;
     private HamburgerMenuItem? deleteMediaMenuItem;
+    private HamburgerMenuItem? exportMediaMenuItem;
 
     public delegate void ClipboardTextSetRequested(string text);
 
@@ -96,7 +98,20 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     public bool HasServerMedia
     {
         get;
-        set => SetProperty(ref field, value);
+        set
+        {
+            if (!SetProperty(ref field, value))
+                return;
+
+            if (editMediaMenuItem != null)
+                editMediaMenuItem.IsEnabled = value;
+
+            if (deleteMediaMenuItem != null)
+                deleteMediaMenuItem.IsEnabled = value;
+
+            if (exportMediaMenuItem != null)
+                exportMediaMenuItem.IsEnabled = value;
+        }
     }
 
     public bool IsTemporary
@@ -158,7 +173,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     {
         Media.MediaToShow = source;
 
-        if (source is ServerMediaSource serverSource)
+        if (source is ServerMediaSource serverSource && source is not ScannedMediaSource)
             OnDisplayedMediaChanged?.Invoke(serverSource.ServerId);
 
         if (collectionBrowse is IMediaSelectionBrowse previousSelectionBrowse)
@@ -192,7 +207,16 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(ImageInfo));
 
         // Initialize extra data
-        if (source is ServerMediaSource serverMediaSource)
+        if (source is ScannedMediaSource scannedMediaSource)
+        {
+            HasServerMedia = false;
+            IsDeleted = false;
+            IsTemporary = false;
+            currentConfiguredMediaId = 0;
+            currentMediaFileId = 0;
+            TagsString = scannedMediaSource.TagsString;
+        }
+        else if (source is ServerMediaSource serverMediaSource)
         {
             HasServerMedia = false;
             IsDeleted = false;
@@ -200,7 +224,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             TagsString = string.Empty;
             currentConfiguredMediaId = 0;
             currentMediaFileId = 0;
-            _ = LoadMediaFileStatus(serverMediaSource.ServerId);
+            _ = LoadMediaFileStatus(serverMediaSource.ServerId, displayVersion);
         }
         else
         {
@@ -218,8 +242,15 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             {
                 var name = await source.GetName();
 
-                currentMediaName = name;
-                UpdateTitle(displayVersion);
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (displayVersion != mediaDisplayVersion)
+                        return;
+
+                    currentMediaName = name;
+                    UpdateTitle(displayVersion);
+                });
+
                 await UpdateBrowsePositionAsync(source, displayVersion);
             }
             catch (Exception e)
@@ -306,7 +337,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     {
         var media = Media.MediaToShow;
 
-        if (media is ServerMediaSource serverMediaSource)
+        if (HasServerMedia && media is ServerMediaSource serverMediaSource && media is not ScannedMediaSource)
         {
             windowService?.ShowMediaEditSetup(serverMediaSource.ServerId);
             return;
@@ -322,7 +353,8 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
         var media = Media.MediaToShow;
 
-        if (media is not ServerMediaSource serverMediaSource || OnMediaSaveRequested == null)
+        if (!HasServerMedia || media is not ServerMediaSource serverMediaSource ||
+            media is ScannedMediaSource || OnMediaSaveRequested == null)
         {
             windowService?.ShowNoticeWindow("This media type cannot be saved.");
             return;
@@ -463,7 +495,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private async Task LoadMediaFileStatus(long configuredMediaId)
+    private async Task LoadMediaFileStatus(long configuredMediaId, int displayVersion)
     {
         if (clientDatabaseService == null)
             return;
@@ -473,7 +505,11 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             var media = await clientDatabaseService.GetConfiguredMediaAsync(configuredMediaId, false);
             if (media?.MediaFile == null)
             {
-                HasServerMedia = false;
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    if (displayVersion == mediaDisplayVersion)
+                        HasServerMedia = false;
+                });
                 return;
             }
 
@@ -483,6 +519,13 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
+                if (displayVersion != mediaDisplayVersion ||
+                    Media.MediaToShow is not ServerMediaSource currentMedia ||
+                    currentMedia is ScannedMediaSource || currentMedia.ServerId != configuredMediaId)
+                {
+                    return;
+                }
+
                 currentConfiguredMediaId = media.Id;
                 currentMediaFileId = mediaFileId;
                 HasServerMedia = true;
@@ -515,7 +558,7 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     private void RefreshMediaTags()
     {
         if (currentConfiguredMediaId != 0)
-            _ = LoadMediaFileStatus(currentConfiguredMediaId);
+            _ = LoadMediaFileStatus(currentConfiguredMediaId, mediaDisplayVersion);
     }
 
     private async Task GoToLastPageAsync()
@@ -662,10 +705,10 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
 
     private void OnMediaUpdated(long mediaFileId)
     {
-        if (mediaFileId == currentMediaFileId)
+        if (mediaFileId == currentMediaFileId && currentConfiguredMediaId != 0)
         {
             // Refresh state from the server
-            _ = LoadMediaFileStatus(currentConfiguredMediaId);
+            _ = LoadMediaFileStatus(currentConfiguredMediaId, mediaDisplayVersion);
         }
     }
 
@@ -693,21 +736,32 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
     {
         MainWindowViewModel.AddDefaultMenuItems(Hamburger);
 
-        Hamburger.MenuItems.Add(new HamburgerMenuItem
-            { Title = "Edit This...", Command = new RelayCommand(OpenMediaEditorSetup) });
+        editMediaMenuItem = new HamburgerMenuItem
+        {
+            Title = "Edit This...",
+            Command = new RelayCommand(OpenMediaEditorSetup),
+            IsEnabled = HasServerMedia,
+        };
+        Hamburger.MenuItems.Add(editMediaMenuItem);
 
         deleteMediaMenuItem = new HamburgerMenuItem
         {
             Title = "Delete",
             Command = new RelayCommand(ToggleDeleteMedia),
+            IsEnabled = HasServerMedia,
         };
         Hamburger.MenuItems.Add(deleteMediaMenuItem);
 
         Hamburger.MenuItems.Add(new HamburgerMenuItem
             { Title = "Copy ID", Command = new RelayCommand(RequestIDCopy) });
 
-        Hamburger.MenuItems.Add(new HamburgerMenuItem
-            { Title = "Export...", Command = new RelayCommand(SaveMedia) });
+        exportMediaMenuItem = new HamburgerMenuItem
+        {
+            Title = "Export...",
+            Command = new RelayCommand(SaveMedia),
+            IsEnabled = HasServerMedia,
+        };
+        Hamburger.MenuItems.Add(exportMediaMenuItem);
 
         MainWindowViewModel.AddTrailingMenuItems(Hamburger, windowService);
     }

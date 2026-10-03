@@ -32,17 +32,20 @@
 
             <Menu Grid.Column="1">
                 <MenuItem Header="File">
-                    <MenuItem Header="Export..." Command="{Binding SaveMedia}" />
+                    <MenuItem Header="Export..." Command="{Binding SaveMedia}" IsEnabled="{Binding HasServerMedia}" />
                     <MenuItem Header="Refresh" Command="{Binding Refresh}" />
                     <Separator />
                     <MenuItem Header="Close" Click="CloseItem_OnClick" />
                 </MenuItem>
                 <MenuItem Header="Image">
                     <MenuItem Header="Copy ID" Command="{Binding RequestIDCopy}" />
-                    <MenuItem Header="Send to import" Command="{Binding SendToImport}" />
-                    <MenuItem Header="Show collections this is in" Command="{Binding FinCollectionsThisIsIn}" />
+                    <MenuItem Header="Send to import" Command="{Binding SendToImport}"
+                              IsEnabled="{Binding HasServerMedia}" />
+                    <MenuItem Header="Show collections this is in" Command="{Binding FinCollectionsThisIsIn}"
+                              IsEnabled="{Binding HasServerMedia}" />
                     <Separator />
-                    <MenuItem Header="{Binding DeleteMediaMenuHeader}" Command="{Binding ToggleDeleteMedia}" />
+                    <MenuItem Header="{Binding DeleteMediaMenuHeader}" Command="{Binding ToggleDeleteMedia}"
+                              IsEnabled="{Binding HasServerMedia}" />
                 </MenuItem>
                 <MenuItem Header="View">
                     <MenuItem Header="Go to first page" Command="{Binding GoToFirstPage}"
@@ -51,8 +54,10 @@
                               IsEnabled="{Binding HasBrowsing}" />
                 </MenuItem>
                 <MenuItem Header="Tools">
-                    <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}" />
-                    <MenuItem Header="Get Info" Command="{Binding ShowImageInfo}" />
+                    <MenuItem Header="Edit Tags" Command="{Binding ShowTagEditor}"
+                              IsEnabled="{Binding HasServerMedia}" />
+                    <MenuItem Header="Get Info" Command="{Binding ShowImageInfo}"
+                              IsEnabled="{Binding HasServerMedia}" />
                 </MenuItem>
             </Menu>
 

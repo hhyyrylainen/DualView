@@ -37,6 +37,7 @@ public sealed class ScannedMediaDTO
     public bool Selected { get; init; }
     public string? Referrer { get; init; }
     public MediaType? MediaType { get; init; }
+    public List<string> Tags { get; init; } = new();
 }
 
 public sealed class AcceptScannedCollectionRequest

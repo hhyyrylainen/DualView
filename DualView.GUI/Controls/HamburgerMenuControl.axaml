@@ -43,6 +43,7 @@
                                         CornerRadius="4"
                                         Command="{Binding Command}"
                                         CommandParameter="{Binding Parameter}"
+                                        IsEnabled="{Binding IsEnabled}"
                                         Content="{Binding Title}">
                                     <Button.Styles>
                                         <Style Selector="Button:pointerover">

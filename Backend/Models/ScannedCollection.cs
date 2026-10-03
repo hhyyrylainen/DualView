@@ -81,6 +81,7 @@ public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollection
                 Selected = media.Selected,
                 Referrer = media.Referrer,
                 MediaType = media.MediaType,
+                Tags = media.UnparsedTags.ToList(),
             }).ToList(),
         };
     }

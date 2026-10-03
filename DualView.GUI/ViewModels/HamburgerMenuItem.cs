@@ -16,6 +16,12 @@ public sealed class HamburgerMenuItem : ViewModelBase
     } = "";
     public ICommand? Command { get; init; }
     public object? Parameter { get; init; }
+
+    public bool IsEnabled
+    {
+        get;
+        set => SetProperty(ref field, value);
+    } = true;
 }
 
 public sealed class HamburgerMenuViewModel : ViewModelBase, IDisposable

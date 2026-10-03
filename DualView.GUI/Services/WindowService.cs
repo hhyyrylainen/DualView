@@ -252,7 +252,8 @@ public sealed class WindowService : IWindowService
         editViewModel.OnDisplayedMediaChanged += OnDisplayedMediaChanged;
         window.Closed += (_, _) => editViewModel.OnDisplayedMediaChanged -= OnDisplayedMediaChanged;
 
-        if (mediaSource is ServerMediaSource serverSource)
+        // TODO: support remote gallery item viewer big image restoring
+        if (mediaSource is ServerMediaSource serverSource && mediaSource is not ScannedMediaSource)
         {
             long? collectionId = collectionBrowse is CollectionBrowse browse ? browse.CollectionId : null;
             windowRecoveryService.RegisterMediaViewer(window, serverSource.ServerId, collectionId);
