@@ -37,6 +37,11 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
 
     public virtual bool RequiresJavaScriptForScanning => false;
 
+    /// <summary>
+    ///   Number of detached trailing gallery page links to ignore while scanning a page.
+    /// </summary>
+    public virtual int IgnoreDetachedLastNGalleryLinks => 0;
+
     public abstract int DefaultFirstPageNumber { get; }
 
     /// <summary>
@@ -228,6 +233,11 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                     }
                 }
 
+                if (IgnoreDetachedLastNGalleryLinks > 0)
+                {
+                    IgnoreDetachedPageNumbers(request, result);
+                }
+
                 // For now, assume gallery pages have no useful videos
                 /*foreach (var videoUrl in GetVideoUrlsFromPage(document))
                 {
@@ -398,6 +408,87 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
 
         position = -offset;
         return position >= 0;
+    }
+
+    private void IgnoreDetachedPageNumbers(RemoteDownloadRequest request, PageScanResult result)
+    {
+        var galleryPageLinks = result.Subpages
+            .Select(subpage =>
+                (Subpage: subpage, CanonicalUrl: ConvertToCanonicalUrl(subpage.HtmlUrl)))
+            .Where(candidate => candidate.CanonicalUrl.StartsWith(
+                SiteBaseUrl + "gallerySynth/", StringComparison.Ordinal))
+            .Select(candidate => (
+                candidate.Subpage,
+                GalleryId: candidate.CanonicalUrl[..candidate.CanonicalUrl.LastIndexOf('=')],
+                PageNumberString: candidate.CanonicalUrl.Split('=').Last()))
+            .Where(candidate => int.TryParse(candidate.PageNumberString, out _))
+            .Select(candidate => (
+                candidate.Subpage,
+                candidate.GalleryId,
+                PageNumber: int.Parse(candidate.PageNumberString)))
+            .ToList();
+        var detachedPageNumbers = new HashSet<(string GalleryId, int PageNumber)>();
+        var currentCanonicalUrl = ConvertToCanonicalUrl(request.HtmlUrl);
+        string? currentGalleryId = null;
+        int? currentPageNumber = null;
+        if (currentCanonicalUrl.StartsWith(SiteBaseUrl + "gallerySynth/", StringComparison.Ordinal))
+        {
+            var currentCanonicalUrlParts = currentCanonicalUrl.Split('=');
+            if (currentCanonicalUrlParts.Length > 1 &&
+                int.TryParse(currentCanonicalUrlParts[^1], out var parsedCurrentPageNumber))
+            {
+                currentGalleryId = string.Join('=', currentCanonicalUrlParts[..^1]);
+                currentPageNumber = parsedCurrentPageNumber;
+            }
+        }
+
+        foreach (var gallery in galleryPageLinks.GroupBy(candidate => candidate.GalleryId))
+        {
+            var distinctPageNumbers = gallery
+                .Select(candidate => candidate.PageNumber)
+                .ToHashSet();
+            if (gallery.Key == currentGalleryId && currentPageNumber.HasValue)
+                distinctPageNumbers.Add(currentPageNumber.Value);
+
+            var pageNumbers = distinctPageNumbers
+                .OrderBy(pageNumber => pageNumber)
+                .ToList();
+
+            for (var pageIndex = pageNumbers.Count - 1; pageIndex > 0; --pageIndex)
+            {
+                if ((long)pageNumbers[pageIndex] <= (long)pageNumbers[pageIndex - 1] + 1)
+                    continue;
+
+                var detachedCount = pageNumbers.Count - pageIndex;
+                if (detachedCount <= IgnoreDetachedLastNGalleryLinks)
+                {
+                    var ignoredPageNumbers = pageNumbers.Skip(pageIndex).ToList();
+                    foreach (var pageNumber in ignoredPageNumbers)
+                        detachedPageNumbers.Add((gallery.Key, pageNumber));
+
+                    Logger.LogInformation(
+                        "Ignoring detached gallery page links {PageNumbers} on {Url}",
+                        string.Join(", ", ignoredPageNumbers), request.HtmlUrl);
+                }
+
+                break;
+            }
+        }
+
+        if (detachedPageNumbers.Count > 0)
+        {
+            result.Subpages.RemoveAll(subpage =>
+            {
+                var canonicalUrl = ConvertToCanonicalUrl(subpage.HtmlUrl);
+                if (!canonicalUrl.StartsWith(SiteBaseUrl + "gallerySynth/", StringComparison.Ordinal))
+                    return false;
+
+                var pageNumberString = canonicalUrl.Split('=').Last();
+                return int.TryParse(pageNumberString, out var pageNumber) &&
+                       detachedPageNumbers.Contains((
+                           canonicalUrl[..canonicalUrl.LastIndexOf('=')], pageNumber));
+            });
+        }
     }
 
     /// <summary>
