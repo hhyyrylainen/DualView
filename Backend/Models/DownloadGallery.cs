@@ -12,11 +12,13 @@ namespace Backend.Models;
 ///   This is not the persisted scanner queue; use <see cref="ScannedCollection"/> for that.
 /// </summary>
 [Index(nameof(GalleryUrl), IsUnique = true)]
+[Index(nameof(CanonicalUrl), IsUnique = true)]
 public class DownloadGallery : UpdateableModel, ISoftDelete, IDTOProvider<DownloadGalleryDTO>
 {
-    public DownloadGallery(string galleryUrl)
+    public DownloadGallery(string galleryUrl, string? canonicalUrl = null)
     {
         GalleryUrl = galleryUrl;
+        CanonicalUrl = canonicalUrl ?? galleryUrl;
     }
 
     [Key]
@@ -25,6 +27,10 @@ public class DownloadGallery : UpdateableModel, ISoftDelete, IDTOProvider<Downlo
     [Required]
     [MaxLength(1024)]
     public string GalleryUrl { get; set; }
+
+    [Required]
+    [MaxLength(1024)]
+    public string CanonicalUrl { get; set; }
 
     [MaxLength(1024)]
     public string? TargetPath { get; set; }

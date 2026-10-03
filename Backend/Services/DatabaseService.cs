@@ -2500,7 +2500,12 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
     // Download Galleries
     public async Task<long> CreateDownloadGalleryAsync(string galleryUrl)
     {
-        var gallery = new DownloadGallery(galleryUrl.TrimOrThrowIfEmpty());
+        return await CreateDownloadGalleryAsync(galleryUrl, galleryUrl);
+    }
+
+    public async Task<long> CreateDownloadGalleryAsync(string galleryUrl, string canonicalUrl)
+    {
+        var gallery = new DownloadGallery(galleryUrl.TrimOrThrowIfEmpty(), canonicalUrl.TrimOrThrowIfEmpty());
         await dbContext.DownloadGalleries.AddAsync(gallery);
         await SaveAsync();
         await updateNotifier.NotifyDownloadGalleriesUpdated();
@@ -3001,15 +3006,21 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
         return await dbContext.DownloadGalleries.FirstOrDefaultAsync(g => g.GalleryUrl == url);
     }
 
+    public async Task<DownloadGallery?> GetDownloadGalleryByCanonicalUrlAsync(string canonicalUrl)
+    {
+        return await dbContext.DownloadGalleries.FirstOrDefaultAsync(gallery =>
+            gallery.CanonicalUrl == canonicalUrl);
+    }
+
     public async Task<FoundMedia?> GetFoundMediaAsync(long id)
     {
         return await dbContext.FoundMedia.FindAsync(id);
     }
 
-    public async Task<ScannedCollection?> GetScannedCollectionByUrlAsync(string url)
+    public async Task<ScannedCollection?> GetScannedCollectionByCanonicalUrlAsync(string canonicalUrl)
     {
         return await dbContext.ScannedCollections
-            .FirstOrDefaultAsync(collection => collection.GalleryUrl == url);
+            .FirstOrDefaultAsync(collection => collection.CanonicalUrl == canonicalUrl);
     }
 
     public async Task CreateScannedCollectionAsync(ScannedCollection collection)

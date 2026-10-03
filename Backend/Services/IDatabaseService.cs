@@ -151,9 +151,11 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     public Task<List<DownloadGallery>> GetDownloadGalleriesAsync();
     public Task<DownloadGallery?> GetDownloadGalleryAsync(long id);
     public Task<DownloadGallery?> GetDownloadGalleryByUrlAsync(string url);
+    public Task<DownloadGallery?> GetDownloadGalleryByCanonicalUrlAsync(string canonicalUrl);
+    public Task<long> CreateDownloadGalleryAsync(string galleryUrl, string canonicalUrl);
     public Task<FoundMedia?> GetFoundMediaAsync(long id);
     public Task SaveFoundMediaAsync(FoundMedia media);
-    public Task<ScannedCollection?> GetScannedCollectionByUrlAsync(string url);
+    public Task<ScannedCollection?> GetScannedCollectionByCanonicalUrlAsync(string canonicalUrl);
     public Task<ScannedCollection?> GetScannedCollectionAsync(long id);
     public Task<List<ScannedCollection>> GetScannedCollectionsAsync();
     public Task<int> DeleteScannedCollectionsOlderThanAsync(DateTime cutoff, CancellationToken cancellationToken);

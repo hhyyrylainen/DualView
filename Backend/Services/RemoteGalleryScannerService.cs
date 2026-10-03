@@ -63,7 +63,7 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
 
         using var scope = serviceScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
-        var existing = await database.GetScannedCollectionByUrlAsync(canonicalUrl);
+        var existing = await database.GetScannedCollectionByCanonicalUrlAsync(canonicalUrl);
         if (existing != null)
             return existing.Id;
 
@@ -72,7 +72,8 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
             : request.PageTitle;
         var gallery = new ScannedCollection(initialGalleryName)
         {
-            GalleryUrl = canonicalUrl,
+            GalleryUrl = request.HtmlUrl,
+            CanonicalUrl = canonicalUrl,
             CurrentlyScannedUrl = request.HtmlUrl,
             ScannerState = JsonSerializer.Serialize(new GalleryScanState { PendingPages = [request], }),
         };
@@ -281,11 +282,20 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         var selected = gallery.FoundMedia
             .Where(item => mediaIds?.Contains(item.Id) ?? item.Selected)
             .ToList();
+        if (selected.Count == 0)
+        {
+            await DeleteEmptyAcceptedGalleryAsync(galleryId);
+            return;
+        }
+
+        var downloadGalleryId = await GetOrCreateDownloadGalleryAsync(database, gallery);
+
         foreach (var item in selected)
         {
             var path = await remoteGalleryMediaService.GetFullMediaAsync(item.Id, cancellationToken);
             await using var stream = File.OpenRead(path);
             var media = await mediaImportHandler.ImportMedia(GetImportFileName(item), stream, uploadSection.Name);
+            await SaveMediaImportInfoAsync(database, media.Id, item, downloadGalleryId);
 
             var parsedTags = new List<AppliedTagDTO>();
             foreach (var tag in item.UnparsedTags)
@@ -309,6 +319,44 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         }
 
         await DeleteEmptyAcceptedGalleryAsync(galleryId);
+    }
+
+    private static async Task<long> GetOrCreateDownloadGalleryAsync(IDatabaseService database,
+        ScannedCollection scannedGallery)
+    {
+        var downloadGallery = await database.GetDownloadGalleryByCanonicalUrlAsync(scannedGallery.CanonicalUrl);
+        if (downloadGallery == null)
+        {
+            downloadGallery = await database.GetDownloadGalleryByUrlAsync(scannedGallery.GalleryUrl);
+            if (downloadGallery != null && downloadGallery.CanonicalUrl != scannedGallery.CanonicalUrl)
+            {
+                downloadGallery.CanonicalUrl = scannedGallery.CanonicalUrl;
+                await database.SaveAsync();
+            }
+        }
+
+        var downloadGalleryId = downloadGallery?.Id ??
+                                await database.CreateDownloadGalleryAsync(scannedGallery.GalleryUrl,
+                                    scannedGallery.CanonicalUrl);
+
+        await database.UpdateDownloadGalleryAsync(downloadGalleryId, null, scannedGallery.Name, null,
+            scannedGallery.UnrecognizedTags);
+
+        return downloadGalleryId;
+    }
+
+    private static async Task SaveMediaImportInfoAsync(IDatabaseService database, long mediaId, FoundMedia item,
+        long downloadGalleryId)
+    {
+        var importInfo = await database.GetMediaImportInfoAsync(mediaId) ?? new MediaImportInfo(mediaId);
+        if (string.IsNullOrWhiteSpace(importInfo.SourceUrl))
+            importInfo.SourceUrl = item.DownloadUrl;
+
+        importInfo.Referrer = item.Referrer;
+        importInfo.PreferredName = item.OverrideName;
+        importInfo.TagsString = string.Join(", ", item.UnparsedTags);
+        importInfo.DownloadGalleryId = downloadGalleryId;
+        await database.SaveMediaImportInfoAsync(importInfo);
     }
 
     private async Task DeleteEmptyAcceptedGalleryAsync(long galleryId)

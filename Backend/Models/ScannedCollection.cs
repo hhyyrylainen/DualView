@@ -12,6 +12,7 @@ namespace Backend.Models;
 ///   Unlike <see cref="DownloadGallery"/>, this is the working collection shown to the user.
 /// </summary>
 [Index(nameof(Name))]
+[Index(nameof(CanonicalUrl))]
 public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollectionDTO>
 {
     public ScannedCollection(string name)
@@ -24,6 +25,12 @@ public class ScannedCollection : UpdateableModel, IDTOProvider<ScannedCollection
 
     [MaxLength(4096)]
     public string GalleryUrl { get; set; } = string.Empty;
+
+    /// <summary>
+    ///   Gets or sets the canonicalized URL used to identify duplicate scanned galleries.
+    /// </summary>
+    [MaxLength(4096)]
+    public string CanonicalUrl { get; set; } = string.Empty;
 
     public bool ScanFailed { get; set; }
 
