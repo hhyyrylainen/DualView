@@ -722,18 +722,21 @@ public class MaintenanceService : IMaintenanceService
 
         public override TimeSpan Interval => TimeSpan.FromDays(1);
 
-        protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord, IDatabaseService databaseService,
+        protected override async Task<bool> RunInternal(MaintenanceJobRecord jobRecord,
+            IDatabaseService databaseService,
             IServiceScope scope, CancellationToken cancellationToken)
         {
             var dataFolder = scope.ServiceProvider.GetRequiredService<IDataFolderService>().GetDataFolderPath();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<PurgeOldRemoteMedia>>();
             var cutoff = DateTime.UtcNow - RemoteMediaTime;
             var deleted = 0;
-            foreach (var folderName in new[] { "remoteMedia", "remoteThumbnails" })
-            {
-                var folder = Path.Combine(dataFolder, folderName);
-                if (!Directory.Exists(folder))
-                    continue;
+            var remoteFolders = new[] { "remoteMedia", "remoteThumbnails", }
+                .Select(folderName => Path.Combine(dataFolder, folderName))
+                .Where(Directory.Exists)
+                .ToArray();
 
+            foreach (var folder in remoteFolders)
+            {
                 foreach (var file in Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
                 {
                     if (cancellationToken.IsCancellationRequested)
@@ -747,10 +750,39 @@ public class MaintenanceService : IMaintenanceService
                 }
             }
 
+            var deletedFolders = 0;
+            if (deleted > 0)
+            {
+                foreach (var folder in remoteFolders)
+                {
+                    var emptyFolders = Directory.EnumerateDirectories(folder, "*", SearchOption.AllDirectories)
+                        .Where(directory => !Directory.EnumerateFileSystemEntries(directory).Any())
+                        .ToArray();
+
+                    foreach (var emptyFolder in emptyFolders)
+                    {
+                        if (cancellationToken.IsCancellationRequested)
+                            break;
+
+                        try
+                        {
+                            Directory.Delete(emptyFolder);
+                            ++deletedFolders;
+                        }
+                        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+                        {
+                            logger.LogWarning(e, "Failed to delete empty remote media folder {Folder}", emptyFolder);
+                        }
+                    }
+                }
+            }
+
             var collectionsDeleted = await databaseService.DeleteScannedCollectionsOlderThanAsync(cutoff,
                 cancellationToken);
 
-            jobRecord.StatusMessage = $"Deleted {deleted} old remote files and {collectionsDeleted} inactive remote scans";
+            jobRecord.StatusMessage =
+                $"Deleted {deleted} old remote files, {deletedFolders} empty folders, and {collectionsDeleted} " +
+                $"inactive remote scans";
             return true;
         }
     }
