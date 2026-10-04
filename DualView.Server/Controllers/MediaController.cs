@@ -5,6 +5,7 @@ using DualView.Shared.Requests;
 using Backend.Models;
 using Backend.Services;
 using Backend.Utilities;
+using ImageMagick;
 using Microsoft.AspNetCore.Mvc;
 
 namespace DualView.Server.Controllers;
@@ -41,6 +42,123 @@ public class MediaController : Controller
 
         if (media == null)
             return NotFound();
+
+        return media.GetDTO();
+    }
+
+    /// <summary>
+    ///   Detects an image's actual format and updates its stored type and file extension when needed.
+    /// </summary>
+    [HttpPost("{mediaId:long}/redetectType")]
+    public async Task<ActionResult<MediaFileDTO>> RedetectType([Required] long mediaId,
+        CancellationToken cancellationToken)
+    {
+        var media = await databaseService.GetMediaByIdAsync(mediaId);
+
+        if (media == null || media.IsDeleted)
+            return NotFound();
+
+        if (!media.MediaType.IsImage())
+            return BadRequest("Only image media types can be redetected.");
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var storage = await MediaImportHandler.GetBaseMediaFolder(databaseService, dataFolderService);
+        var originalPath = Path.GetFullPath(Path.Combine(storage, media.PathRelativeToStorage()));
+        if (!System.IO.File.Exists(originalPath))
+            return NotFound("The media file is missing from storage.");
+
+        MagickFormat detectedFormat;
+        int frameCount;
+
+        try
+        {
+            await using var imageStream = System.IO.File.OpenRead(originalPath);
+            using var images = new MagickImageCollection();
+            await images.ReadAsync(imageStream, cancellationToken);
+            if (images.Count == 0)
+                return UnprocessableEntity("ImageMagick did not find any image frames.");
+
+            detectedFormat = images[0].Format;
+            frameCount = images.Count;
+        }
+        catch (MagickException exception)
+        {
+            logger.LogWarning(exception, "ImageMagick could not detect the format for media {MediaId}", mediaId);
+            return UnprocessableEntity("ImageMagick could not read this image.");
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var detectedExtension = FileProbe.GetExtensionForFormat(detectedFormat);
+        if (detectedExtension == null)
+            return UnprocessableEntity("The detected image format is not supported.");
+
+        var detectedMediaType = MediaTypeExtensions.TypeFromExtension(detectedExtension);
+        if (detectedMediaType == MediaType.Webp && frameCount > 1)
+            detectedMediaType = MediaType.WebpAnimated;
+
+        var originalFileName = media.OriginalFileName;
+        var originalMediaType = media.MediaType;
+        var correctedFileName = Path.ChangeExtension(originalFileName, detectedExtension);
+        var newMediaPath = originalPath;
+
+        if (!string.Equals(originalFileName, correctedFileName, StringComparison.Ordinal))
+        {
+            try
+            {
+                media.OriginalFileName = correctedFileName;
+                newMediaPath = Path.GetFullPath(Path.Combine(storage, media.PathRelativeToStorage()));
+            }
+            finally
+            {
+                media.OriginalFileName = originalFileName;
+            }
+        }
+
+        var pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        var shouldMoveFile = !string.Equals(originalPath, newMediaPath, pathComparison);
+
+        if (!string.Equals(originalFileName, correctedFileName, StringComparison.Ordinal) ||
+            originalMediaType != detectedMediaType)
+        {
+            if (shouldMoveFile && System.IO.File.Exists(newMediaPath))
+                return Conflict("A file with the detected extension already exists in storage.");
+
+            mediaProcessingService.NotifyMediaFileChanged(media, storage);
+
+            if (shouldMoveFile)
+                System.IO.File.Move(originalPath, newMediaPath);
+
+            media.OriginalFileName = correctedFileName;
+            media.MediaType = detectedMediaType;
+
+            try
+            {
+                await databaseService.SaveMediaFileAsync(media);
+            }
+            catch (Exception exception)
+            {
+                await databaseService.ReloadEntity(media);
+                if (media.OriginalFileName == originalFileName && media.MediaType == originalMediaType)
+                {
+                    if (shouldMoveFile && System.IO.File.Exists(newMediaPath) &&
+                        !System.IO.File.Exists(originalPath))
+                    {
+                        System.IO.File.Move(newMediaPath, originalPath);
+                    }
+
+                    throw;
+                }
+
+                logger.LogWarning(exception,
+                    "Media {MediaId} was updated, but saving its update failed", mediaId);
+            }
+
+            mediaProcessingService.NotifyMediaFileChanged(media, storage);
+        }
 
         return media.GetDTO();
     }
@@ -202,7 +320,8 @@ public class MediaController : Controller
     }
 
     [HttpPost("{mediaId:long}/appliedTag")]
-    public async Task<ActionResult<long>> AddAppliedTag([Required] long mediaId, [FromBody] AddAppliedTagRequest request)
+    public async Task<ActionResult<long>> AddAppliedTag([Required] long mediaId,
+        [FromBody] AddAppliedTagRequest request)
     {
         if (request.ParsedTag != null)
             return Ok(await databaseService.AddParsedAppliedTagToMediaAsync(mediaId, request.ParsedTag));
