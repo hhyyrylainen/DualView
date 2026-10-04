@@ -178,7 +178,7 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
                     Cookies = request.Cookies.CloneShallow(),
                     Enriched = true,
                     Tags = tags,
-                    OverrideName = GetDownloadOverrideName(document, request),
+                    OverrideName = GetDownloadOverrideName(document, request, download),
                 });
 
                 Logger.LogInformation("Found website content: {Url}, referrer: {Referrer}", download, request.HtmlUrl);
@@ -266,8 +266,10 @@ public abstract class SiteWithGalleriesBase : IRemoteDownloadPlugin, IRemoteGall
     /// </summary>
     /// <param name="document">Document of the HTML page</param>
     /// <param name="contentHtmlRequest">The URL of the page that refers to the media</param>
+    /// <param name="downloadUrl">The URL of the download</param>
     /// <returns>Override name or null</returns>
-    protected virtual string? GetDownloadOverrideName(IDocument document, RemoteDownloadRequest contentHtmlRequest)
+    protected virtual string? GetDownloadOverrideName(IDocument document, RemoteDownloadRequest contentHtmlRequest,
+        string downloadUrl)
     {
         return null;
     }
