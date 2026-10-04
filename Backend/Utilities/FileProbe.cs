@@ -239,6 +239,7 @@ public static class FileProbe
             MagickFormat.Jpeg => ".jpg",
             MagickFormat.WebP => ".webp",
             MagickFormat.Tiff => ".tiff",
+            MagickFormat.Avif => ".avif",
             _ => null,
         };
     }

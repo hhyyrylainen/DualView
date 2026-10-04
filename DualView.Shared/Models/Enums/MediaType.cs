@@ -94,7 +94,7 @@ public static class MediaTypeExtensions
         if (extension == ".bmp")
             return MediaType.Bmp;
 
-        if (extension == ".tif")
+        if (extension == ".tif" || extension == ".tiff")
             return MediaType.Tif;
 
         if (extension == ".avif")

@@ -50,6 +50,14 @@ public class HttpBackendAPI : IBackendAPI
         return content;
     }
 
+    public async Task<MediaFileDTO> RedetectMediaType(long mediaId)
+    {
+        using var response = await HttpClient.PostAsync($"api/v1/media/{mediaId}/redetectType", null);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<MediaFileDTO>() ??
+               throw new Exception("Failed to deserialize response");
+    }
+
     public async Task<OperationStatusUpdate> GetOperationStatus(long operationId)
     {
         return await HttpClient.GetFromJsonAsync<OperationStatusUpdate>($"api/v1/operation/{operationId}") ??

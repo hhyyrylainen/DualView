@@ -13,6 +13,11 @@ public interface IBackendAPI
     public Task<MediaFileDTO> ImportMedia(string fileName, Stream data, string? sectionName,
         string? sourcePath = null);
 
+    /// <summary>
+    ///   Detects and corrects the stored type and extension for an image.
+    /// </summary>
+    public Task<MediaFileDTO> RedetectMediaType(long mediaId);
+
     // Operation operations
     public Task<OperationStatusUpdate> GetOperationStatus(long operationId);
     public Task<bool> PauseOperation(long operationId);

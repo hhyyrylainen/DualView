@@ -20,7 +20,7 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
         Timeout = TimeSpan.FromSeconds(120),
     };
 
-    protected readonly IConfiguredMediaInfo MediaInfo;
+    protected IConfiguredMediaInfo MediaInfo;
 
     public IConfiguredMediaInfo Info => MediaInfo;
 
@@ -31,6 +31,16 @@ public class ServerMediaSource : BaseMediaSource, IVisualMediaSource
     }
 
     public long ServerId => MediaInfo.Id;
+
+    public void UpdateMediaInfo(MediaFileDTO media)
+    {
+        MediaInfo = new ConfiguredMediaInfo(media.OriginalFileName, MediaInfo.Id, MediaInfo.MediaFileId,
+            media.MediaType, media.Width, media.Height)
+        {
+            IsFolder = MediaInfo.IsFolder,
+            IsCollection = MediaInfo.IsCollection,
+        };
+    }
 
     /// <summary>
     ///   Called during app startup to set the base URL for the HTTP client

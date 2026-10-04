@@ -6,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using DualView.GUI.Models;
 using DualView.GUI.Services;
+using DualView.Shared.Models.Enums;
 using DualView.Shared.Services;
 using DualView.Shared.Utils;
 using Avalonia.Threading;
@@ -100,8 +101,9 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         get;
         set
         {
-            if (!SetProperty(ref field, value))
-                return;
+            SetProperty(ref field, value);
+            CanRedetectType = value && Media.MediaToShow is ServerMediaSource serverMediaSource &&
+                              serverMediaSource.Info.MediaType.IsImage();
 
             if (editMediaMenuItem != null)
                 editMediaMenuItem.IsEnabled = value;
@@ -112,6 +114,12 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
             if (exportMediaMenuItem != null)
                 exportMediaMenuItem.IsEnabled = value;
         }
+    }
+
+    public bool CanRedetectType
+    {
+        get;
+        private set => SetProperty(ref field, value);
     }
 
     public bool IsTemporary
@@ -325,6 +333,14 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         }
 
         _ = ShowImageInfoAsync();
+    }
+
+    public void RedetectType()
+    {
+        if (backendAPI == null || !CanRedetectType || currentMediaFileId == 0)
+            return;
+
+        _ = RedetectTypeAsync();
     }
 
     public void FinCollectionsThisIsIn()
@@ -621,6 +637,49 @@ public class ImageViewerWindowViewModel : ViewModelBase, IDisposable
         catch (Exception e)
         {
             windowService?.ShowErrorWindow("Failed to get media information", e);
+        }
+    }
+
+    private async Task RedetectTypeAsync()
+    {
+        if (backendAPI == null || Media.MediaToShow is not ServerMediaSource mediaSource)
+            return;
+
+        var mediaId = currentMediaFileId;
+        var displayVersion = mediaDisplayVersion;
+        var previousName = mediaSource.Info.Name;
+        var previousType = mediaSource.Info.MediaType;
+
+        try
+        {
+            var updatedMedia = await backendAPI.RedetectMediaType(mediaId);
+
+            if (displayVersion != mediaDisplayVersion || currentMediaFileId != mediaId ||
+                !ReferenceEquals(Media.MediaToShow, mediaSource))
+            {
+                return;
+            }
+
+            var wasUpdated = previousName != updatedMedia.OriginalFileName ||
+                             previousType != updatedMedia.MediaType;
+
+            if (wasUpdated)
+            {
+                mediaSource.UpdateMediaInfo(updatedMedia);
+                Refresh();
+                windowService?.ShowNoticeWindow(
+                    $"Updated the image type to {updatedMedia.MediaType} and renamed it to " +
+                    $"{updatedMedia.OriginalFileName}.", "Redetect Type");
+            }
+            else
+            {
+                windowService?.ShowNoticeWindow("The image type and extension are already correct.",
+                    "Redetect Type");
+            }
+        }
+        catch (Exception e)
+        {
+            windowService?.ShowErrorWindow("Failed to redetect image type", e);
         }
     }
 

@@ -58,6 +58,8 @@
                               IsEnabled="{Binding HasServerMedia}" />
                     <MenuItem Header="Get Info" Command="{Binding ShowImageInfo}"
                               IsEnabled="{Binding HasServerMedia}" />
+                    <MenuItem Header="Redetect Type" Command="{Binding RedetectType}"
+                              IsEnabled="{Binding CanRedetectType}" />
                 </MenuItem>
             </Menu>
 
