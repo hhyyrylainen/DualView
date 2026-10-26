@@ -84,6 +84,8 @@ public interface IDatabaseService : IDatabaseCommonService, IDisposable
     /// </summary>
     public Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, string? sectionName);
 
+    public Task<MediaFile> CreateMediaInUploadSectionAsync(MediaFile mediaItem, long sectionId);
+
     public Task<List<MediaFile>> GetEligibleMediaFilesForPurgeAsync(TimeSpan timeSinceDeletion);
     public Task<List<MediaFile>> GetEligibleTemporaryMediaFilesForPurgeAsync(TimeSpan timeSinceUpdate);
 

@@ -288,7 +288,8 @@ public sealed class RemoteDownloadService : IRemoteDownloadService
                 MediaFile media;
                 try
                 {
-                    media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, section.Name);
+                    media = await mediaImportHandler.ImportMedia(GetImportFileName(request), mediaStream, null,
+                        uploadSectionId: section.Id);
                 }
                 catch (Exception)
                 {

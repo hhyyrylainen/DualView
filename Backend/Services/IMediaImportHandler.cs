@@ -4,7 +4,8 @@ namespace Backend.Services;
 
 public interface IMediaImportHandler
 {
-    public Task<MediaFile> ImportMedia(string fileName, Stream stream, string? sectionName, string? sourcePath = null);
+    public Task<MediaFile> ImportMedia(string fileName, Stream stream, string? sectionName, string? sourcePath = null,
+        long? uploadSectionId = null);
 
     // TODO: create a direct server-used import that goes straight to a collection rather than the import window
     /*

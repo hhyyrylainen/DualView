@@ -63,10 +63,16 @@ public class MediaImportHandler : IMediaImportHandler
     }
 
     public async Task<MediaFile> ImportMedia(string fileName, Stream stream, string? sectionName,
-        string? sourcePath = null)
+        string? sourcePath = null, long? uploadSectionId = null)
     {
         if (!stream.CanSeek)
             throw new ArgumentException("Current implementation of importing must be able to seek");
+
+        // Resolve the target at once. Names are not unique and may change while downloading.
+        var section = uploadSectionId.HasValue
+            ? await databaseService.GetUploadSectionAsync(uploadSectionId.Value) ??
+              throw new ArgumentException("Upload section not found", nameof(uploadSectionId))
+            : await databaseService.GetOrCreateUploadSectionAsync(sectionName);
 
         var type = MediaTypeExtensions.TypeFromExtension(Path.GetExtension(fileName));
 
@@ -94,14 +100,13 @@ public class MediaImportHandler : IMediaImportHandler
             // If it already exists, make sure it is added to the section as desired
             try
             {
-                var section = await databaseService.GetOrCreateUploadSectionAsync(sectionName);
                 var index = await databaseService.GetNextUploadSectionIndexAsync(section.Id);
                 await databaseService.AddMediaToUploadSectionAsync(existing.Id, section.Id, index);
             }
             catch (Exception e)
             {
-                logger.LogError(e, "Failed to add media to upload section (it was already imported): {SectionName}",
-                    sectionName);
+                logger.LogError(e, "Failed to add existing media {MediaId} to upload section {SectionId}",
+                    existing.Id, section.Id);
                 throw;
             }
 
@@ -116,7 +121,7 @@ public class MediaImportHandler : IMediaImportHandler
             var videoMedia = await CreateVideoMedia(stream, fileName, hash, type);
             videoMedia.IsTemporary = true;
 
-            var result = await SaveFinalMedia(stream, sectionName, storage, videoMedia);
+            var result = await SaveFinalMediaToUploadSection(stream, section.Id, storage, videoMedia);
 
             await HandleSourcePath(result, sourcePath);
 
@@ -161,7 +166,7 @@ public class MediaImportHandler : IMediaImportHandler
             IsTemporary = true,
         };
 
-        var finalResult = await SaveFinalMedia(stream, sectionName, storage, mediaItem);
+        var finalResult = await SaveFinalMediaToUploadSection(stream, section.Id, storage, mediaItem);
 
         await HandleSourcePath(finalResult, sourcePath);
 
@@ -374,7 +379,7 @@ public class MediaImportHandler : IMediaImportHandler
         await databaseService.SaveMediaImportInfoAsync(importInfo);
     }
 
-    private async Task<MediaFile> SaveFinalMedia(Stream stream, string? sectionName, string storage,
+    private async Task<MediaFile> SaveFinalMediaToUploadSection(Stream stream, long sectionId, string storage,
         MediaFile mediaItem)
     {
         var finalPath = Path.Join(storage, mediaItem.PathRelativeToStorage());
@@ -390,7 +395,7 @@ public class MediaImportHandler : IMediaImportHandler
         await stream.CopyToAsync(writer);
 
         // Finally, can save the item (and this adds it to the upload section)
-        var newMedia = await databaseService.CreateMediaAsync(mediaItem, sectionName);
+        var newMedia = await databaseService.CreateMediaInUploadSectionAsync(mediaItem, sectionId);
 
         logger.LogInformation("Media imported successfully, id: {Id}", newMedia.Id);
         return newMedia;

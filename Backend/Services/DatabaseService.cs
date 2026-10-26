@@ -2028,10 +2028,17 @@ public class DatabaseService : IDatabaseService, IClientDatabaseService
 
     public async Task<MediaFile> CreateMediaAsync(MediaFile mediaItem, string? sectionName)
     {
+        var section = await GetOrCreateUploadSectionAsync(sectionName);
+        return await CreateMediaInUploadSectionAsync(mediaItem, section.Id);
+    }
+
+    public async Task<MediaFile> CreateMediaInUploadSectionAsync(MediaFile mediaItem, long sectionId)
+    {
+        var section = await dbContext.UploadSections.FindAsync(sectionId) ??
+                      throw new ArgumentException("Upload section not found", nameof(sectionId));
+
         await dbContext.MediaFiles.AddAsync(mediaItem);
         await SaveAsync();
-
-        var section = await GetOrCreateUploadSectionAsync(sectionName);
 
         // We are adding a new item so mark the last usage as updated (the following methods will call DB save)
         section.UpdatedAt = DateTime.UtcNow;
