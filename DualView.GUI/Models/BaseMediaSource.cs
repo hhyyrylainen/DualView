@@ -535,13 +535,13 @@ public abstract class BaseMediaSource(IServiceProvider serviceProvider) : IDispo
         {
             AdjustOutputResolution(ref width, ref height);
 
-            // Current frame should be disposed already if it existed, so we just assign here
+            // Current frame should be disposed of already if it existed, so we just assign here
 
             if (!UseAlphaForVideos)
             {
                 // Assume that videos do not have alpha in them
                 CurrentFrame = new MagickImage(MagickColors.Black, (uint)width, (uint)height);
-                CurrentFrame.Alpha(AlphaOption.Off);
+                CurrentFrame.Alpha(AlphaAction.Off);
             }
             else
             {
@@ -578,12 +578,12 @@ public abstract class BaseMediaSource(IServiceProvider serviceProvider) : IDispo
         currentAnimationFrame = 0;
         var firstFrame = loadedAnimation[0];
 
-        // Copy it to the temporary buffer to have the first frame again ready
+        // Copy it to the temporary buffer to have the first frame again ready.
         // Apparently copy pixels operation doesn't copy all of the pixels...
         CurrentFrame.Composite(firstFrame, CompositeOperator.Copy);
 
         // Ensure transparency is respected.
-        CurrentFrame.Alpha(AlphaOption.On);
+        CurrentFrame.Alpha(AlphaAction.On);
 
         SetNextGifFrameDelay(firstFrame);
 
