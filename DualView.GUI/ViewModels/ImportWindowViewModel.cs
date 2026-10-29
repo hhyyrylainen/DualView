@@ -24,6 +24,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     private readonly ISignalRService? signalRService;
     private readonly IBackendAPI? backendAPI;
 
+    private readonly SemaphoreSlim missingTagsReloadSemaphore = new(1, 1);
     private readonly Lock remoteScanEventLock = new();
     private readonly List<RemoteScanEventDTO> remoteScanEventsReceivedDuringLoad = new();
     private bool loadingRemoteScanEvents;
@@ -65,6 +66,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         signalRService.OnUploadSectionsUpdated += OnUploadSectionsUpdated;
         signalRService.OnUploadSectionActiveChanged += OnUploadSectionActiveChanged;
         signalRService.OnMissingTagsUpdated += OnMissingTagsUpdated;
+        signalRService.OnConnectionStatusChanged += OnConnectionStatusChanged;
         signalRService.OnRemoteScanEventRecorded += OnRemoteScanEventRecorded;
         signalRService.OnScannedCollectionUpdated += OnScannedCollectionUpdated;
 
@@ -179,14 +181,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     public void SelectMissingTagsTab()
     {
         SelectTab(3);
-    }
-
-    private async Task IgnoreMissingTagAsync(string tag)
-    {
-        if (databaseService == null)
-            return;
-        await databaseService.AddIgnoredTagAsync(tag);
-        await ReloadMissingTagsAsync();
+        _ = ReloadMissingTagsAsync();
     }
 
     public async Task ResetIgnoredTagsAsync()
@@ -204,13 +199,6 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
 
         await backendAPI.ClearCurrentMissingTagDetections();
         await ReloadMissingTagsAsync();
-    }
-
-    private void CreateMissingTag(string tag)
-    {
-        var manager = windowService?.ShowSingletonWindow<TagManagerWindowViewModel>();
-        if (manager != null)
-            manager.BeginNewTag(tag);
     }
 
     public async Task ActivateOrCreateAsync(string name)
@@ -253,16 +241,13 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         {
             var sectionsTask = databaseService.GetUploadSectionsAsync();
             var recentSectionsTask = databaseService.GetRecentImportSectionsAsync();
-            var missingTagsTask = databaseService.GetMissingTagsAsync();
+            var missingTagsTask = ReloadMissingTagsAsync();
             await Task.WhenAll(sectionsTask, recentSectionsTask, missingTagsTask);
             var sections = await sectionsTask;
             var recentSections = await recentSectionsTask;
-            var missingTags = await missingTagsTask;
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 loadedRecentSections = recentSections;
-                loadedMissingTags = missingTags;
-                UpdateMissingTags();
                 var existingSections = Sections.ToDictionary(section => section.Id);
                 var refreshedSections = sections.Select(section =>
                     existingSections.TryGetValue(section.Id, out var existingSection)
@@ -371,6 +356,7 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         signalRService?.OnUploadSectionsUpdated -= OnUploadSectionsUpdated;
         signalRService?.OnUploadSectionActiveChanged -= OnUploadSectionActiveChanged;
         signalRService?.OnMissingTagsUpdated -= OnMissingTagsUpdated;
+        signalRService?.OnConnectionStatusChanged -= OnConnectionStatusChanged;
         signalRService?.OnRemoteScanEventRecorded -= OnRemoteScanEventRecorded;
         signalRService?.OnScannedCollectionUpdated -= OnScannedCollectionUpdated;
         foreach (var section in Sections)
@@ -378,6 +364,21 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
         foreach (var collection in ScannedCollections)
             collection.Dispose();
         Hamburger.Dispose();
+    }
+
+    private async Task IgnoreMissingTagAsync(string tag)
+    {
+        if (databaseService == null)
+            return;
+        await databaseService.AddIgnoredTagAsync(tag);
+        await ReloadMissingTagsAsync();
+    }
+
+    private void CreateMissingTag(string tag)
+    {
+        var manager = windowService?.ShowSingletonWindow<TagManagerWindowViewModel>();
+        if (manager != null)
+            manager.BeginNewTag(tag);
     }
 
     private async Task SetTargetNewSectionAsync()
@@ -410,6 +411,12 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     {
         if (activeSectionId.HasValue)
             Dispatcher.UIThread.Post(() => TargetNewSection = false);
+    }
+
+    private void OnConnectionStatusChanged(bool connected)
+    {
+        if (connected)
+            _ = ReloadMissingTagsAsync();
     }
 
     private void OnMissingTagsUpdated()
@@ -520,13 +527,27 @@ public class ImportWindowViewModel : ViewModelBase, IDisposable
     {
         if (databaseService == null)
             return;
-        var missingTags = await databaseService.GetMissingTagsAsync();
 
-        await Dispatcher.UIThread.InvokeAsync(() =>
+        // Include the UI update in the serialized operation so an older response cannot
+        // overwrite tags fetched after a scan notification.
+        await missingTagsReloadSemaphore.WaitAsync();
+        try
         {
-            loadedMissingTags = missingTags;
-            UpdateMissingTags();
-        });
+            var missingTags = await databaseService.GetMissingTagsAsync();
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                loadedMissingTags = missingTags;
+                UpdateMissingTags();
+            });
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "Failed to load missing tags");
+        }
+        finally
+        {
+            missingTagsReloadSemaphore.Release();
+        }
     }
 
     private void UpdateMissingTags()
