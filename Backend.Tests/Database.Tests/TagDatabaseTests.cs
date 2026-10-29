@@ -261,6 +261,29 @@ public class TagDatabaseTests
     }
 
     [Fact]
+    public async Task UploadSection_MultipleAliasesApplyTagOnlyOnce()
+    {
+        await using var context = SqliteTestHelpers.CreateContext(seed: true);
+        var service = SqliteTestHelpers.CreateService(context);
+        var tagId = await service.CreateTagAsync("real tag", TagCategory.DescribeCharacterObject);
+        await service.CreateTagAliasAsync(tagId, "first alias");
+        await service.CreateTagAliasAsync(tagId, "second alias");
+        var section = await service.GetOrCreateUploadSectionAsync("Alias section");
+        var parser = new TagParser(service);
+
+        foreach (var name in new[] { "real tag", "first alias", "second alias", })
+        {
+            var parsed = await parser.ParseTag(name);
+            Assert.NotNull(parsed);
+            await service.AddParsedAppliedTagToUploadSectionAsync(section.Id, parsed.GetDTO());
+        }
+
+        context.ChangeTracker.Clear();
+        Assert.Single(await service.GetUploadSectionAppliedTagsAsync(section.Id));
+        Assert.Equal(1, await context.AppliedTags.CountAsync());
+    }
+
+    [Fact]
     public async Task UploadSection_DoesNotAddEquivalentAppliedTagTwice()
     {
         await using var context = SqliteTestHelpers.CreateContext(seed: true);

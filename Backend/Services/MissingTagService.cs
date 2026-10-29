@@ -11,6 +11,7 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
     private readonly IAppEvents appEvents;
     private readonly ILogger<MissingTagService> logger;
     private readonly Lock lockObject = new();
+    private readonly SemaphoreSlim applicationSemaphore = new(1, 1);
     private readonly List<MissingTagDTO> missingTags = new();
 
     public MissingTagService(IServiceScopeFactory scopeFactory, IAppEvents appEvents,
@@ -112,6 +113,9 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
     {
         _ = Task.Run(async () =>
         {
+            // Alias updates can arrive while an earlier update is still applying the same pending entries.
+            // Serialize the entire operation so each job sees the entries removed by the previous one.
+            await applicationSemaphore.WaitAsync();
             try
             {
                 await operation();
@@ -119,6 +123,10 @@ public sealed class MissingTagService : IMissingTagService, IDisposable
             catch (Exception ex)
             {
                 logger.LogError(ex, "Failed to apply tag {TagId} to missing tag entries", tagId);
+            }
+            finally
+            {
+                applicationSemaphore.Release();
             }
         });
     }
