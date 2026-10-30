@@ -109,9 +109,9 @@ public class HttpBackendAPI : IBackendAPI
         response.EnsureSuccessStatusCode();
     }
 
-    public async Task ResumeScannedCollectionAsync(long id)
+    public async Task ResumeScannedCollectionAsync(long id, bool skipCurrent = false)
     {
-        using var response = await HttpClient.PostAsync($"api/v1/scannedCollection/{id}/resume", null);
+        using var response = await HttpClient.PostAsync($"api/v1/scannedCollection/{id}/resume?skipCurrent={skipCurrent}", null);
         response.EnsureSuccessStatusCode();
     }
 

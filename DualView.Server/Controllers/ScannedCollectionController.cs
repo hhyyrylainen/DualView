@@ -90,9 +90,9 @@ public sealed class ScannedCollectionController : Controller
     }
 
     [HttpPost("{id:long}/resume")]
-    public async Task<IActionResult> Resume(long id)
+    public async Task<IActionResult> Resume(long id, [FromQuery] bool skipCurrent = false)
     {
-        await scannerService.ResumeGalleryAsync(id, HttpContext.RequestAborted);
+        await scannerService.ResumeGalleryAsync(id, HttpContext.RequestAborted, skipCurrent);
         return Ok();
     }
 

@@ -27,7 +27,7 @@ public interface IBackendAPI
     public Task<IReadOnlyList<RemoteScanEventDTO>> GetRemoteScanEvents();
     public Task ClearRemoteScanEvents();
     public Task PauseScannedCollectionAsync(long id);
-    public Task ResumeScannedCollectionAsync(long id);
+    public Task ResumeScannedCollectionAsync(long id, bool skipCurrent = false);
     public Task DeleteScannedCollectionAsync(long id);
     public Task AcceptScannedCollectionAsync(long id, string name, List<long> mediaIds);
     public Task<long> StartCollectionVisualSimilaritySort(long collectionId);

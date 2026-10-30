@@ -222,6 +222,12 @@ public sealed class ScannedCollectionViewModel : ViewModelBase, IDisposable, ICo
             await backendAPI.ResumeScannedCollectionAsync(id);
     }
 
+    public async Task ResumeSkippingCurrentAsync()
+    {
+        if (backendAPI != null)
+            await backendAPI.ResumeScannedCollectionAsync(id, skipCurrent: true);
+    }
+
     public async Task DeleteAsync()
     {
         if (backendAPI == null)

@@ -6,7 +6,7 @@
              x:DataType="vm:ScannedCollectionViewModel">
     <Border BorderBrush="Gray" BorderThickness="1" Margin="4" Padding="4">
         <Grid RowDefinitions="Auto,Auto,*,Auto">
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" Height="34">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto" Height="34">
                 <AutoCompleteBox x:Name="TargetNameInput" Grid.Column="0" Text="{Binding TargetName}"
                                  ItemsSource="{Binding TargetNameSuggestions}"
                                  MinimumPrefixLength="3"
@@ -17,9 +17,11 @@
                         IsVisible="{Binding CanPause}" />
                 <Button Grid.Column="2" Margin="4,0" Content="Resume" Command="{Binding ResumeAsync}"
                         IsVisible="{Binding CanResume}" />
-                <Button Grid.Column="3" Margin="4,0" Content="Accept" Click="OnAcceptClick"
+                <Button Grid.Column="3" Margin="4,0" Content="Resume (skip current)"
+                        Command="{Binding ResumeSkippingCurrentAsync}" IsVisible="{Binding CanResume}" />
+                <Button Grid.Column="4" Margin="4,0" Content="Accept" Click="OnAcceptClick"
                         Background="#2878D0" />
-                <Button Grid.Column="4" Margin="4,0" Content="Delete" Command="{Binding DeleteAsync}"
+                <Button Grid.Column="5" Margin="4,0" Content="Delete" Command="{Binding DeleteAsync}"
                         Background="#C62828" />
             </Grid>
             <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*">

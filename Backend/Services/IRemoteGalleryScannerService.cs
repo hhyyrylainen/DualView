@@ -19,7 +19,10 @@ public interface IRemoteGalleryScannerService
 
     public Task PauseGalleryAsync(long galleryId, CancellationToken cancellationToken);
 
-    public Task ResumeGalleryAsync(long galleryId, CancellationToken cancellationToken);
+    /// <summary>
+    ///   Resumes scanning, optionally removing the first pending page before continuing.
+    /// </summary>
+    public Task ResumeGalleryAsync(long galleryId, CancellationToken cancellationToken, bool skipCurrent = false);
 
     /// <summary>
     ///   Deletes a gallery and prevents queued or in-flight results from being saved to it.

@@ -106,9 +106,9 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         await SetPauseStateAsync(galleryId, true);
     }
 
-    public async Task ResumeGalleryAsync(long galleryId, CancellationToken cancellationToken)
+    public async Task ResumeGalleryAsync(long galleryId, CancellationToken cancellationToken, bool skipCurrent = false)
     {
-        await SetPauseStateAsync(galleryId, false);
+        await SetPauseStateAsync(galleryId, false, skipCurrent);
     }
 
     public async Task DeleteGalleryAsync(long galleryId, CancellationToken cancellationToken)
@@ -620,12 +620,25 @@ public sealed class RemoteGalleryScannerService : IRemoteGalleryScannerService, 
         logger.LogWarning("Gallery {GalleryId} scan stopped: {Error}", galleryId, error);
     }
 
-    private async Task SetPauseStateAsync(long galleryId, bool paused)
+    private async Task SetPauseStateAsync(long galleryId, bool paused, bool skipCurrent = false)
     {
         using var scope = serviceScopeFactory.CreateScope();
         var database = scope.ServiceProvider.GetRequiredService<IDatabaseService>();
         var gallery = await database.GetScannedCollectionAsync(galleryId) ??
                       throw new ArgumentException("Gallery not found", nameof(galleryId));
+
+        if (skipCurrent)
+        {
+            if (!gallery.ScanPaused && !gallery.ScanFailed)
+                return;
+
+            var state = DeserializeState(gallery.ScannerState);
+            if (state.PendingPages.Count > 0)
+                state.PendingPages.RemoveAt(0);
+
+            gallery.ScannerState = JsonSerializer.Serialize(state);
+            gallery.CurrentlyScannedUrl = state.PendingPages.FirstOrDefault()?.HtmlUrl;
+        }
 
         gallery.ScanPaused = paused;
         if (!paused)
