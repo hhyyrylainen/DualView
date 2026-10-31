@@ -1,6 +1,8 @@
 using System;
 using System.Threading.Tasks;
 using DualView.Shared.Services;
+using DualView.GUI.ViewModels;
+using Avalonia.Threading;
 using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +16,8 @@ public class GUISignalRService : SignalRServiceBase, IDisposable
 
     private bool disposedValue;
 
-    public GUISignalRService(ILogger<GUISignalRService> logger, IGuiConfigurationService guiConfigurationService) :
+    public GUISignalRService(ILogger<GUISignalRService> logger, IGuiConfigurationService guiConfigurationService,
+        IWindowService windowService) :
         base(logger)
     {
         hubConnection = new HubConnectionBuilder()
@@ -26,6 +29,21 @@ public class GUISignalRService : SignalRServiceBase, IDisposable
 
         // Register listeners specified in the interface
         RegisterBaseListeners(hubConnection);
+
+        hubConnection.On<Guid>(nameof(IDataHub.ShowImporter), async requestId =>
+        {
+            try
+            {
+                var shown = await Dispatcher.UIThread.InvokeAsync(() =>
+                    windowService.ShowSingletonWindow<ImportWindowViewModel>() != null);
+                if (shown)
+                    await hubConnection.InvokeAsync("ImporterShown", requestId);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e, "Failed to show or acknowledge importer activation");
+            }
+        });
 
         // Life cycle events
 

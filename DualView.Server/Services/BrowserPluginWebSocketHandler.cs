@@ -29,6 +29,7 @@ public sealed class BrowserPluginWebSocketHandler
     private readonly IRemoteScanService remoteScanService;
     private readonly IRemoteGalleryScannerService remoteGalleryScannerService;
     private readonly IAppEvents appEvents;
+    private readonly IClientViewActivationService viewActivation;
     private readonly ConcurrentDictionary<string, byte> activeBrowserPageScans = new();
     private readonly SemaphoreSlim sendLock = new(1, 1);
     private readonly Lock orderedProcessingLock = new();
@@ -47,7 +48,8 @@ public sealed class BrowserPluginWebSocketHandler
     public BrowserPluginWebSocketHandler(IServiceScopeFactory serviceScopeFactory,
         ILogger<BrowserPluginWebSocketHandler> logger, IHostApplicationLifetime applicationLifetime,
         IRemoteDownloadService remoteDownloadService, IRemoteScanService remoteScanService,
-        IRemoteGalleryScannerService remoteGalleryScannerService, IAppEvents appEvents)
+        IRemoteGalleryScannerService remoteGalleryScannerService, IAppEvents appEvents,
+        IClientViewActivationService viewActivation)
     {
         this.serviceScopeFactory = serviceScopeFactory;
         this.logger = logger;
@@ -56,6 +58,7 @@ public sealed class BrowserPluginWebSocketHandler
         this.remoteScanService = remoteScanService;
         this.remoteGalleryScannerService = remoteGalleryScannerService;
         this.appEvents = appEvents;
+        this.viewActivation = viewActivation;
     }
 
     // TODO: should we have some key already in the query parameters?
@@ -229,6 +232,7 @@ public sealed class BrowserPluginWebSocketHandler
                         break;
                     }
 
+                    viewActivation.ShowImporter();
                     await SendMessageAsync(socket, new BrowserPluginMessage
                     {
                         Type = "downloadQueued",
@@ -314,6 +318,7 @@ public sealed class BrowserPluginWebSocketHandler
 
         if (result == UrlInformation.ContentLink)
         {
+            viewActivation.ShowImporter();
             await SendAcceptedAsync(socket, message.RequestId, cancellation);
             QueueOrderedProcessing(() => ProcessSupportedRequestAsync(socket, pageRequest, message.RequestId,
                 result, cancellation));
@@ -325,6 +330,7 @@ public sealed class BrowserPluginWebSocketHandler
         // Galleries are durable background work, including gallery pages that also happen to contain content.
         if ((result & (UrlInformation.Gallery | UrlInformation.GalleryPage)) != 0)
         {
+            viewActivation.ShowImporter();
             await SendAcceptedAsync(socket, message.RequestId, cancellation);
             QueueOrderedProcessing(() => ProcessSupportedRequestAsync(socket, pageRequest, message.RequestId,
                 result, cancellation));
@@ -334,6 +340,7 @@ public sealed class BrowserPluginWebSocketHandler
         // If it is a single content, scan it and put the media into an import section immediately.
         if ((result & UrlInformation.ContentPage) == UrlInformation.ContentPage)
         {
+            viewActivation.ShowImporter();
             await SendAcceptedAsync(socket, message.RequestId, cancellation);
             QueueOrderedProcessing(() => ProcessSupportedRequestAsync(socket, pageRequest, message.RequestId,
                 result, cancellation));

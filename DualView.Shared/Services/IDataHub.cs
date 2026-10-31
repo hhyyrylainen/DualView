@@ -5,6 +5,8 @@ namespace DualView.Shared.Services;
 
 public interface IDataHub
 {
+    public Task ShowImporter(Guid requestId);
+
     public Task AppSettingsUpdated();
 
     public Task MediaFoldersUpdated();

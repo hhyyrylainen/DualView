@@ -8,6 +8,8 @@ public class ServerConfigurationService : IServerConfigurationService
 
     private readonly ILogger logger;
 
+    public string? GUILauncher { get; }
+
     public string? ListenUrl { get; }
     public string? DatabaseFilePath { get; }
     public string? LegacyDatabaseFilePath { get; }
@@ -25,7 +27,8 @@ public class ServerConfigurationService : IServerConfigurationService
         {
             try
             {
-                var yaml = new YamlDotNet.Serialization.DeserializerBuilder().WithCaseInsensitivePropertyMatching().Build();
+                var yaml = new YamlDotNet.Serialization.DeserializerBuilder().WithCaseInsensitivePropertyMatching()
+                    .Build();
                 tempConfig = yaml.Deserialize<ConfigFileFormat>(File.ReadAllText(expectedConfigFile));
 
                 logger.LogInformation("Loaded server config from {Path}", expectedConfigFile);
@@ -44,6 +47,17 @@ public class ServerConfigurationService : IServerConfigurationService
             tempConfig = new ConfigFileFormat();
         }
 
+        GUILauncher = string.IsNullOrWhiteSpace(tempConfig.GUILauncher) ? null : tempConfig.GUILauncher;
+
+        if (GUILauncher != null)
+        {
+            if (!File.Exists(GUILauncher))
+            {
+                throw new FileNotFoundException(
+                    $"GUI launcher file not found at {GUILauncher}, set to empty if not wanted");
+            }
+        }
+
         if (!string.IsNullOrEmpty(tempConfig.ListenUrl))
             ListenUrl = tempConfig.ListenUrl;
 
@@ -59,6 +73,8 @@ public class ServerConfigurationService : IServerConfigurationService
 
     private class ConfigFileFormat
     {
+        public string? GUILauncher { get; set; }
+
         public string? ListenUrl { get; set; }
 
         public string? DatabaseFile { get; set; }

@@ -124,6 +124,12 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<ILegacyDatabaseImporter, LegacyDatabaseImporter>();
 
 builder.Services.AddSignalR();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddSingleton<IGUILauncher, GUILauncher>();
+builder.Services.AddSingleton<ClientViewActivationService>();
+builder.Services.AddSingleton<IClientViewActivationService>(sp =>
+    sp.GetRequiredService<ClientViewActivationService>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<ClientViewActivationService>());
 
 // Register data folder service
 builder.Services.AddSingleton<IDataFolderService>(dataFolderService);

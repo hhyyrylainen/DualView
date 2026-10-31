@@ -36,6 +36,9 @@ public sealed class WindowService : IWindowService
 
         if (singletons.TryGetValue(vmType, out var existing) && existing is { IsVisible: true })
         {
+            if (existing.WindowState == WindowState.Minimized)
+                existing.WindowState = WindowState.Normal;
+
             existing.Activate();
             existing.Focus();
             return (TViewModel?)existing.DataContext;
@@ -79,6 +82,9 @@ public sealed class WindowService : IWindowService
 
         if (singletons.TryGetValue(vmType, out var existing) && existing is { IsVisible: true })
         {
+            if (existing.WindowState == WindowState.Minimized)
+                existing.WindowState = WindowState.Normal;
+
             existing.Activate();
             existing.Focus();
             return;

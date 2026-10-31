@@ -40,3 +40,19 @@ The enabled service starts with your systemd user session. To run it at boot
 without logging in, enable lingering separately with `loginctl enable-linger "$USER"`
 (your system may require administrator authorization). View server output with
 `journalctl --user -u dualview-server.service`.
+
+## Automatically show browser imports
+
+Accepted browser plugin image, page, and link requests ask connected desktop clients
+to open or activate the importer. To also start the GUI when no client responds,
+add an executable path to `server-config.yaml` in the server's data directory:
+
+```yaml
+GUILauncher: /home/your-user/bin/DualView.GUI
+```
+
+The value is an executable path (or an executable wrapper script), without command
+line arguments. The server must run in an environment that can access your desktop
+session. On Linux, the GUI starts in a separate group when `/usr/bin/setsid` is
+available. Leaving the setting unset disables launching; existing clients still
+receive activation requests.
