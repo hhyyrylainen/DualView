@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DualView Web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Send pages, images, and links to DualView.",
   "permissions": [
     "alarms",
@@ -47,7 +47,11 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "dualview-web@boostslair.com"
+      "id": "dualview-web@boostslair.com",
+      "data_collection_permissions": {
+        "required": ["browsingActivity", "websiteContent"],
+        "optional": []
+      }
     }
   }
 }
