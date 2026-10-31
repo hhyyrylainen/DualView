@@ -280,7 +280,7 @@ if (ResourceLimits.Memory >= reasonableMemoryLimit)
         await importer.ImportAsync(serverConfig.LegacyDatabaseFilePath,
             serverConfig.LegacyCollectionRootPath ??
             Path.GetDirectoryName(Path.GetFullPath(serverConfig.LegacyDatabaseFilePath!))!);
-        logger.LogInformation("Legacy import succeeded! Normal app startup will now happen.");
+        logger.LogInformation("Legacy import succeeded! Normal app startup will now happen");
     }
 }
 
