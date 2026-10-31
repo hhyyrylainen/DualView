@@ -3,7 +3,7 @@ Description=DualView server
 
 [Service]
 Type=simple
-WorkingDirectory="%h/bin/DualViewServer"
+WorkingDirectory=%h/bin/DualViewServer
 ExecStart="%h/bin/DualViewServer/DualView.Server"
 Environment=ASPNETCORE_ENVIRONMENT=Production
 Restart=on-failure
